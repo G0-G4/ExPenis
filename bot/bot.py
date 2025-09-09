@@ -17,20 +17,46 @@ ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT = range(4)
 INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other Income']
 EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills', 'Rent', 'Other Expense']
 
+# UI constants
+CATEGORIES_PER_ROW = 3
+WELCOME_MESSAGE = "Welcome to Expense Tracker Bot! Click the button below to enter a transaction."
+TRANSACTION_TYPE_MESSAGE = "Select transaction type:"
+INCOME_CATEGORY_MESSAGE = "Select income category:"
+EXPENSE_CATEGORY_MESSAGE = "Select expense category:"
+AMOUNT_PROMPT_MESSAGE = "Please enter the amount:"
+INVALID_AMOUNT_MESSAGE = "Please enter a valid number for the amount."
+THANK_YOU_MESSAGE = "Thank you!"
+MAIN_MENU_MESSAGE = "What would you like to do next?"
+
 # Temporary storage for transactions (in a real app, this would be a database)
 user_data = {}
 
 
+def create_category_keyboard(categories, prefix):
+    """Create a keyboard with categories arranged in columns"""
+    keyboard = []
+    row = []
+    for i, category in enumerate(categories):
+        row.append(InlineKeyboardButton(category, callback_data=f'{prefix}_{i}'))
+        if len(row) == CATEGORIES_PER_ROW or i == len(categories) - 1:
+            keyboard.append(row)
+            row = []
+    return keyboard
+
+
+def get_main_menu_keyboard():
+    """Create the main menu keyboard"""
+    return [[InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')]]
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send welcome message and show main menu"""
-    keyboard = [
-        [InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')],
-    ]
+    keyboard = get_main_menu_keyboard()
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if update.message:
         await update.message.reply_text(
-            "Welcome to Expense Tracker Bot! Click the button below to enter a transaction.",
+            WELCOME_MESSAGE,
             reply_markup=reply_markup
         )
 
@@ -56,23 +82,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            text="Select transaction type:",
+            text=TRANSACTION_TYPE_MESSAGE,
             reply_markup=reply_markup
         )
     
     elif query.data == 'type_income':
-        # Show income categories in 3 columns
-        keyboard = []
-        row = []
-        for i, category in enumerate(INCOME_CATEGORIES):
-            row.append(InlineKeyboardButton(category, callback_data=f'income_{i}'))
-            if len(row) == 3 or i == len(INCOME_CATEGORIES) - 1:
-                keyboard.append(row)
-                row = []
-        
+        # Show income categories
+        keyboard = create_category_keyboard(INCOME_CATEGORIES, 'income')
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            text="Select income category:",
+            text=INCOME_CATEGORY_MESSAGE,
             reply_markup=reply_markup
         )
         
@@ -82,18 +101,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]['type'] = 'income'
     
     elif query.data == 'type_expense':
-        # Show expense categories in 3 columns
-        keyboard = []
-        row = []
-        for i, category in enumerate(EXPENSE_CATEGORIES):
-            row.append(InlineKeyboardButton(category, callback_data=f'expense_{i}'))
-            if len(row) == 3 or i == len(EXPENSE_CATEGORIES) - 1:
-                keyboard.append(row)
-                row = []
-        
+        # Show expense categories
+        keyboard = create_category_keyboard(EXPENSE_CATEGORIES, 'expense')
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            text="Select expense category:",
+            text=EXPENSE_CATEGORY_MESSAGE,
             reply_markup=reply_markup
         )
         
@@ -117,7 +129,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_data[user_id]['category'] = category
             
             await query.edit_message_text(
-                text=f"Selected category: {category}\n\nPlease enter the amount:"
+                text=f"Selected category: {category}\n\n{AMOUNT_PROMPT_MESSAGE}"
             )
             
             # Set state to expect amount input
@@ -136,7 +148,7 @@ async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             amount_text = update.message.text
             if not amount_text:
-                await update.message.reply_text("Please enter a valid number for the amount.")
+                await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
                 return
                 
             amount = float(amount_text)
@@ -154,34 +166,30 @@ async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # In a real app, you would save this to a database
             # For now, we'll just display it
             await update.message.reply_text(
-                f"Transaction recorded:\n{transaction_text}\n\nThank you!"
+                f"Transaction recorded:\n{transaction_text}\n\n{THANK_YOU_MESSAGE}"
             )
             
             # Clear user data for this transaction
             user_data[user_id] = {}
             
             # Show main menu again
-            keyboard = [
-                [InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')],
-            ]
+            keyboard = get_main_menu_keyboard()
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await update.message.reply_text(
-                "What would you like to do next?",
+                MAIN_MENU_MESSAGE,
                 reply_markup=reply_markup
             )
             
         except ValueError:
-            await update.message.reply_text("Please enter a valid number for the amount.")
+            await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
     else:
         # If not in amount input state, show main menu
-        keyboard = [
-            [InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')],
-        ]
+        keyboard = get_main_menu_keyboard()
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            "Welcome to Expense Tracker Bot! Click the button below to enter a transaction.",
+            WELCOME_MESSAGE,
             reply_markup=reply_markup
         )
 
