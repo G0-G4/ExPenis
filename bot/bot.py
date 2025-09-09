@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 from core.config import TOKEN
+from core.service.transaction_service import TransactionService
 import logging
 
 # Enable logging
@@ -9,6 +10,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 # Define conversation states
 ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT = range(4)
@@ -27,9 +29,14 @@ AMOUNT_PROMPT_MESSAGE = "Please enter the amount:"
 INVALID_AMOUNT_MESSAGE = "Please enter a valid number for the amount."
 THANK_YOU_MESSAGE = "Thank you!"
 MAIN_MENU_MESSAGE = "What would you like to do next?"
+VIEW_TRANSACTIONS_MESSAGE = "Here are your recent transactions:"
 
 # Temporary storage for transactions (in a real app, this would be a database)
 user_data = {}
+
+# Database session
+db_session = None
+transaction_service = None
 
 
 def create_category_keyboard(categories, prefix):
@@ -59,6 +66,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             WELCOME_MESSAGE,
             reply_markup=reply_markup
         )
+
+async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send welcome message and show main menu"""
+    res = await transaction_service.get_category_summary(update.message.from_user.id)
+    await update.message.reply_text(str(res))
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -163,11 +175,23 @@ async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 transaction_text = f"❌ Expense: -{amount} ({category})"
             
-            # In a real app, you would save this to a database
-            # For now, we'll just display it
-            await update.message.reply_text(
-                f"Transaction recorded:\n{transaction_text}\n\n{THANK_YOU_MESSAGE}"
-            )
+            # Save transaction to database using transaction service
+            try:
+                transaction = await transaction_service.create_transaction(
+                    user_id=user_id,
+                    amount=amount,
+                    category=category,
+                    transaction_type=transaction_type,
+                )
+                
+                await update.message.reply_text(
+                    f"Transaction recorded:\n{transaction_text}\n\nTransaction ID: {transaction.id}\n\n{THANK_YOU_MESSAGE}"
+                )
+            except Exception as e:
+                logger.error(f"Error saving transaction: {e}")
+                await update.message.reply_text(
+                    f"Transaction recorded:\n{transaction_text}\n\nNote: Failed to save to database.\n\n{THANK_YOU_MESSAGE}"
+                )
             
             # Clear user data for this transaction
             user_data[user_id] = {}
@@ -196,6 +220,11 @@ async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Run the bot."""
+    global db_session, transaction_service
+    
+    # Initialize database session and transaction service
+    transaction_service = TransactionService()
+    
     # Create the Application and pass it your bot's token.
     if not TOKEN:
         logger.error("TOKEN is not set. Please check your .env file.")
@@ -207,6 +236,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_amount))
+    application.add_handler(CommandHandler("stat", statistics))
 
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
