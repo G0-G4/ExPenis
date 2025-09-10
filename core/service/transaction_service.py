@@ -220,22 +220,6 @@ class TransactionService:
                 start_date = datetime.combine(target_date, datetime.min.time())
                 end_date = datetime.combine(target_date, datetime.max.time())
                 period_label = target_date.strftime("%Y-%m-%d")
-            elif period_type == "week":
-                # Parse YYYY-WW (ISO week)
-                if '-' in date_input:
-                    year, week_str = date_input.split('-')
-                    year = int(year)
-                    week = int(week_str.replace('W', ''))
-                else:
-                    parts = date_input.split('W')
-                    year = int(parts[0])
-                    week = int(parts[1])
-                
-                # Get first day of the week (Monday)
-                target_date = datetime.strptime(f'{year}-W{week:02d}-1', "%Y-W%W-%w").date()
-                start_date = datetime.combine(target_date, datetime.min.time())
-                end_date = datetime.combine(target_date + timedelta(days=6), datetime.max.time())
-                period_label = f"Week {week}, {year}"
             elif period_type == "month":
                 # Parse YYYY-MM
                 target_date = datetime.strptime(date_input, "%Y-%m").date()
