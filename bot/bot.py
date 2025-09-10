@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 # Define conversation states
-ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT = range(4)
+ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD = range(6)
 
 # UI constants
 CATEGORIES_PER_ROW = 3
@@ -46,6 +46,9 @@ TRANSACTION_UPDATED_MESSAGE = "Transaction updated:"
 ERROR_UPDATING_TRANSACTION_MESSAGE = "Error updating transaction."
 ERROR_NO_TRANSACTION_SELECTED = "Error: No transaction selected for editing."
 TRANSACTION_ID_MESSAGE = "Transaction ID:"
+PERIOD_VIEW_MESSAGE = "Select a period to view:"
+PERIOD_STATS_MESSAGE = "Period Statistics"
+NO_DATA_MESSAGE = "No data for this period."
 
 
 class ExpenseBot:
@@ -68,7 +71,109 @@ class ExpenseBot:
 
     def get_main_menu_keyboard(self):
         """Create the main menu keyboard"""
-        return [[InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')]]
+        return [
+            [InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')],
+            [InlineKeyboardButton("📊 View by Period", callback_data='select_period')]
+        ]
+
+    def get_period_navigation_keyboard(self, period_type, period_value, user_id):
+        """Create navigation keyboard for period viewing"""
+        keyboard = []
+        
+        # Navigation buttons
+        nav_row = [
+            InlineKeyboardButton("◀️ Previous", callback_data=f"prev_{period_type}_{period_value}"),
+            InlineKeyboardButton("📅 Choose Date", callback_data=f"choose_date_{period_type}"),
+            InlineKeyboardButton("Next ▶️", callback_data=f"next_{period_type}_{period_value}")
+        ]
+        keyboard.append(nav_row)
+        
+        # Back to period selection
+        keyboard.append([InlineKeyboardButton("Back to Periods", callback_data="select_period")])
+        
+        return keyboard
+
+    async def show_period_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show period selection menu"""
+        keyboard = [
+            [InlineKeyboardButton("Today", callback_data="view_period_day_0")],
+            [InlineKeyboardButton("This Week", callback_data="view_period_week_0")],
+            [InlineKeyboardButton("This Month", callback_data="view_period_month_0")],
+            [InlineKeyboardButton("This Year", callback_data="view_period_year_0")],
+            [InlineKeyboardButton("Custom Date", callback_data="choose_date_day")],
+            [InlineKeyboardButton("Custom Week", callback_data="choose_date_week")],
+            [InlineKeyboardButton("Custom Month", callback_data="choose_date_month")],
+            [InlineKeyboardButton("Custom Year", callback_data="choose_date_year")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                text=PERIOD_VIEW_MESSAGE,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                text=PERIOD_VIEW_MESSAGE,
+                reply_markup=reply_markup
+            )
+
+    async def view_period_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
+                               period_type: str, offset: int = 0):
+        """View statistics for a specific period"""
+        query = update.callback_query
+        user_id = query.from_user.id
+        
+        # Get period data
+        period_data = await self.transaction_service.get_period_statistics(
+            user_id, period_type, offset
+        )
+        
+        if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
+            keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text=f"{PERIOD_STATS_MESSAGE}\n\n{NO_DATA_MESSAGE}",
+                reply_markup=reply_markup
+            )
+            return
+        
+        # Format message
+        message_text = f"{PERIOD_STATS_MESSAGE}\n\n"
+        message_text += f"Period: {period_data['period_label']}\n\n"
+        
+        # Add income categories
+        if period_data["income_categories"]:
+            message_text += "💰 Income by Category:\n"
+            total_income = sum(cat["total"] for cat in period_data["income_categories"])
+            for category in period_data["income_categories"]:
+                percentage = (category["total"] / total_income * 100) if total_income > 0 else 0
+                message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
+            message_text += f"  Total Income: {total_income:.2f}\n\n"
+        
+        # Add expense categories
+        if period_data["expense_categories"]:
+            message_text += "💸 Expenses by Category:\n"
+            total_expense = sum(cat["total"] for cat in period_data["expense_categories"])
+            for category in period_data["expense_categories"]:
+                percentage = (category["total"] / total_expense * 100) if total_expense > 0 else 0
+                message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
+            message_text += f"  Total Expenses: {total_expense:.2f}\n\n"
+        
+        # Add net total
+        net_total = period_data["net_total"]
+        message_text += f"📊 Net Total: {net_total:.2f}"
+        
+        # Add navigation keyboard
+        keyboard = self.get_period_navigation_keyboard(period_type, offset, user_id)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=message_text,
+            reply_markup=reply_markup
+        )
 
     async def get_user_income_categories(self, user_id: int) -> list:
         """Get income category names for a user"""
@@ -237,6 +342,39 @@ class ExpenseBot:
                 reply_markup=reply_markup
             )
         
+        elif query.data == 'select_period':
+            await self.show_period_selection(update, context)
+        
+        elif query.data.startswith('view_period_'):
+            parts = query.data.split('_')
+            period_type = parts[2]  # day, week, month, year
+            offset = int(parts[3])  # offset for navigation
+            await self.view_period_stats(update, context, period_type, offset)
+        
+        elif query.data.startswith('prev_') or query.data.startswith('next_'):
+            parts = query.data.split('_')
+            direction = parts[0]  # prev or next
+            period_type = parts[1]
+            current_offset = int(parts[2])
+            
+            # Calculate new offset
+            offset = current_offset - 1 if direction == 'prev' else current_offset + 1
+            await self.view_period_stats(update, context, period_type, offset)
+        
+        elif query.data.startswith('choose_date_'):
+            period_type = query.data.split('_')[2]
+            
+            # Store state for date input
+            if user_id not in self.user_data:
+                self.user_data[user_id] = {}
+            self.user_data[user_id]['state'] = 'CHOOSING_DATE'
+            self.user_data[user_id]['choosing_date_for'] = period_type
+            
+            # Ask user for date
+            await query.edit_message_text(
+                text="Please enter a date (YYYY-MM-DD) or week number (YYYY-WW) or month (YYYY-MM) or year (YYYY):"
+            )
+        
         elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
             await self.edit_transaction(update, context)
         
@@ -308,6 +446,71 @@ class ExpenseBot:
             return
             
         user_id = update.message.from_user.id
+        
+        # Check if we're expecting a date input
+        if (user_id in self.user_data and 
+            self.user_data[user_id].get('state') == 'CHOOSING_DATE'):
+            
+            date_input = update.message.text.strip()
+            period_type = self.user_data[user_id].get('choosing_date_for', 'day')
+            
+            try:
+                # Parse the date input and show stats for that period
+                period_data = await self.transaction_service.get_custom_period_statistics(
+                    user_id, period_type, date_input
+                )
+                
+                if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text(
+                        text=f"{PERIOD_STATS_MESSAGE}\n\n{NO_DATA_MESSAGE}",
+                        reply_markup=reply_markup
+                    )
+                    self.user_data[user_id] = {}
+                    return
+                
+                # Format message
+                message_text = f"{PERIOD_STATS_MESSAGE}\n\n"
+                message_text += f"Period: {period_data['period_label']}\n\n"
+                
+                # Add income categories
+                if period_data["income_categories"]:
+                    message_text += "💰 Income by Category:\n"
+                    total_income = sum(cat["total"] for cat in period_data["income_categories"])
+                    for category in period_data["income_categories"]:
+                        percentage = (category["total"] / total_income * 100) if total_income > 0 else 0
+                        message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
+                    message_text += f"  Total Income: {total_income:.2f}\n\n"
+                
+                # Add expense categories
+                if period_data["expense_categories"]:
+                    message_text += "💸 Expenses by Category:\n"
+                    total_expense = sum(cat["total"] for cat in period_data["expense_categories"])
+                    for category in period_data["expense_categories"]:
+                        percentage = (category["total"] / total_expense * 100) if total_expense > 0 else 0
+                        message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
+                    message_text += f"  Total Expenses: {total_expense:.2f}\n\n"
+                
+                # Add net total
+                net_total = period_data["net_total"]
+                message_text += f"📊 Net Total: {net_total:.2f}"
+                
+                # Add navigation keyboard (for custom periods, we use offset 0)
+                keyboard = self.get_period_navigation_keyboard(period_type, 0, user_id)
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    text=message_text,
+                    reply_markup=reply_markup
+                )
+                
+                self.user_data[user_id] = {}
+                return
+                
+            except ValueError as e:
+                await update.message.reply_text("Invalid date format. Please try again.")
+                return
         
         # Check if we're expecting an amount input for a new transaction
         if user_id in self.user_data and self.user_data[user_id].get('state') == ENTER_AMOUNT:
