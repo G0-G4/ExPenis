@@ -284,26 +284,14 @@ class ExpenseBot:
                 # Clear user data for this transaction
                 self.user_data[user_id] = {}
                 
-                # Show main menu again
-                keyboard = self.get_main_menu_keyboard()
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                await update.message.reply_text(
-                    MAIN_MENU_MESSAGE,
-                    reply_markup=reply_markup
-                )
+                # Show main menu with today's transactions
+                await self.start(update, context)
                 
             except ValueError:
                 await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
         else:
             # If not in amount input state, show main menu
-            keyboard = self.get_main_menu_keyboard()
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await update.message.reply_text(
-                WELCOME_MESSAGE,
-                reply_markup=reply_markup
-            )
+            await self.start(update, context)
 
     def _initialize_application(self):
         """Initialize the Telegram application and register handlers"""
