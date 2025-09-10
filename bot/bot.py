@@ -17,10 +17,6 @@ logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 # Define conversation states
 ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT = range(4)
 
-# Define income and expense categories (fallback defaults)
-INCOME_CATEGORIES = ['Salary', 'Investment', 'Gift', 'Other Income']
-EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Learning', 'Cafe', 'Other Expense']
-
 # UI constants
 CATEGORIES_PER_ROW = 3
 
@@ -256,11 +252,9 @@ class ExpenseBot:
             await self.refresh_main_menu(update, context)
         
         elif query.data == 'type_income':
-            # Show income categories (now fetched from database)
-            user_income_categories = await self.get_user_income_categories(user_id)
-            if not user_income_categories:
-                # Fallback to default categories if user has none
-                user_income_categories = INCOME_CATEGORIES
+            # Ensure user has categories, creating defaults if needed
+            income_cats, _ = await self.category_service.ensure_user_has_categories(user_id)
+            user_income_categories = [cat.name for cat in income_cats]
             
             keyboard = self.create_category_keyboard(user_income_categories, 'income')
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -275,11 +269,9 @@ class ExpenseBot:
             self.user_data[user_id]['type'] = 'income'
         
         elif query.data == 'type_expense':
-            # Show expense categories (now fetched from database)
-            user_expense_categories = await self.get_user_expense_categories(user_id)
-            if not user_expense_categories:
-                # Fallback to default categories if user has none
-                user_expense_categories = EXPENSE_CATEGORIES
+            # Ensure user has categories, creating defaults if needed
+            _, expense_cats = await self.category_service.ensure_user_has_categories(user_id)
+            user_expense_categories = [cat.name for cat in expense_cats]
             
             keyboard = self.create_category_keyboard(user_expense_categories, 'expense')
             reply_markup = InlineKeyboardMarkup(keyboard)

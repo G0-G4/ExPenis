@@ -44,3 +44,39 @@ class CategoryService:
                 .order_by(Category.name)
             )
             return list(result.scalars().all())
+
+    async def create_default_categories(self, user_id: int):
+        """Create default categories for a new user"""
+        default_income_categories = ['Salary', 'Investment', 'Gift', 'Other Income']
+        default_expense_categories = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Learning', 'Cafe', 'Other Expense']
+        
+        async with session_maker() as session:
+            # Check if user already has categories
+            income_cats = await self.get_user_income_categories(user_id)
+            expense_cats = await self.get_user_expense_categories(user_id)
+            
+            # Only create defaults if user has no categories of that type
+            if not income_cats:
+                for cat_name in default_income_categories:
+                    category = Category(user_id=user_id, name=cat_name, type="income")
+                    session.add(category)
+            
+            if not expense_cats:
+                for cat_name in default_expense_categories:
+                    category = Category(user_id=user_id, name=cat_name, type="expense")
+                    session.add(category)
+            
+            await session.commit()
+
+    async def ensure_user_has_categories(self, user_id: int):
+        """Ensure user has categories, creating defaults if needed"""
+        income_cats = await self.get_user_income_categories(user_id)
+        expense_cats = await self.get_user_expense_categories(user_id)
+        
+        if not income_cats and not expense_cats:
+            await self.create_default_categories(user_id)
+            # Refresh the lists after creation
+            income_cats = await self.get_user_income_categories(user_id)
+            expense_cats = await self.get_user_expense_categories(user_id)
+            
+        return income_cats, expense_cats
