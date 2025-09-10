@@ -88,6 +88,16 @@ class ExpenseBot:
             [InlineKeyboardButton("📊 View by Period", callback_data='select_period')]
         ]
 
+    def get_transaction_type_keyboard(self):
+        """Create the transaction type selection keyboard"""
+        return [
+            [
+                InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
+                InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
+            ],
+            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
+        ]
+
     def get_period_navigation_keyboard(self, period_type, period_value, user_id):
         """Create navigation keyboard for period viewing"""
         keyboard = []
@@ -358,14 +368,7 @@ class ExpenseBot:
         
         if query.data == 'enter_transaction':
             # Show transaction type selection (+ or -)
-            keyboard = [
-                [
-                    InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
-                    InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
-                ],
-                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
             await query.edit_message_text(
                 text=TRANSACTION_TYPE_MESSAGE,
                 reply_markup=reply_markup,
@@ -426,14 +429,7 @@ class ExpenseBot:
         
         elif query.data == 'back_to_type_selection':
             # Show transaction type selection again
-            keyboard = [
-                [
-                    InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
-                    InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
-                ],
-                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
             await query.edit_message_text(
                 text=TRANSACTION_TYPE_MESSAGE,
                 reply_markup=reply_markup,
