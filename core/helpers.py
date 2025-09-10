@@ -66,7 +66,7 @@ async def _calculate_period_boundaries(base_date: date, period_type: str) -> tup
         week_end = week_start + relativedelta(weekday=SU)      # Sunday of the week
         start_date = datetime.combine(week_start, datetime.min.time())
         end_date = datetime.combine(week_end, datetime.max.time())
-        period_label = f"Week {week_start.isocalendar()[1]}, {week_start.year}"
+        period_label = f"{week_start.strftime('%Y-%m-%d')} to {week_end.strftime('%Y-%m-%d')}"
     elif period_type == "month":
         # Get the first and last day of the month containing base_date
         month_start = base_date.replace(day=1)
