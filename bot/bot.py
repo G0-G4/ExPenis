@@ -128,6 +128,34 @@ class ExpenseBot:
             reply_markup=reply_markup
         )
 
+    async def edit_transaction_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle amount editing for a transaction"""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = query.from_user.id
+        transaction_id = int(query.data.split('_')[2])
+        
+        # Get transaction details
+        transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
+        
+        if not transaction or transaction.user_id != user_id:
+            await query.edit_message_text("Transaction not found or access denied.")
+            return
+        
+        # Store editing state
+        if user_id not in self.user_data:
+            self.user_data[user_id] = {}
+        self.user_data[user_id]['editing_transaction_id'] = transaction_id
+        self.user_data[user_id]['state'] = 'EDITING_AMOUNT'
+        
+        emoji = "✅" if transaction.type == "income" else "❌"
+        transaction_text = f"{emoji} {transaction.amount} ({transaction.category})"
+        
+        await query.edit_message_text(
+            text=f"Editing transaction:\n{transaction_text}\n\nPlease enter the new amount:"
+        )
+
     async def delete_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_id: int):
         """Delete a transaction"""
         query = update.callback_query
@@ -178,6 +206,9 @@ class ExpenseBot:
         
         elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
             await self.edit_transaction(update, context)
+        
+        elif query.data.startswith('edit_amount_'):
+            await self.edit_transaction_amount(update, context)
         
         elif query.data.startswith('delete_'):
             transaction_id = int(query.data.split('_')[1])
@@ -243,7 +274,7 @@ class ExpenseBot:
             
         user_id = update.message.from_user.id
         
-        # Check if we're expecting an amount input
+        # Check if we're expecting an amount input for a new transaction
         if user_id in self.user_data and self.user_data[user_id].get('state') == ENTER_AMOUNT:
             try:
                 amount_text = update.message.text
@@ -282,6 +313,49 @@ class ExpenseBot:
                     )
                 
                 # Clear user data for this transaction
+                self.user_data[user_id] = {}
+                
+                # Show main menu with today's transactions
+                await self.start(update, context)
+                
+            except ValueError:
+                await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
+        
+        # Check if we're editing an existing transaction amount
+        elif user_id in self.user_data and self.user_data[user_id].get('state') == 'EDITING_AMOUNT':
+            try:
+                amount_text = update.message.text
+                if not amount_text:
+                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
+                    return
+                    
+                amount = float(amount_text)
+                transaction_id = self.user_data[user_id].get('editing_transaction_id')
+                
+                if not transaction_id:
+                    await update.message.reply_text("Error: No transaction selected for editing.")
+                    return
+                
+                # Update transaction in database
+                try:
+                    updated_transaction = await self.transaction_service.update_transaction_amount(
+                        transaction_id=transaction_id,
+                        user_id=user_id,
+                        new_amount=amount
+                    )
+                    
+                    if updated_transaction:
+                        emoji = "✅" if updated_transaction.type == "income" else "❌"
+                        await update.message.reply_text(
+                            f"Transaction updated:\n{emoji} {updated_transaction.amount} ({updated_transaction.category})\n\n{THANK_YOU_MESSAGE}"
+                        )
+                    else:
+                        await update.message.reply_text("Error: Transaction not found or access denied.")
+                except Exception as e:
+                    logger.error(f"Error updating transaction: {e}")
+                    await update.message.reply_text("Error updating transaction.")
+                
+                # Clear user data
                 self.user_data[user_id] = {}
                 
                 # Show main menu with today's transactions
