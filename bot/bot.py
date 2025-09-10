@@ -78,7 +78,7 @@ class ExpenseBot:
                 keyboard.append(row)
                 row = []
         # Add back button to category selection
-        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")])
         return keyboard
 
     def get_main_menu_keyboard(self):
@@ -424,6 +424,22 @@ class ExpenseBot:
             # Refresh the main view with updated transactions
             await self.refresh_main_menu(update, context)
         
+        elif query.data == 'back_to_type_selection':
+            # Show transaction type selection again
+            keyboard = [
+                [
+                    InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
+                    InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
+                ],
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text=TRANSACTION_TYPE_MESSAGE,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+        
         elif query.data == 'type_income':
             # Ensure user has categories, creating defaults if needed
             income_cats, _ = await self.category_service.ensure_user_has_categories(user_id)
@@ -471,7 +487,7 @@ class ExpenseBot:
                 self.user_data[user_id]['category'] = category
                 
                 # Add back button to amount prompt
-                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(
@@ -602,7 +618,7 @@ class ExpenseBot:
             try:
                 amount_text = update.message.text
                 if not amount_text:
-                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")]]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await update.message.reply_text(
@@ -660,7 +676,7 @@ class ExpenseBot:
                 await self.refresh_main_menu(update, context)
                 
             except ValueError:
-                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await update.message.reply_text(
