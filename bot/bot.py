@@ -91,11 +91,6 @@ class ExpenseBot:
         elif update.callback_query:
             await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup)
 
-    async def statistics(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Send category summary statistics"""
-        res = await self.transaction_service.get_category_summary(update.message.from_user.id)
-        await update.message.reply_text(str(res))
-
     async def edit_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle transaction editing"""
         query = update.callback_query
@@ -341,7 +336,7 @@ class ExpenseBot:
                     updated_transaction = await self.transaction_service.update_transaction_amount(
                         transaction_id=transaction_id,
                         user_id=user_id,
-                        new_amount=amount
+                        amount=amount
                     )
                     
                     if updated_transaction:
@@ -377,7 +372,6 @@ class ExpenseBot:
         
         # Register command handlers
         self.application.add_handler(CommandHandler('start', self.start))
-        self.application.add_handler(CommandHandler('stat', self.statistics))
         
         # Register callback query handler
         self.application.add_handler(CallbackQueryHandler(self.button_handler))

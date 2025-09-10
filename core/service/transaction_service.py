@@ -26,23 +26,56 @@ class TransactionService:
             session.add(transaction)
         return transaction
     
-    async def get_user_transactions(
-        self, 
-        user_id: int, 
-        limit: int = 100, 
-        offset: int = 0
-    ) -> List[Transaction]:
-        """Get transactions for a specific user"""
-        result = await session_maker().execute(
-            select(Transaction)
-            .where(Transaction.user_id == user_id)
-            .order_by(Transaction.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return list(result.scalars().all())
-    
     async def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
         """Get a transaction by its ID"""
         async with session_maker() as session:
             result = await session.execute(
+                select(Transaction).where(Transaction.id == transaction_id)
+            )
+            return result.scalar_one_or_none()
+
+    async def update_transaction_amount(self, transaction_id: int, user_id: int, amount: float) -> Transaction:
+        """Get a transaction by its ID"""
+        async with session_maker() as session, session.begin():
+            transaction = (await session.execute(
+                select(Transaction).where(Transaction.id == transaction_id, Transaction.user_id == user_id)
+            )).scalar_one_or_none()
+            if transaction is None:
+                raise Exception(f"transaction {transaction_id} not found for user {user_id}")
+            transaction.amount = amount
+            session.add(transaction)
+            session.flush()
+        return transaction
+
+    async def get_todays_transactions(self, user_id: int) -> List[Transaction]:
+        """Get today's transactions for a specific user"""
+        today = date.today()
+        start_of_day = datetime.combine(today, datetime.min.time())
+        end_of_day = datetime.combine(today, datetime.max.time())
+
+        async with session_maker() as session:
+            result = await session.execute(
+                select(Transaction)
+                .where(
+                    Transaction.user_id == user_id,
+                    Transaction.created_at >= start_of_day,
+                    Transaction.created_at <= end_of_day
+                )
+                .order_by(Transaction.created_at.desc())
+            )
+            return list(result.scalars().all())
+
+    async def delete_transaction(self, transaction_id: int, user_id: int) -> bool:
+        """Delete a transaction"""
+        async with session_maker() as session:
+            result = await session.execute(
+                select(Transaction).where(Transaction.id == transaction_id, Transaction.user_id == user_id)
+            )
+            transaction = result.scalar_one_or_none()
+
+            if transaction:
+                await session.delete(transaction)
+                await session.commit()
+                return True
+            return False
+
