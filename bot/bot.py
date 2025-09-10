@@ -20,35 +20,45 @@ ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VI
 # UI constants
 CATEGORIES_PER_ROW = 3
 
-# Message constants
-WELCOME_MESSAGE = "Welcome to Expense Tracker Bot! Click the button below to enter a transaction."
-TODAYS_TRANSACTIONS_MESSAGE = "Today's Transactions:"
-NO_TRANSACTIONS_MESSAGE = "No transactions today."
-TOTAL_INCOME_MESSAGE = "Total Income Today: {total_income}"
-TOTAL_EXPENSE_MESSAGE = "Total Expense Today: {total_expense}"
-NET_TOTAL_MESSAGE = "Net Total Today: {net_total}"
-TRANSACTION_TYPE_MESSAGE = "Select transaction type:"
-INCOME_CATEGORY_MESSAGE = "Select income category:"
-EXPENSE_CATEGORY_MESSAGE = "Select expense category:"
-AMOUNT_PROMPT_MESSAGE = "Please enter the amount:"
-INVALID_AMOUNT_MESSAGE = "Please enter a valid number for the amount."
-THANK_YOU_MESSAGE = "Thank you!"
-MAIN_MENU_MESSAGE = "What would you like to do next?"
-VIEW_TRANSACTIONS_MESSAGE = "Here are your recent transactions:"
-TRANSACTION_NOT_FOUND_MESSAGE = "Transaction not found or access denied."
-EDIT_TRANSACTION_MESSAGE = "Editing transaction:"
-CHOOSE_OPTION_MESSAGE = "Choose an option:"
-TRANSACTION_DELETED_MESSAGE = "Transaction deleted successfully!"
-ERROR_DELETING_TRANSACTION_MESSAGE = "Error deleting transaction."
-TRANSACTION_RECORDED_MESSAGE = "Transaction recorded:"
-ERROR_SAVING_TRANSACTION_MESSAGE = "Note: Failed to save to database."
-TRANSACTION_UPDATED_MESSAGE = "Transaction updated:"
-ERROR_UPDATING_TRANSACTION_MESSAGE = "Error updating transaction."
-ERROR_NO_TRANSACTION_SELECTED = "Error: No transaction selected for editing."
-TRANSACTION_ID_MESSAGE = "Transaction ID:"
-PERIOD_VIEW_MESSAGE = "Select a period to view:"
-PERIOD_STATS_MESSAGE = "Period Statistics"
-NO_DATA_MESSAGE = "No data for this period."
+# Message constants with improved formatting
+WELCOME_MESSAGE = "🎯 <b>Welcome to Expense Tracker Bot!</b>\n\nClick the button below to enter a transaction."
+TODAYS_TRANSACTIONS_MESSAGE = "📋 <b>Today's Transactions:</b>"
+NO_TRANSACTIONS_MESSAGE = "📭 <i>No transactions today.</i>"
+TOTAL_INCOME_MESSAGE = "🟢 <b>Total Income:  {total_income}</b>"
+TOTAL_EXPENSE_MESSAGE = "🔴 <b>Total Expense: {total_expense}</b>"
+NET_TOTAL_MESSAGE = "📊 <b>Net Total:     {net_total}</b>"
+TRANSACTION_TYPE_MESSAGE = "CALLTYPE <b>Select transaction type:</b>"
+INCOME_CATEGORY_MESSAGE = "💰 <b>Select income category:</b>"
+EXPENSE_CATEGORY_MESSAGE = "🛒 <b>Select expense category:</b>"
+AMOUNT_PROMPT_MESSAGE = "💵 <b>Please enter the amount:</b>"
+INVALID_AMOUNT_MESSAGE = "⚠️ <i>Please enter a valid number for the amount.</i>"
+THANK_YOU_MESSAGE = "🙏 <b>Thank you!</b>"
+MAIN_MENU_MESSAGE = "📋 <b>What would you like to do next?</b>"
+VIEW_TRANSACTIONS_MESSAGE = "📜 <b>Here are your recent transactions:</b>"
+TRANSACTION_NOT_FOUND_MESSAGE = "❌ <i>Transaction not found or access denied.</i>"
+EDIT_TRANSACTION_MESSAGE = "✏️ <b>Editing transaction:</b>"
+CHOOSE_OPTION_MESSAGE = "🔧 <b>Choose an option:</b>"
+TRANSACTION_DELETED_MESSAGE = "🗑️ <b>Transaction deleted successfully!</b>"
+ERROR_DELETING_TRANSACTION_MESSAGE = "💥 <i>Error deleting transaction.</i>"
+TRANSACTION_RECORDED_MESSAGE = "💾 <b>Transaction recorded:</b>"
+ERROR_SAVING_TRANSACTION_MESSAGE = "⚠️ <i>Note: Failed to save to database.</i>"
+TRANSACTION_UPDATED_MESSAGE = "🔄 <b>Transaction updated:</b>"
+ERROR_UPDATING_TRANSACTION_MESSAGE = "💥 <i>Error updating transaction.</i>"
+ERROR_NO_TRANSACTION_SELECTED = "❌ <i>Error: No transaction selected for editing.</i>"
+TRANSACTION_ID_MESSAGE = "🆔 <b>Transaction ID:</b>"
+PERIOD_VIEW_MESSAGE = "📅 <b>Select a period to view:</b>"
+PERIOD_STATS_MESSAGE = "📈 <b>Period Statistics</b>"
+NO_DATA_MESSAGE = "📭 <i>No data for this period.</i>"
+
+# Helper function to format numbers with thousands separator
+def format_amount(amount):
+    """Format amount with thousands separator and 2 decimal places"""
+    return f"{amount:,.2f}"
+
+# Helper function to format percentage
+def format_percentage(value):
+    """Format percentage with 1 decimal place"""
+    return f"{value:.1f}"
 
 
 class ExpenseBot:
@@ -72,7 +82,7 @@ class ExpenseBot:
     def get_main_menu_keyboard(self):
         """Create the main menu keyboard"""
         return [
-            [InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')],
+            [InlineKeyboardButton("➕ Enter Transaction", callback_data='enter_transaction')],
             [InlineKeyboardButton("📊 View by Period", callback_data='select_period')]
         ]
 
@@ -82,25 +92,25 @@ class ExpenseBot:
         
         # Navigation buttons
         nav_row = [
-            InlineKeyboardButton("◀️ Previous", callback_data=f"prev_{period_type}_{period_value}"),
+            InlineKeyboardButton("⬅️ Previous", callback_data=f"prev_{period_type}_{period_value}"),
             InlineKeyboardButton("📅 Choose Date", callback_data=f"choose_custom_period"),
-            InlineKeyboardButton("Next ▶️", callback_data=f"next_{period_type}_{period_value}")
+            InlineKeyboardButton("Next ➡️", callback_data=f"next_{period_type}_{period_value}")
         ]
         keyboard.append(nav_row)
         
         # Back to period selection
-        keyboard.append([InlineKeyboardButton("Back to Periods", callback_data="select_period")])
+        keyboard.append([InlineKeyboardButton("🔙 Back to Periods", callback_data="select_period")])
         
         return keyboard
 
     async def show_period_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show period selection menu"""
         keyboard = [
-            [InlineKeyboardButton("Today", callback_data="view_period_day_0")],
-            [InlineKeyboardButton("This Week", callback_data="view_period_week_0")],
-            [InlineKeyboardButton("This Month", callback_data="view_period_month_0")],
-            [InlineKeyboardButton("This Year", callback_data="view_period_year_0")],
-            [InlineKeyboardButton("Custom Period", callback_data="choose_custom_period")],
+            [InlineKeyboardButton("📅 Today", callback_data="view_period_day_0")],
+            [InlineKeyboardButton("📅 This Week", callback_data="view_period_week_0")],
+            [InlineKeyboardButton("📅 This Month", callback_data="view_period_month_0")],
+            [InlineKeyboardButton("📅 This Year", callback_data="view_period_year_0")],
+            [InlineKeyboardButton("🔍 Custom Period", callback_data="choose_custom_period")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
         ]
         
@@ -109,12 +119,14 @@ class ExpenseBot:
         if update.callback_query:
             await update.callback_query.edit_message_text(
                 text=PERIOD_VIEW_MESSAGE,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
         else:
             await update.message.reply_text(
                 text=PERIOD_VIEW_MESSAGE,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
 
     async def view_period_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
@@ -135,39 +147,45 @@ class ExpenseBot:
         if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
             await query.edit_message_text(
                 text=f"{PERIOD_STATS_MESSAGE}\n\n{NO_DATA_MESSAGE}",
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
             return
         
         # Format message
-        message_text = f"{PERIOD_STATS_MESSAGE}\n\n"
-        message_text += f"Period: {period_data['period_label']}\n\n"
+        message_text = f"{PERIOD_STATS_MESSAGE}\n"
+        message_text += f"<pre>Period: {period_data['period_label']}</pre>\n\n"
         
         # Add income categories
         if period_data["income_categories"]:
-            message_text += "💰 Income by Category:\n"
+            message_text += "<b>💰 Income by Category:</b>\n"
             total_income = sum(cat["total"] for cat in period_data["income_categories"])
             for category in period_data["income_categories"]:
                 percentage = (category["total"] / total_income * 100) if total_income > 0 else 0
-                message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
-            message_text += f"  Total Income: {total_income:.2f}\n\n"
+                message_text += f"  {category['category']:<15} {format_amount(category['total']):>12} ({format_percentage(percentage)}%)\n"
+            message_text += f"  {'Total Income':<15} <b>{format_amount(total_income):>12}</b>\n\n"
         
         # Add expense categories
         if period_data["expense_categories"]:
-            message_text += "💸 Expenses by Category:\n"
+            message_text += "<b>💸 Expenses by Category:</b>\n"
             total_expense = sum(cat["total"] for cat in period_data["expense_categories"])
             for category in period_data["expense_categories"]:
                 percentage = (category["total"] / total_expense * 100) if total_expense > 0 else 0
-                message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
-            message_text += f"  Total Expenses: {total_expense:.2f}\n\n"
+                message_text += f"  {category['category']:<15} {format_amount(category['total']):>12} ({format_percentage(percentage)}%)\n"
+            message_text += f"  {'Total Expenses':<15} <b>{format_amount(total_expense):>12}</b>\n\n"
         
         # Add net total
         net_total = period_data["net_total"]
-        message_text += f"📊 Net Total: {net_total:.2f}"
+        net_total_formatted = format_amount(abs(net_total))
+        if net_total >= 0:
+            message_text += f"<b>📊 Net Total:       +{net_total_formatted}</b>"
+        else:
+            message_text += f"<b>📊 Net Total:       -{net_total_formatted}</b>"
         
         await query.edit_message_text(
             text=message_text,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode="HTML"
         )
 
     async def get_user_income_categories(self, user_id: int) -> list:
@@ -197,13 +215,14 @@ class ExpenseBot:
         
         # Add today's transactions as buttons
         for transaction in todays_transactions:
-            emoji = "✅" if transaction.type == "income" else "❌"
-            button_text = f"{emoji} {transaction.amount} ({transaction.category})"
+            emoji = "🟢" if transaction.type == "income" else "🔴"
+            formatted_amount = format_amount(transaction.amount)
+            button_text = f"{emoji} {formatted_amount:>10} ({transaction.category})"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_{transaction.id}")])
         
         # Add separator if there are transactions
         if todays_transactions:
-            keyboard.append([InlineKeyboardButton("---", callback_data="separator")])
+            keyboard.append([InlineKeyboardButton("───────────────", callback_data="separator")])
         
         # Add main menu button
         keyboard.extend(self.get_main_menu_keyboard())
@@ -211,9 +230,12 @@ class ExpenseBot:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Build message text with totals
-        totals_text = f"\n\n{TOTAL_INCOME_MESSAGE.format(total_income=f'{total_income:.2f}')}\n"
-        totals_text += f"{TOTAL_EXPENSE_MESSAGE.format(total_expense=f'{total_expense:.2f}')}\n"
-        totals_text += f"{NET_TOTAL_MESSAGE.format(net_total=f'{net_total:.2f}')}"
+        totals_text = f"\n\n{TOTAL_INCOME_MESSAGE.format(total_income=format_amount(total_income))}\n"
+        totals_text += f"{TOTAL_EXPENSE_MESSAGE.format(total_expense=format_amount(total_expense))}\n"
+        if net_total >= 0:
+            totals_text += f"{NET_TOTAL_MESSAGE.format(net_total=f'+{format_amount(net_total)}')}"
+        else:
+            totals_text += f"{NET_TOTAL_MESSAGE.format(net_total=f'-{format_amount(abs(net_total))}')}"
         
         message_text = WELCOME_MESSAGE
         if todays_transactions:
@@ -222,9 +244,9 @@ class ExpenseBot:
             message_text = f"{WELCOME_MESSAGE}\n\n{NO_TRANSACTIONS_MESSAGE}{totals_text}"
         
         if update.message:
-            await update.message.reply_text(message_text, reply_markup=reply_markup)
+            await update.message.reply_text(message_text, reply_markup=reply_markup, parse_mode="HTML")
         elif update.callback_query:
-            await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup)
+            await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode="HTML")
 
     async def refresh_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Refresh the main menu view"""
@@ -242,7 +264,7 @@ class ExpenseBot:
         transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
         
         if not transaction or transaction.user_id != user_id:
-            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE)
+            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
             return
         
         # Create edit options
@@ -254,12 +276,14 @@ class ExpenseBot:
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        emoji = "✅" if transaction.type == "income" else "❌"
-        transaction_text = f"{emoji} {transaction.amount} ({transaction.category})"
+        emoji = "🟢" if transaction.type == "income" else "🔴"
+        formatted_amount = format_amount(transaction.amount)
+        transaction_text = f"{emoji} {formatted_amount} ({transaction.category})"
         
         await query.edit_message_text(
-            text=f"{EDIT_TRANSACTION_MESSAGE}\n{transaction_text}\n\n{CHOOSE_OPTION_MESSAGE}",
-            reply_markup=reply_markup
+            text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{CHOOSE_OPTION_MESSAGE}",
+            reply_markup=reply_markup,
+            parse_mode="HTML"
         )
 
     async def edit_transaction_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -274,7 +298,7 @@ class ExpenseBot:
         transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
         
         if not transaction or transaction.user_id != user_id:
-            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE)
+            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
             return
         
         # Store editing state
@@ -283,11 +307,13 @@ class ExpenseBot:
         self.user_data[user_id]['editing_transaction_id'] = transaction_id
         self.user_data[user_id]['state'] = 'EDITING_AMOUNT'
         
-        emoji = "✅" if transaction.type == "income" else "❌"
-        transaction_text = f"{emoji} {transaction.amount} ({transaction.category})"
+        emoji = "🟢" if transaction.type == "income" else "🔴"
+        formatted_amount = format_amount(transaction.amount)
+        transaction_text = f"{emoji} {formatted_amount} ({transaction.category})"
         
         await query.edit_message_text(
-            text=f"{EDIT_TRANSACTION_MESSAGE}\n{transaction_text}\n\n{AMOUNT_PROMPT_MESSAGE}"
+            text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{AMOUNT_PROMPT_MESSAGE}",
+            parse_mode="HTML"
         )
 
     async def delete_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_id: int):
@@ -302,12 +328,12 @@ class ExpenseBot:
             result = await self.transaction_service.delete_transaction(transaction_id, user_id)
             
             if result:
-                await query.edit_message_text(TRANSACTION_DELETED_MESSAGE)
+                await query.edit_message_text(TRANSACTION_DELETED_MESSAGE, parse_mode="HTML")
             else:
-                await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE)
+                await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Error deleting transaction: {e}")
-            await query.edit_message_text(ERROR_DELETING_TRANSACTION_MESSAGE)
+            await query.edit_message_text(ERROR_DELETING_TRANSACTION_MESSAGE, parse_mode="HTML")
         
         # After deletion, show main menu
         await self.refresh_main_menu(update, context)
@@ -327,14 +353,15 @@ class ExpenseBot:
             # Show transaction type selection (+ or -)
             keyboard = [
                 [
-                    InlineKeyboardButton("Income (+)", callback_data='type_income'),
-                    InlineKeyboardButton("Expense (-)", callback_data='type_expense'),
+                    InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
+                    InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
                 ],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=TRANSACTION_TYPE_MESSAGE,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
         
         elif query.data == 'select_period':
@@ -364,10 +391,11 @@ class ExpenseBot:
             
             # Ask user for date
             await query.edit_message_text(
-                text="Please enter a date in one of these formats:\n"
-                     "YYYY (for a year)\n"
-                     "YYYY-MM (for a month)\n"
-                     "YYYY-MM-DD (for a specific date)"
+                text="📅 <b>Please enter a date in one of these formats:</b>\n"
+                     "<pre>YYYY</pre>          (for a year)\n"
+                     "<pre>YYYY-MM</pre>       (for a month)\n"
+                     "<pre>YYYY-MM-DD</pre>    (for a specific date)",
+                parse_mode="HTML"
             )
         
         elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
@@ -393,7 +421,8 @@ class ExpenseBot:
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=INCOME_CATEGORY_MESSAGE,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
             
             # Store transaction type for this user
@@ -410,7 +439,8 @@ class ExpenseBot:
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=EXPENSE_CATEGORY_MESSAGE,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode="HTML"
             )
             
             # Store transaction type for this user
@@ -429,7 +459,8 @@ class ExpenseBot:
                 self.user_data[user_id]['category'] = category
                 
                 await query.edit_message_text(
-                    text=f"Selected category: {category}\n\n{AMOUNT_PROMPT_MESSAGE}"
+                    text=f"🏷️ <b>Selected category: {category}</b>\n\n{AMOUNT_PROMPT_MESSAGE}",
+                    parse_mode="HTML"
                 )
                 
                 # Set state to expect amount input
@@ -468,10 +499,11 @@ class ExpenseBot:
                 period_type = 'day'
             else:
                 await update.message.reply_text(
-                    "Invalid date format. Please use one of these formats:\n"
-                    "YYYY (for a year)\n"
-                    "YYYY-MM (for a month)\n"
-                    "YYYY-MM-DD (for a specific date)"
+                    "❌ <b>Invalid date format.</b> Please use one of these formats:\n"
+                    "<pre>YYYY</pre>          (for a year)\n"
+                    "<pre>YYYY-MM</pre>       (for a month)\n"
+                    "<pre>YYYY-MM-DD</pre>    (for a specific date)",
+                    parse_mode="HTML"
                 )
                 return
             
@@ -488,47 +520,53 @@ class ExpenseBot:
                 if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
                     await update.message.reply_text(
                         text=f"{PERIOD_STATS_MESSAGE}\n\n{NO_DATA_MESSAGE}",
-                        reply_markup=reply_markup
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
                     )
                     self.user_data[user_id] = {}
                     return
                 
                 # Format message
-                message_text = f"{PERIOD_STATS_MESSAGE}\n\n"
-                message_text += f"Period: {period_data['period_label']}\n\n"
+                message_text = f"{PERIOD_STATS_MESSAGE}\n"
+                message_text += f"<pre>Period: {period_data['period_label']}</pre>\n\n"
                 
                 # Add income categories
                 if period_data["income_categories"]:
-                    message_text += "💰 Income by Category:\n"
+                    message_text += "<b>💰 Income by Category:</b>\n"
                     total_income = sum(cat["total"] for cat in period_data["income_categories"])
                     for category in period_data["income_categories"]:
                         percentage = (category["total"] / total_income * 100) if total_income > 0 else 0
-                        message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
-                    message_text += f"  Total Income: {total_income:.2f}\n\n"
+                        message_text += f"  {category['category']:<15} {format_amount(category['total']):>12} ({format_percentage(percentage)}%)\n"
+                    message_text += f"  {'Total Income':<15} <b>{format_amount(total_income):>12}</b>\n\n"
                 
                 # Add expense categories
                 if period_data["expense_categories"]:
-                    message_text += "💸 Expenses by Category:\n"
+                    message_text += "<b>💸 Expenses by Category:</b>\n"
                     total_expense = sum(cat["total"] for cat in period_data["expense_categories"])
                     for category in period_data["expense_categories"]:
                         percentage = (category["total"] / total_expense * 100) if total_expense > 0 else 0
-                        message_text += f"  {category['category']}: {category['total']:.2f} ({percentage:.1f}%)\n"
-                    message_text += f"  Total Expenses: {total_expense:.2f}\n\n"
+                        message_text += f"  {category['category']:<15} {format_amount(category['total']):>12} ({format_percentage(percentage)}%)\n"
+                    message_text += f"  {'Total Expenses':<15} <b>{format_amount(total_expense):>12}</b>\n\n"
                 
                 # Add net total
                 net_total = period_data["net_total"]
-                message_text += f"📊 Net Total: {net_total:.2f}"
+                net_total_formatted = format_amount(abs(net_total))
+                if net_total >= 0:
+                    message_text += f"<b>📊 Net Total:       +{net_total_formatted}</b>"
+                else:
+                    message_text += f"<b>📊 Net Total:       -{net_total_formatted}</b>"
                 
                 await update.message.reply_text(
                     text=message_text,
-                    reply_markup=reply_markup
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
                 )
                 
                 self.user_data[user_id] = {}
                 return
                 
             except ValueError as e:
-                await update.message.reply_text("Invalid date format. Please try again.")
+                await update.message.reply_text("❌ <b>Invalid date format.</b> Please try again.", parse_mode="HTML")
                 return
         
         # Check if we're expecting an amount input for a new transaction
@@ -536,7 +574,7 @@ class ExpenseBot:
             try:
                 amount_text = update.message.text
                 if not amount_text:
-                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
+                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
                     return
                     
                 amount = float(amount_text)
@@ -546,10 +584,11 @@ class ExpenseBot:
                 category = self.user_data[user_id]['category']
                 
                 # Format transaction for display
+                formatted_amount = format_amount(amount)
                 if transaction_type == 'income':
-                    transaction_text = f"✅ Income: +{amount} ({category})"
+                    transaction_text = f"🟢 Income: +{formatted_amount} ({category})"
                 else:
-                    transaction_text = f"❌ Expense: -{amount} ({category})"
+                    transaction_text = f"🔴 Expense: -{formatted_amount} ({category})"
                 
                 # Save transaction to database using transaction service
                 try:
@@ -561,12 +600,14 @@ class ExpenseBot:
                     )
                     
                     await update.message.reply_text(
-                        f"{TRANSACTION_RECORDED_MESSAGE}\n{transaction_text}\n\n{TRANSACTION_ID_MESSAGE} {transaction.id}\n\n{THANK_YOU_MESSAGE}"
+                        f"{TRANSACTION_RECORDED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{TRANSACTION_ID_MESSAGE} {transaction.id}\n\n{THANK_YOU_MESSAGE}",
+                        parse_mode="HTML"
                     )
                 except Exception as e:
                     logger.error(f"Error saving transaction: {e}")
                     await update.message.reply_text(
-                        f"{TRANSACTION_RECORDED_MESSAGE}\n{transaction_text}\n\n{ERROR_SAVING_TRANSACTION_MESSAGE}\n\n{THANK_YOU_MESSAGE}"
+                        f"{TRANSACTION_RECORDED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{ERROR_SAVING_TRANSACTION_MESSAGE}\n\n{THANK_YOU_MESSAGE}",
+                        parse_mode="HTML"
                     )
                 
                 # Clear user data for this transaction
@@ -576,21 +617,21 @@ class ExpenseBot:
                 await self.refresh_main_menu(update, context)
                 
             except ValueError:
-                await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
+                await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
         
         # Check if we're editing an existing transaction amount
         elif user_id in self.user_data and self.user_data[user_id].get('state') == 'EDITING_AMOUNT':
             try:
                 amount_text = update.message.text
                 if not amount_text:
-                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
+                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
                     return
                     
                 amount = float(amount_text)
                 transaction_id = self.user_data[user_id].get('editing_transaction_id')
                 
                 if not transaction_id:
-                    await update.message.reply_text(ERROR_NO_TRANSACTION_SELECTED)
+                    await update.message.reply_text(ERROR_NO_TRANSACTION_SELECTED, parse_mode="HTML")
                     return
                 
                 # Update transaction in database
@@ -602,15 +643,17 @@ class ExpenseBot:
                     )
                     
                     if updated_transaction:
-                        emoji = "✅" if updated_transaction.type == "income" else "❌"
+                        emoji = "🟢" if updated_transaction.type == "income" else "🔴"
+                        formatted_amount = format_amount(updated_transaction.amount)
                         await update.message.reply_text(
-                            f"{TRANSACTION_UPDATED_MESSAGE}\n{emoji} {updated_transaction.amount} ({updated_transaction.category})\n\n{THANK_YOU_MESSAGE}"
+                            f"{TRANSACTION_UPDATED_MESSAGE}\n<pre>{emoji} {formatted_amount} ({updated_transaction.category})</pre>\n\n{THANK_YOU_MESSAGE}",
+                            parse_mode="HTML"
                         )
                     else:
-                        await update.message.reply_text(TRANSACTION_NOT_FOUND_MESSAGE)
+                        await update.message.reply_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
                 except Exception as e:
                     logger.error(f"Error updating transaction: {e}")
-                    await update.message.reply_text(ERROR_UPDATING_TRANSACTION_MESSAGE)
+                    await update.message.reply_text(ERROR_UPDATING_TRANSACTION_MESSAGE, parse_mode="HTML")
                 
                 # Clear user data
                 self.user_data[user_id] = {}
@@ -619,7 +662,7 @@ class ExpenseBot:
                 await self.refresh_main_menu(update, context)
                 
             except ValueError:
-                await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
+                await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
         else:
             # If not in amount input state, show main menu
             await self.refresh_main_menu(update, context)
