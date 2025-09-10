@@ -17,8 +17,8 @@ logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT = range(4)
 
 # Define income and expense categories
-INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other Income']
-EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills', 'Rent', 'Other Expense']
+INCOME_CATEGORIES = ['Salary', 'Investment', 'Gift', 'Other Income']
+EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Learning', 'Cafe', 'Other Expense']
 
 # UI constants
 CATEGORIES_PER_ROW = 3
