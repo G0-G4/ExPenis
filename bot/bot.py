@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+import asyncio
 
 from core.config import TOKEN
 from core.service.transaction_service import TransactionService
@@ -22,6 +23,8 @@ EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills',
 # UI constants
 CATEGORIES_PER_ROW = 3
 WELCOME_MESSAGE = "Welcome to Expense Tracker Bot! Click the button below to enter a transaction."
+TODAYS_TRANSACTIONS_MESSAGE = "Today's Transactions:"
+NO_TRANSACTIONS_MESSAGE = "No transactions today."
 TRANSACTION_TYPE_MESSAGE = "Select transaction type:"
 INCOME_CATEGORY_MESSAGE = "Select income category:"
 EXPENSE_CATEGORY_MESSAGE = "Select expense category:"
@@ -54,20 +57,99 @@ class ExpenseBot:
         return [[InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')]]
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Send welcome message and show main menu"""
-        keyboard = self.get_main_menu_keyboard()
+        """Send welcome message and show main menu with today's transactions"""
+        user_id = update.message.from_user.id if update.message else update.callback_query.from_user.id
+        
+        # Get today's transactions
+        todays_transactions = await self.transaction_service.get_todays_transactions(user_id)
+        
+        keyboard = []
+        
+        # Add today's transactions as buttons
+        for transaction in todays_transactions:
+            emoji = "✅" if transaction.type == "income" else "❌"
+            button_text = f"{emoji} {transaction.amount} ({transaction.category})"
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_{transaction.id}")])
+        
+        # Add separator if there are transactions
+        if todays_transactions:
+            keyboard.append([InlineKeyboardButton("---", callback_data="separator")])
+        
+        # Add main menu button
+        keyboard.extend(self.get_main_menu_keyboard())
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        message_text = WELCOME_MESSAGE
+        if todays_transactions:
+            message_text = f"{WELCOME_MESSAGE}\n\n{TODAYS_TRANSACTIONS_MESSAGE}"
+        else:
+            message_text = f"{WELCOME_MESSAGE}\n\n{NO_TRANSACTIONS_MESSAGE}"
+        
         if update.message:
-            await update.message.reply_text(
-                WELCOME_MESSAGE,
-                reply_markup=reply_markup
-            )
+            await update.message.reply_text(message_text, reply_markup=reply_markup)
+        elif update.callback_query:
+            await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup)
 
     async def statistics(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send category summary statistics"""
         res = await self.transaction_service.get_category_summary(update.message.from_user.id)
         await update.message.reply_text(str(res))
+
+    async def edit_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle transaction editing"""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = query.from_user.id
+        transaction_id = int(query.data.split('_')[1])
+        
+        # Get transaction details
+        transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
+        
+        if not transaction or transaction.user_id != user_id:
+            await query.edit_message_text("Transaction not found or access denied.")
+            return
+        
+        # Create edit options
+        keyboard = [
+            [InlineKeyboardButton("✏️ Edit Amount", callback_data=f"edit_amount_{transaction.id}")],
+            [InlineKeyboardButton("🗑️ Delete", callback_data=f"delete_{transaction.id}")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        emoji = "✅" if transaction.type == "income" else "❌"
+        transaction_text = f"{emoji} {transaction.amount} ({transaction.category})"
+        
+        await query.edit_message_text(
+            text=f"Editing transaction:\n{transaction_text}\n\nChoose an option:",
+            reply_markup=reply_markup
+        )
+
+    async def delete_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_id: int):
+        """Delete a transaction"""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = query.from_user.id
+        
+        try:
+            # Delete the transaction
+            result = await self.transaction_service.delete_transaction(transaction_id, user_id)
+            
+            if result:
+                await query.edit_message_text("Transaction deleted successfully!")
+            else:
+                await query.edit_message_text("Transaction not found or access denied.")
+        except Exception as e:
+            logger.error(f"Error deleting transaction: {e}")
+            await query.edit_message_text("Error deleting transaction.")
+        
+        # After deletion, show main menu
+        await asyncio.sleep(2)
+        await self.start(update, context)
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle all button presses"""
@@ -93,6 +175,17 @@ class ExpenseBot:
                 text=TRANSACTION_TYPE_MESSAGE,
                 reply_markup=reply_markup
             )
+        
+        elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
+            await self.edit_transaction(update, context)
+        
+        elif query.data.startswith('delete_'):
+            transaction_id = int(query.data.split('_')[1])
+            await self.delete_transaction(update, context, transaction_id)
+        
+        elif query.data == 'back_to_main':
+            # Refresh the main view with updated transactions
+            await self.start(update, context)
         
         elif query.data == 'type_income':
             # Show income categories
