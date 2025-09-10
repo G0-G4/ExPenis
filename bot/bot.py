@@ -27,6 +27,9 @@ CATEGORIES_PER_ROW = 3
 WELCOME_MESSAGE = "Welcome to Expense Tracker Bot! Click the button below to enter a transaction."
 TODAYS_TRANSACTIONS_MESSAGE = "Today's Transactions:"
 NO_TRANSACTIONS_MESSAGE = "No transactions today."
+TOTAL_INCOME_MESSAGE = "Total Income Today: {total_income}"
+TOTAL_EXPENSE_MESSAGE = "Total Expense Today: {total_expense}"
+NET_TOTAL_MESSAGE = "Net Total Today: {net_total}"
 TRANSACTION_TYPE_MESSAGE = "Select transaction type:"
 INCOME_CATEGORY_MESSAGE = "Select income category:"
 EXPENSE_CATEGORY_MESSAGE = "Select expense category:"
@@ -76,6 +79,12 @@ class ExpenseBot:
         # Get today's transactions
         todays_transactions = await self.transaction_service.get_todays_transactions(user_id)
         
+        # Get today's totals
+        totals = await self.transaction_service.get_todays_totals(user_id)
+        total_income = totals["total_income"]
+        total_expense = totals["total_expense"]
+        net_total = totals["net_total"]
+        
         keyboard = []
         
         # Add today's transactions as buttons
@@ -93,11 +102,16 @@ class ExpenseBot:
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        # Build message text with totals
+        totals_text = f"\n\n{TOTAL_INCOME_MESSAGE.format(total_income=f'{total_income:.2f}')}\n"
+        totals_text += f"{TOTAL_EXPENSE_MESSAGE.format(total_expense=f'{total_expense:.2f}')}\n"
+        totals_text += f"{NET_TOTAL_MESSAGE.format(net_total=f'{net_total:.2f}')}"
+        
         message_text = WELCOME_MESSAGE
         if todays_transactions:
-            message_text = f"{WELCOME_MESSAGE}\n\n{TODAYS_TRANSACTIONS_MESSAGE}"
+            message_text = f"{WELCOME_MESSAGE}\n\n{TODAYS_TRANSACTIONS_MESSAGE}{totals_text}"
         else:
-            message_text = f"{WELCOME_MESSAGE}\n\n{NO_TRANSACTIONS_MESSAGE}"
+            message_text = f"{WELCOME_MESSAGE}\n\n{NO_TRANSACTIONS_MESSAGE}{totals_text}"
         
         if update.message:
             await update.message.reply_text(message_text, reply_markup=reply_markup)

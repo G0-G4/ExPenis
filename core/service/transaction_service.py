@@ -79,3 +79,39 @@ class TransactionService:
                 return True
             return False
 
+    async def get_todays_totals(self, user_id: int) -> dict:
+        """Get today's total income and expenses for a specific user"""
+        today = date.today()
+        start_of_day = datetime.combine(today, datetime.min.time())
+        end_of_day = datetime.combine(today, datetime.max.time())
+
+        async with session_maker() as session:
+            # Get total income
+            income_result = await session.execute(
+                select(func.sum(Transaction.amount))
+                .where(
+                    Transaction.user_id == user_id,
+                    Transaction.type == "income",
+                    Transaction.created_at >= start_of_day,
+                    Transaction.created_at <= end_of_day
+                )
+            )
+            total_income = income_result.scalar() or 0.0
+
+            # Get total expenses
+            expense_result = await session.execute(
+                select(func.sum(Transaction.amount))
+                .where(
+                    Transaction.user_id == user_id,
+                    Transaction.type == "expense",
+                    Transaction.created_at >= start_of_day,
+                    Transaction.created_at <= end_of_day
+                )
+            )
+            total_expense = expense_result.scalar() or 0.0
+
+            return {
+                "total_income": total_income,
+                "total_expense": total_expense,
+                "net_total": total_income - total_expense
+            }
