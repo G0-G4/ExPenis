@@ -4,6 +4,7 @@ import asyncio
 
 from core.config import TOKEN
 from core.service.transaction_service import TransactionService
+from core.service.category_service import CategoryService
 import logging
 
 # Enable logging
@@ -16,7 +17,7 @@ logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 # Define conversation states
 ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT = range(4)
 
-# Define income and expense categories
+# Define income and expense categories (fallback defaults)
 INCOME_CATEGORIES = ['Salary', 'Investment', 'Gift', 'Other Income']
 EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Learning', 'Cafe', 'Other Expense']
 
@@ -55,6 +56,7 @@ class ExpenseBot:
     def __init__(self):
         self.user_data = {}
         self.transaction_service = TransactionService()
+        self.category_service = CategoryService()
         self.application = None
 
     def create_category_keyboard(self, categories, prefix):
@@ -62,7 +64,7 @@ class ExpenseBot:
         keyboard = []
         row = []
         for i, category in enumerate(categories):
-            row.append(InlineKeyboardButton(category, callback_data=f'{prefix}_{i}'))
+            row.append(InlineKeyboardButton(category, callback_data=f'{prefix}_{category}'))
             if len(row) == CATEGORIES_PER_ROW or i == len(categories) - 1:
                 keyboard.append(row)
                 row = []
@@ -71,6 +73,16 @@ class ExpenseBot:
     def get_main_menu_keyboard(self):
         """Create the main menu keyboard"""
         return [[InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')]]
+
+    async def get_user_income_categories(self, user_id: int) -> list:
+        """Get income category names for a user"""
+        categories = await self.category_service.get_user_income_categories(user_id)
+        return [cat.name for cat in categories] if categories else []
+
+    async def get_user_expense_categories(self, user_id: int) -> list:
+        """Get expense category names for a user"""
+        categories = await self.category_service.get_user_expense_categories(user_id)
+        return [cat.name for cat in categories] if categories else []
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send welcome message and show main menu with today's transactions"""
@@ -244,8 +256,13 @@ class ExpenseBot:
             await self.refresh_main_menu(update, context)
         
         elif query.data == 'type_income':
-            # Show income categories
-            keyboard = self.create_category_keyboard(INCOME_CATEGORIES, 'income')
+            # Show income categories (now fetched from database)
+            user_income_categories = await self.get_user_income_categories(user_id)
+            if not user_income_categories:
+                # Fallback to default categories if user has none
+                user_income_categories = INCOME_CATEGORIES
+            
+            keyboard = self.create_category_keyboard(user_income_categories, 'income')
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=INCOME_CATEGORY_MESSAGE,
@@ -258,8 +275,13 @@ class ExpenseBot:
             self.user_data[user_id]['type'] = 'income'
         
         elif query.data == 'type_expense':
-            # Show expense categories
-            keyboard = self.create_category_keyboard(EXPENSE_CATEGORIES, 'expense')
+            # Show expense categories (now fetched from database)
+            user_expense_categories = await self.get_user_expense_categories(user_id)
+            if not user_expense_categories:
+                # Fallback to default categories if user has none
+                user_expense_categories = EXPENSE_CATEGORIES
+            
+            keyboard = self.create_category_keyboard(user_expense_categories, 'expense')
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=EXPENSE_CATEGORY_MESSAGE,
@@ -274,13 +296,9 @@ class ExpenseBot:
         elif query.data and (query.data.startswith('income_') or query.data.startswith('expense_')):
             # Category selected, ask for amount
             if query.data:
-                category_type, category_index = query.data.split('_')
-                category_index = int(category_index)
-                
-                if category_type == 'income':
-                    category = INCOME_CATEGORIES[category_index]
-                else:
-                    category = EXPENSE_CATEGORIES[category_index]
+                parts = query.data.split('_', 1)  # Split only on first underscore
+                category_type = parts[0]
+                category = parts[1]  # Now using category name directly
                 
                 # Store selected category
                 self.user_data[user_id]['category'] = category
