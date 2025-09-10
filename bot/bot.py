@@ -83,7 +83,7 @@ class ExpenseBot:
         # Navigation buttons
         nav_row = [
             InlineKeyboardButton("◀️ Previous", callback_data=f"prev_{period_type}_{period_value}"),
-            InlineKeyboardButton("📅 Choose Date", callback_data=f"choose_date_{period_type}"),
+            InlineKeyboardButton("📅 Choose Date", callback_data=f"choose_custom_period"),
             InlineKeyboardButton("Next ▶️", callback_data=f"next_{period_type}_{period_value}")
         ]
         keyboard.append(nav_row)
@@ -100,10 +100,7 @@ class ExpenseBot:
             [InlineKeyboardButton("This Week", callback_data="view_period_week_0")],
             [InlineKeyboardButton("This Month", callback_data="view_period_month_0")],
             [InlineKeyboardButton("This Year", callback_data="view_period_year_0")],
-            [InlineKeyboardButton("Custom Date", callback_data="choose_date_day")],
-            [InlineKeyboardButton("Custom Week", callback_data="choose_date_week")],
-            [InlineKeyboardButton("Custom Month", callback_data="choose_date_month")],
-            [InlineKeyboardButton("Custom Year", callback_data="choose_date_year")],
+            [InlineKeyboardButton("Custom Period", callback_data="choose_custom_period")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
         ]
         
@@ -361,18 +358,18 @@ class ExpenseBot:
             offset = current_offset - 1 if direction == 'prev' else current_offset + 1
             await self.view_period_stats(update, context, period_type, offset)
         
-        elif query.data.startswith('choose_date_'):
-            period_type = query.data.split('_')[2]
-            
+        elif query.data == 'choose_custom_period':
             # Store state for date input
             if user_id not in self.user_data:
                 self.user_data[user_id] = {}
             self.user_data[user_id]['state'] = 'CHOOSING_DATE'
-            self.user_data[user_id]['choosing_date_for'] = period_type
             
             # Ask user for date
             await query.edit_message_text(
-                text="Please enter a date (YYYY-MM-DD) or week number (YYYY-WW) or month (YYYY-MM) or year (YYYY):"
+                text="Please enter a date in one of these formats:\n"
+                     "YYYY (for a year)\n"
+                     "YYYY-MM (for a month)\n"
+                     "YYYY-MM-DD (for a specific date)"
             )
         
         elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
@@ -452,7 +449,33 @@ class ExpenseBot:
             self.user_data[user_id].get('state') == 'CHOOSING_DATE'):
             
             date_input = update.message.text.strip()
-            period_type = self.user_data[user_id].get('choosing_date_for', 'day')
+            
+            # Determine period type based on input format
+            if len(date_input) == 4 and date_input.isdigit():
+                # YYYY format - year
+                period_type = 'year'
+            elif (len(date_input) == 7 and 
+                  date_input[4] == '-' and 
+                  date_input[:4].isdigit() and 
+                  date_input[5:].isdigit()):
+                # YYYY-MM format - month
+                period_type = 'month'
+            elif (len(date_input) == 10 and 
+                  date_input[4] == '-' and 
+                  date_input[7] == '-' and 
+                  date_input[:4].isdigit() and 
+                  date_input[5:7].isdigit() and 
+                  date_input[8:].isdigit()):
+                # YYYY-MM-DD format - day
+                period_type = 'day'
+            else:
+                await update.message.reply_text(
+                    "Invalid date format. Please use one of these formats:\n"
+                    "YYYY (for a year)\n"
+                    "YYYY-MM (for a month)\n"
+                    "YYYY-MM-DD (for a specific date)"
+                )
+                return
             
             try:
                 # Parse the date input and show stats for that period
