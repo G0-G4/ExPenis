@@ -1,5 +1,5 @@
 CREATE TABLE categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     name TEXT NOT NULL,
