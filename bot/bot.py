@@ -128,9 +128,11 @@ class ExpenseBot:
             user_id, period_type, offset
         )
         
+        # Add navigation keyboard - this will be used in both cases
+        keyboard = self.get_period_navigation_keyboard(period_type, offset, user_id)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
-            keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=f"{PERIOD_STATS_MESSAGE}\n\n{NO_DATA_MESSAGE}",
                 reply_markup=reply_markup
@@ -162,10 +164,6 @@ class ExpenseBot:
         # Add net total
         net_total = period_data["net_total"]
         message_text += f"📊 Net Total: {net_total:.2f}"
-        
-        # Add navigation keyboard
-        keyboard = self.get_period_navigation_keyboard(period_type, offset, user_id)
-        reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
             text=message_text,
@@ -483,9 +481,11 @@ class ExpenseBot:
                     user_id, period_type, date_input
                 )
                 
+                # Add navigation keyboard for custom periods
+                keyboard = self.get_period_navigation_keyboard(period_type, 0, user_id)
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
                 if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
-                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
                     await update.message.reply_text(
                         text=f"{PERIOD_STATS_MESSAGE}\n\n{NO_DATA_MESSAGE}",
                         reply_markup=reply_markup
@@ -518,10 +518,6 @@ class ExpenseBot:
                 # Add net total
                 net_total = period_data["net_total"]
                 message_text += f"📊 Net Total: {net_total:.2f}"
-                
-                # Add navigation keyboard (for custom periods, we use offset 0)
-                keyboard = self.get_period_navigation_keyboard(period_type, 0, user_id)
-                reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await update.message.reply_text(
                     text=message_text,
