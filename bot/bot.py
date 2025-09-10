@@ -37,28 +37,6 @@ class ExpenseBot:
         self.user_data = {}
         self.transaction_service = TransactionService()
         self.application = None
-        self._handlers = []
-        
-    def command(self, command_name):
-        """Decorator for command handlers"""
-        def decorator(func):
-            self._handlers.append(('command', command_name, func))
-            return func
-        return decorator
-        
-    def callback_query(self):
-        """Decorator for callback query handlers"""
-        def decorator(func):
-            self._handlers.append(('callback_query', None, func))
-            return func
-        return decorator
-        
-    def message(self, filter_condition):
-        """Decorator for message handlers"""
-        def decorator(func):
-            self._handlers.append(('message', filter_condition, func))
-            return func
-        return decorator
 
     def create_category_keyboard(self, categories, prefix):
         """Create a keyboard with categories arranged in columns"""
@@ -75,7 +53,6 @@ class ExpenseBot:
         """Create the main menu keyboard"""
         return [[InlineKeyboardButton("Enter Transaction", callback_data='enter_transaction')]]
 
-    @command('start')
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send welcome message and show main menu"""
         keyboard = self.get_main_menu_keyboard()
@@ -87,13 +64,11 @@ class ExpenseBot:
                 reply_markup=reply_markup
             )
 
-    @command('stat')
     async def statistics(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send category summary statistics"""
         res = await self.transaction_service.get_category_summary(update.message.from_user.id)
         await update.message.reply_text(str(res))
 
-    @callback_query()
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle all button presses"""
         query = update.callback_query
@@ -168,7 +143,6 @@ class ExpenseBot:
                 # Set state to expect amount input
                 self.user_data[user_id]['state'] = ENTER_AMOUNT
 
-    @message(filters.TEXT & ~filters.COMMAND)
     async def handle_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle amount input from user"""
         if not update.message or not update.message.from_user:
@@ -246,14 +220,15 @@ class ExpenseBot:
             
         self.application = ApplicationBuilder().token(TOKEN).build()
         
-        # Register all handlers
-        for handler_type, arg, func in self._handlers:
-            if handler_type == 'command':
-                self.application.add_handler(CommandHandler(arg, func))
-            elif handler_type == 'callback_query':
-                self.application.add_handler(CallbackQueryHandler(func))
-            elif handler_type == 'message':
-                self.application.add_handler(MessageHandler(arg, func))
+        # Register command handlers
+        self.application.add_handler(CommandHandler('start', self.start))
+        self.application.add_handler(CommandHandler('stat', self.statistics))
+        
+        # Register callback query handler
+        self.application.add_handler(CallbackQueryHandler(self.button_handler))
+        
+        # Register message handler
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_amount))
         
         return True
 
