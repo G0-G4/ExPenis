@@ -175,7 +175,6 @@ class ExpenseBot:
             await query.edit_message_text("Error deleting transaction.")
         
         # After deletion, show main menu
-        await asyncio.sleep(2)
         await self.refresh_main_menu(update, context)
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
