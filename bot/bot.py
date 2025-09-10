@@ -22,6 +22,8 @@ EXPENSE_CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills',
 
 # UI constants
 CATEGORIES_PER_ROW = 3
+
+# Message constants
 WELCOME_MESSAGE = "Welcome to Expense Tracker Bot! Click the button below to enter a transaction."
 TODAYS_TRANSACTIONS_MESSAGE = "Today's Transactions:"
 NO_TRANSACTIONS_MESSAGE = "No transactions today."
@@ -33,6 +35,17 @@ INVALID_AMOUNT_MESSAGE = "Please enter a valid number for the amount."
 THANK_YOU_MESSAGE = "Thank you!"
 MAIN_MENU_MESSAGE = "What would you like to do next?"
 VIEW_TRANSACTIONS_MESSAGE = "Here are your recent transactions:"
+TRANSACTION_NOT_FOUND_MESSAGE = "Transaction not found or access denied."
+EDIT_TRANSACTION_MESSAGE = "Editing transaction:"
+CHOOSE_OPTION_MESSAGE = "Choose an option:"
+TRANSACTION_DELETED_MESSAGE = "Transaction deleted successfully!"
+ERROR_DELETING_TRANSACTION_MESSAGE = "Error deleting transaction."
+TRANSACTION_RECORDED_MESSAGE = "Transaction recorded:"
+ERROR_SAVING_TRANSACTION_MESSAGE = "Note: Failed to save to database."
+TRANSACTION_UPDATED_MESSAGE = "Transaction updated:"
+ERROR_UPDATING_TRANSACTION_MESSAGE = "Error updating transaction."
+ERROR_NO_TRANSACTION_SELECTED = "Error: No transaction selected for editing."
+TRANSACTION_ID_MESSAGE = "Transaction ID:"
 
 
 class ExpenseBot:
@@ -107,7 +120,7 @@ class ExpenseBot:
         transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
         
         if not transaction or transaction.user_id != user_id:
-            await query.edit_message_text("Transaction not found or access denied.")
+            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE)
             return
         
         # Create edit options
@@ -123,7 +136,7 @@ class ExpenseBot:
         transaction_text = f"{emoji} {transaction.amount} ({transaction.category})"
         
         await query.edit_message_text(
-            text=f"Editing transaction:\n{transaction_text}\n\nChoose an option:",
+            text=f"{EDIT_TRANSACTION_MESSAGE}\n{transaction_text}\n\n{CHOOSE_OPTION_MESSAGE}",
             reply_markup=reply_markup
         )
 
@@ -139,7 +152,7 @@ class ExpenseBot:
         transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
         
         if not transaction or transaction.user_id != user_id:
-            await query.edit_message_text("Transaction not found or access denied.")
+            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE)
             return
         
         # Store editing state
@@ -152,7 +165,7 @@ class ExpenseBot:
         transaction_text = f"{emoji} {transaction.amount} ({transaction.category})"
         
         await query.edit_message_text(
-            text=f"Editing transaction:\n{transaction_text}\n\nPlease enter the new amount:"
+            text=f"{EDIT_TRANSACTION_MESSAGE}\n{transaction_text}\n\n{AMOUNT_PROMPT_MESSAGE}"
         )
 
     async def delete_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_id: int):
@@ -167,12 +180,12 @@ class ExpenseBot:
             result = await self.transaction_service.delete_transaction(transaction_id, user_id)
             
             if result:
-                await query.edit_message_text("Transaction deleted successfully!")
+                await query.edit_message_text(TRANSACTION_DELETED_MESSAGE)
             else:
-                await query.edit_message_text("Transaction not found or access denied.")
+                await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE)
         except Exception as e:
             logger.error(f"Error deleting transaction: {e}")
-            await query.edit_message_text("Error deleting transaction.")
+            await query.edit_message_text(ERROR_DELETING_TRANSACTION_MESSAGE)
         
         # After deletion, show main menu
         await self.refresh_main_menu(update, context)
@@ -302,12 +315,12 @@ class ExpenseBot:
                     )
                     
                     await update.message.reply_text(
-                        f"Transaction recorded:\n{transaction_text}\n\nTransaction ID: {transaction.id}\n\n{THANK_YOU_MESSAGE}"
+                        f"{TRANSACTION_RECORDED_MESSAGE}\n{transaction_text}\n\n{TRANSACTION_ID_MESSAGE} {transaction.id}\n\n{THANK_YOU_MESSAGE}"
                     )
                 except Exception as e:
                     logger.error(f"Error saving transaction: {e}")
                     await update.message.reply_text(
-                        f"Transaction recorded:\n{transaction_text}\n\nNote: Failed to save to database.\n\n{THANK_YOU_MESSAGE}"
+                        f"{TRANSACTION_RECORDED_MESSAGE}\n{transaction_text}\n\n{ERROR_SAVING_TRANSACTION_MESSAGE}\n\n{THANK_YOU_MESSAGE}"
                     )
                 
                 # Clear user data for this transaction
@@ -331,7 +344,7 @@ class ExpenseBot:
                 transaction_id = self.user_data[user_id].get('editing_transaction_id')
                 
                 if not transaction_id:
-                    await update.message.reply_text("Error: No transaction selected for editing.")
+                    await update.message.reply_text(ERROR_NO_TRANSACTION_SELECTED)
                     return
                 
                 # Update transaction in database
@@ -345,13 +358,13 @@ class ExpenseBot:
                     if updated_transaction:
                         emoji = "✅" if updated_transaction.type == "income" else "❌"
                         await update.message.reply_text(
-                            f"Transaction updated:\n{emoji} {updated_transaction.amount} ({updated_transaction.category})\n\n{THANK_YOU_MESSAGE}"
+                            f"{TRANSACTION_UPDATED_MESSAGE}\n{emoji} {updated_transaction.amount} ({updated_transaction.category})\n\n{THANK_YOU_MESSAGE}"
                         )
                     else:
-                        await update.message.reply_text("Error: Transaction not found or access denied.")
+                        await update.message.reply_text(TRANSACTION_NOT_FOUND_MESSAGE)
                 except Exception as e:
                     logger.error(f"Error updating transaction: {e}")
-                    await update.message.reply_text("Error updating transaction.")
+                    await update.message.reply_text(ERROR_UPDATING_TRANSACTION_MESSAGE)
                 
                 # Clear user data
                 self.user_data[user_id] = {}
