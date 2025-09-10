@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 import calendar
+from dateutil.relativedelta import relativedelta, MO
 
 from core.database import  get_session_async, session_maker
 from core.models.transaction import Transaction
@@ -120,51 +121,39 @@ class TransactionService:
     async def get_period_statistics(self, user_id: int, period_type: str, offset: int = 0) -> dict:
         """Get statistics for a specific period (day, week, month, year) with offset"""
         async with session_maker() as session:
-            # Calculate date range based on period type and offset
+            # Calculate date range based on period type and offset using dateutil
+            base_date = date.today()
+            start_date = None
+            end_date = None
+            period_label = ""
+
             if period_type == "day":
-                target_date = date.today() + timedelta(days=offset)
+                target_date = base_date + timedelta(days=offset)
                 start_date = datetime.combine(target_date, datetime.min.time())
                 end_date = datetime.combine(target_date, datetime.max.time())
                 period_label = target_date.strftime("%Y-%m-%d")
             elif period_type == "week":
-                # Calculate week start (Monday) with offset
-                today = date.today()
-                days_ahead = -today.weekday()  # Monday is 0
-                week_start = today + timedelta(days=days_ahead, weeks=offset)
-                week_end = week_start + timedelta(days=6)
-                start_date = datetime.combine(week_start, datetime.min.time())
-                end_date = datetime.combine(week_end, datetime.max.time())
-                period_label = f"Week {week_start.isocalendar()[1]}, {week_start.year}"
+                # Find the Monday of the current week
+                current_week_start = base_date + relativedelta(weekday=MO(-1)) # Monday of the week containing base_date
+                # Apply offset in weeks
+                target_week_start = current_week_start + relativedelta(weeks=offset)
+                target_week_end = target_week_start + timedelta(days=6)
+                start_date = datetime.combine(target_week_start, datetime.min.time())
+                end_date = datetime.combine(target_week_end, datetime.max.time())
+                period_label = f"Week {target_week_start.isocalendar()[1]}, {target_week_start.year}"
             elif period_type == "month":
-                # Calculate month with offset
-                today = date.today()
-                first_day = today.replace(day=1)
+                # Get the first day of the current month
+                current_month_start = base_date.replace(day=1)
                 # Apply offset in months
-                if offset != 0:
-                    if offset > 0:
-                        for _ in range(offset):
-                            if first_day.month == 12:
-                                first_day = first_day.replace(year=first_day.year + 1, month=1)
-                            else:
-                                first_day = first_day.replace(month=first_day.month + 1)
-                    else:
-                        for _ in range(-offset):
-                            if first_day.month == 1:
-                                first_day = first_day.replace(year=first_day.year - 1, month=12)
-                            else:
-                                first_day = first_day.replace(month=first_day.month - 1)
-                
-                # Last day of month
-                if first_day.month == 12:
-                    last_day = first_day.replace(day=31)
-                else:
-                    last_day = first_day.replace(month=first_day.month + 1, day=1) - timedelta(days=1)
-                
-                start_date = datetime.combine(first_day, datetime.min.time())
-                end_date = datetime.combine(last_day, datetime.max.time())
-                period_label = first_day.strftime("%B %Y")
+                target_month_start = current_month_start + relativedelta(months=offset)
+                # Get the last day of the target month
+                next_month_start = target_month_start + relativedelta(months=1)
+                target_month_end = next_month_start - timedelta(days=1)
+                start_date = datetime.combine(target_month_start, datetime.min.time())
+                end_date = datetime.combine(target_month_end, datetime.max.time())
+                period_label = target_month_start.strftime("%B %Y")
             elif period_type == "year":
-                target_year = date.today().year + offset
+                target_year = base_date.year + offset
                 start_date = datetime(target_year, 1, 1, 0, 0, 0)
                 end_date = datetime(target_year, 12, 31, 23, 59, 59)
                 period_label = str(target_year)
