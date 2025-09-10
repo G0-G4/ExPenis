@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 import calendar
-from dateutil.relativedelta import relativedelta, MO
+from dateutil.relativedelta import relativedelta, MO, SU
 
 from core.database import  get_session_async, session_maker
 from core.models.transaction import Transaction
@@ -177,7 +177,7 @@ class TransactionService:
         period_label = ""
 
         if period_type == "day":
-            target_date = base_date + timedelta(days=offset)
+            target_date = base_date + relativedelta(days=offset)
             start_date = datetime.combine(target_date, datetime.min.time())
             end_date = datetime.combine(target_date, datetime.max.time())
             period_label = target_date.strftime("%Y-%m-%d")
@@ -186,7 +186,7 @@ class TransactionService:
             current_week_start = base_date + relativedelta(weekday=MO(-1))
             # Apply offset in weeks
             target_week_start = current_week_start + relativedelta(weeks=offset)
-            target_week_end = target_week_start + timedelta(days=6)
+            target_week_end = target_week_start + relativedelta(weekday=SU)
             start_date = datetime.combine(target_week_start, datetime.min.time())
             end_date = datetime.combine(target_week_end, datetime.max.time())
             period_label = f"Week {target_week_start.isocalendar()[1]}, {target_week_start.year}"
@@ -196,8 +196,7 @@ class TransactionService:
             # Apply offset in months
             target_month_start = current_month_start + relativedelta(months=offset)
             # Get the last day of the target month
-            next_month_start = target_month_start + relativedelta(months=1)
-            target_month_end = next_month_start - timedelta(days=1)
+            target_month_end = target_month_start + relativedelta(months=1, days=-1)
             start_date = datetime.combine(target_month_start, datetime.min.time())
             end_date = datetime.combine(target_month_end, datetime.max.time())
             period_label = target_month_start.strftime("%B %Y")
@@ -220,18 +219,22 @@ class TransactionService:
                 start_date = datetime.combine(target_date, datetime.min.time())
                 end_date = datetime.combine(target_date, datetime.max.time())
                 period_label = target_date.strftime("%Y-%m-%d")
+            elif period_type == "week":
+                # Parse YYYY-WW (ISO week number)
+                year, week = map(int, date_input.split("-W"))
+                target_week_start = datetime.strptime(f'{year}-{week}-1', '%Y-%U-%w').date()
+                target_week_end = target_week_start + relativedelta(weekday=SU)
+                start_date = datetime.combine(target_week_start, datetime.min.time())
+                end_date = datetime.combine(target_week_end, datetime.max.time())
+                period_label = f"Week {week}, {year}"
             elif period_type == "month":
                 # Parse YYYY-MM
                 target_date = datetime.strptime(date_input, "%Y-%m").date()
-                first_day = target_date.replace(day=1)
-                # Last day of month
-                if first_day.month == 12:
-                    last_day = first_day.replace(day=31)
-                else:
-                    last_day = first_day.replace(month=first_day.month + 1, day=1) - timedelta(days=1)
-                start_date = datetime.combine(first_day, datetime.min.time())
-                end_date = datetime.combine(last_day, datetime.max.time())
-                period_label = first_day.strftime("%B %Y")
+                target_month_start = target_date.replace(day=1)
+                target_month_end = target_month_start + relativedelta(months=1, days=-1)
+                start_date = datetime.combine(target_month_start, datetime.min.time())
+                end_date = datetime.combine(target_month_end, datetime.max.time())
+                period_label = target_month_start.strftime("%B %Y")
             elif period_type == "year":
                 # Parse YYYY
                 year = int(date_input)
