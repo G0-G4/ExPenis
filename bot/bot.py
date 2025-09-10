@@ -77,6 +77,8 @@ class ExpenseBot:
             if len(row) == CATEGORIES_PER_ROW or i == len(categories) - 1:
                 keyboard.append(row)
                 row = []
+        # Add back button to category selection
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
         return keyboard
 
     def get_main_menu_keyboard(self):
@@ -311,8 +313,13 @@ class ExpenseBot:
         formatted_amount = format_amount(transaction.amount)
         transaction_text = f"{emoji} {formatted_amount} ({transaction.category})"
         
+        # Add back button to amount editing
+        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await query.edit_message_text(
             text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{AMOUNT_PROMPT_MESSAGE}",
+            reply_markup=reply_markup,
             parse_mode="HTML"
         )
 
@@ -356,6 +363,7 @@ class ExpenseBot:
                     InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
                     InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
                 ],
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
@@ -389,12 +397,16 @@ class ExpenseBot:
                 self.user_data[user_id] = {}
             self.user_data[user_id]['state'] = 'CHOOSING_DATE'
             
-            # Ask user for date
+            # Ask user for date with back button
+            keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await query.edit_message_text(
                 text="📅 <b>Please enter a date in one of these formats:</b>\n"
                      "<pre>YYYY</pre>          (for a year)\n"
                      "<pre>YYYY-MM</pre>       (for a month)\n"
                      "<pre>YYYY-MM-DD</pre>    (for a specific date)",
+                reply_markup=reply_markup,
                 parse_mode="HTML"
             )
         
@@ -458,8 +470,13 @@ class ExpenseBot:
                 # Store selected category
                 self.user_data[user_id]['category'] = category
                 
+                # Add back button to amount prompt
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
                 await query.edit_message_text(
                     text=f"🏷️ <b>Selected category: {category}</b>\n\n{AMOUNT_PROMPT_MESSAGE}",
+                    reply_markup=reply_markup,
                     parse_mode="HTML"
                 )
                 
@@ -498,11 +515,15 @@ class ExpenseBot:
                 # YYYY-MM-DD format - day
                 period_type = 'day'
             else:
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
                 await update.message.reply_text(
                     "❌ <b>Invalid date format.</b> Please use one of these formats:\n"
                     "<pre>YYYY</pre>          (for a year)\n"
                     "<pre>YYYY-MM</pre>       (for a month)\n"
                     "<pre>YYYY-MM-DD</pre>    (for a specific date)",
+                    reply_markup=reply_markup,
                     parse_mode="HTML"
                 )
                 return
@@ -566,7 +587,14 @@ class ExpenseBot:
                 return
                 
             except ValueError as e:
-                await update.message.reply_text("❌ <b>Invalid date format.</b> Please try again.", parse_mode="HTML")
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="select_period")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    "❌ <b>Invalid date format.</b> Please try again.", 
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
                 return
         
         # Check if we're expecting an amount input for a new transaction
@@ -574,7 +602,14 @@ class ExpenseBot:
             try:
                 amount_text = update.message.text
                 if not amount_text:
-                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.message.reply_text(
+                        INVALID_AMOUNT_MESSAGE, 
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
                     return
                     
                 amount = float(amount_text)
@@ -599,14 +634,22 @@ class ExpenseBot:
                         transaction_type=transaction_type,
                     )
                     
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
                     await update.message.reply_text(
                         f"{TRANSACTION_RECORDED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{TRANSACTION_ID_MESSAGE} {transaction.id}\n\n{THANK_YOU_MESSAGE}",
+                        reply_markup=reply_markup,
                         parse_mode="HTML"
                     )
                 except Exception as e:
                     logger.error(f"Error saving transaction: {e}")
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
                     await update.message.reply_text(
                         f"{TRANSACTION_RECORDED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{ERROR_SAVING_TRANSACTION_MESSAGE}\n\n{THANK_YOU_MESSAGE}",
+                        reply_markup=reply_markup,
                         parse_mode="HTML"
                     )
                 
@@ -617,21 +660,42 @@ class ExpenseBot:
                 await self.refresh_main_menu(update, context)
                 
             except ValueError:
-                await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    INVALID_AMOUNT_MESSAGE, 
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
         
         # Check if we're editing an existing transaction amount
         elif user_id in self.user_data and self.user_data[user_id].get('state') == 'EDITING_AMOUNT':
             try:
                 amount_text = update.message.text
                 if not amount_text:
-                    await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.message.reply_text(
+                        INVALID_AMOUNT_MESSAGE, 
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
                     return
                     
                 amount = float(amount_text)
                 transaction_id = self.user_data[user_id].get('editing_transaction_id')
                 
                 if not transaction_id:
-                    await update.message.reply_text(ERROR_NO_TRANSACTION_SELECTED, parse_mode="HTML")
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.message.reply_text(
+                        ERROR_NO_TRANSACTION_SELECTED, 
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
                     return
                 
                 # Update transaction in database
@@ -645,15 +709,33 @@ class ExpenseBot:
                     if updated_transaction:
                         emoji = "🟢" if updated_transaction.type == "income" else "🔴"
                         formatted_amount = format_amount(updated_transaction.amount)
+                        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        
                         await update.message.reply_text(
                             f"{TRANSACTION_UPDATED_MESSAGE}\n<pre>{emoji} {formatted_amount} ({updated_transaction.category})</pre>\n\n{THANK_YOU_MESSAGE}",
+                            reply_markup=reply_markup,
                             parse_mode="HTML"
                         )
                     else:
-                        await update.message.reply_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
+                        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        
+                        await update.message.reply_text(
+                            TRANSACTION_NOT_FOUND_MESSAGE, 
+                            reply_markup=reply_markup,
+                            parse_mode="HTML"
+                        )
                 except Exception as e:
                     logger.error(f"Error updating transaction: {e}")
-                    await update.message.reply_text(ERROR_UPDATING_TRANSACTION_MESSAGE, parse_mode="HTML")
+                    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.message.reply_text(
+                        ERROR_UPDATING_TRANSACTION_MESSAGE, 
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
                 
                 # Clear user data
                 self.user_data[user_id] = {}
@@ -662,7 +744,14 @@ class ExpenseBot:
                 await self.refresh_main_menu(update, context)
                 
             except ValueError:
-                await update.message.reply_text(INVALID_AMOUNT_MESSAGE, parse_mode="HTML")
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    INVALID_AMOUNT_MESSAGE, 
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
         else:
             # If not in amount input state, show main menu
             await self.refresh_main_menu(update, context)
