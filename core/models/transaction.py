@@ -13,6 +13,7 @@ class Transaction(Base):
     category = Column(String, nullable=False)
     type = Column(String, nullable=False)  # 'income' or 'expense'
     created_at = Column(DateTime, default=datetime.now(UTC))
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
     
     def __repr__(self):
         return f"<Transaction(user_id={self.user_id}, amount={self.amount}, category='{self.category}', type='{self.type}')>"

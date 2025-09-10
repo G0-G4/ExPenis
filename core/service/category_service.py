@@ -15,7 +15,7 @@ class CategoryService:
                     Category.user_id == user_id,
                     Category.type == "income"
                 )
-                .order_by(Category.name)
+                .order_by(Category.id)
             )
             return list(result.scalars().all())
 
@@ -28,7 +28,7 @@ class CategoryService:
                     Category.user_id == user_id,
                     Category.type == "expense"
                 )
-                .order_by(Category.name)
+                .order_by(Category.id)
             )
             return list(result.scalars().all())
 
@@ -41,7 +41,7 @@ class CategoryService:
                     Category.user_id == user_id,
                     Category.type == category_type
                 )
-                .order_by(Category.name)
+                .order_by(Category.id)
             )
             return list(result.scalars().all())
 
