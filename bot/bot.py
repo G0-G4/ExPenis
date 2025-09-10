@@ -91,6 +91,10 @@ class ExpenseBot:
         elif update.callback_query:
             await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup)
 
+    async def refresh_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Refresh the main menu view"""
+        await self.start(update, context)
+
     async def edit_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle transaction editing"""
         query = update.callback_query
@@ -172,7 +176,7 @@ class ExpenseBot:
         
         # After deletion, show main menu
         await asyncio.sleep(2)
-        await self.start(update, context)
+        await self.refresh_main_menu(update, context)
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle all button presses"""
@@ -211,7 +215,7 @@ class ExpenseBot:
         
         elif query.data == 'back_to_main':
             # Refresh the main view with updated transactions
-            await self.start(update, context)
+            await self.refresh_main_menu(update, context)
         
         elif query.data == 'type_income':
             # Show income categories
@@ -311,7 +315,7 @@ class ExpenseBot:
                 self.user_data[user_id] = {}
                 
                 # Show main menu with today's transactions
-                await self.start(update, context)
+                await self.refresh_main_menu(update, context)
                 
             except ValueError:
                 await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
@@ -354,13 +358,13 @@ class ExpenseBot:
                 self.user_data[user_id] = {}
                 
                 # Show main menu with today's transactions
-                await self.start(update, context)
+                await self.refresh_main_menu(update, context)
                 
             except ValueError:
                 await update.message.reply_text(INVALID_AMOUNT_MESSAGE)
         else:
             # If not in amount input state, show main menu
-            await self.start(update, context)
+            await self.refresh_main_menu(update, context)
 
     def _initialize_application(self):
         """Initialize the Telegram application and register handlers"""
