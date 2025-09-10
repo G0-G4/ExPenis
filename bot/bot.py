@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 import asyncio
 
@@ -667,6 +667,13 @@ class ExpenseBot:
             # If not in amount input state, show main menu
             await self.refresh_main_menu(update, context)
 
+    async def set_bot_commands(self):
+        """Set bot commands menu"""
+        commands = [
+            BotCommand("start", "Open the main menu"),
+        ]
+        await self.application.bot.set_my_commands(commands)
+
     def _initialize_application(self):
         """Initialize the Telegram application and register handlers"""
         if not TOKEN:
@@ -686,10 +693,15 @@ class ExpenseBot:
         
         return True
 
+    async def post_init(self, application):
+        """Post initialization tasks"""
+        await self.set_bot_commands()
+
     def run(self):
         """Run the bot"""
         if not self._initialize_application():
             return
+        self.application.post_init = self.post_init
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
