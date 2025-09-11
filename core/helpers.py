@@ -3,7 +3,7 @@ from datetime import date, datetime
 from dateutil.relativedelta import MO, SU, relativedelta
 
 
-async def calculate_period_dates(period_type: str, offset: int = 0) -> tuple[datetime, datetime, str]:
+async def calculate_period_dates(base_date: date, period_type: str, offset: int = 0) -> tuple[datetime, datetime, str]:
     """Helper method to calculate date ranges for relative periods"""
     base_date = date.today()
 
@@ -27,16 +27,16 @@ async def calculate_period_dates(period_type: str, offset: int = 0) -> tuple[dat
     # Use the common helper to calculate boundaries
     return await _calculate_period_boundaries(target_base_date, period_type)
 
-async def parse_custom_period_dates(period_type: str, date_input: str) -> tuple[datetime, datetime, str]:
+async def get_target_date(period_type: str, date_input: str) -> date:
     """Helper method to parse custom period dates"""
     target_base_date = None
     try:
         if period_type == "day":
             # Parse YYYY-MM-DD
-            target_base_date = datetime.strptime(date_input, "%Y-%m-%d").date()
+            target_base_date = datetime.strptime(date_input, "%Y-%m-%dd").date()
         elif period_type == "month":
             # Parse YYYY-MM
-            target_base_date = datetime.strptime(date_input, "%Y-%m").date().replace(day=1)
+            target_base_date = datetime.strptime(date_input, "%Y-%mm").date().replace(day=1)
         elif period_type == "year":
             # Parse YYYY
             year = int(date_input)
@@ -45,9 +45,8 @@ async def parse_custom_period_dates(period_type: str, date_input: str) -> tuple[
             raise ValueError("Invalid period type")
     except ValueError as e:
         raise ValueError(f"Invalid date format for {period_type}: {e}")
+    return target_base_date
 
-    # Use the common helper to calculate boundaries
-    return await _calculate_period_boundaries(target_base_date, period_type)
 
 async def _calculate_period_boundaries(base_date: date, period_type: str) -> tuple[datetime, datetime, str]:
     """Helper method to calculate start/end dates and label for a given base date and period type."""

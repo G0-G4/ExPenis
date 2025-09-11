@@ -31,6 +31,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Add separator if there are transactions
     if todays_transactions:
         keyboard.append([InlineKeyboardButton("───────────────", callback_data="separator")])
+    keyboard.append([InlineKeyboardButton("button", callback_data="button")]) # TODO test
 
     # Add main menu button
     keyboard.extend(get_main_menu_keyboard())

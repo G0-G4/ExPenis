@@ -19,6 +19,7 @@ async def period_selection_screen(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("🔍 Custom Period", callback_data="choose_custom_period")],
         [InlineKeyboardButton("⬅️ Back", callback_data="back")]
     ]
+    context.user_data['update'] = update
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -39,29 +40,27 @@ async def period_selection_screen(update: Update, context: ContextTypes.DEFAULT_
 
 
 PERIOD_VIEW_SCREEN = "PERIOD_VIEW_SCREEN"
-async def period_view_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def period_view_screen(update, context: ContextTypes.DEFAULT_TYPE, recursive_call=False):
     push_state(context)
-    context.user_data['previous_state'] = PERIOD_VIEW_SCREEN
     query = update.callback_query
-    if query and query.data.startswith('view_period_'):
+    if not recursive_call and query.data.startswith('view_period_'):
         parts = query.data.split('_')
         period_type = parts[2]  # day, week, month, year
         offset = int(parts[3])  # offset for navigation
         context.user_data['date'] = str(date.today())
         context.user_data['period_type'] = period_type
         context.user_data['offset'] = offset
-        return await period_view_screen(update, context)
-    if 'date' in context.user_data:
+        context.user_data['user_id'] = query.from_user.id
+        return await period_view_screen(update, context, True)
+    if recursive_call and 'date' in context.user_data:
         context.user_data['date'] = str(date.today())
         return await view_period_stats(update, context, context.user_data['period_type'] , context.user_data['offset'])
 
     elif query and query.data.startswith('prev_') or query.data.startswith('next_'):
-        parts = query.data.split('_') #TODO do all through context
+        parts = query.data.split('_')
         direction = parts[0]  # prev or next
         period_type = parts[1]
         current_offset = int(parts[2])
-        # context.user_data['period_type'] = period_type
-        # context.user_data['offset'] = current_offset
 
         # Calculate new offset
         offset = current_offset - 1 if direction == 'prev' else current_offset + 1
@@ -85,16 +84,15 @@ async def period_view_screen(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def view_period_stats(update: Update, context: ContextTypes.DEFAULT_TYPE,
                             period_type: str, offset: int = 0):
     """View statistics for a specific period"""
-    query = update.callback_query
-    user_id = query.from_user.id
 
+    query = context.user_data['update'].callback_query
     # Get period data
     period_data = await get_custom_period_statistics(
-        user_id, context.user_data['period_type'], context.user_data['date'], offset
+        context.user_data['user_id'], context.user_data['period_type'], context.user_data['date'], offset
     )
 
     # Add navigation keyboard - this will be used in both cases
-    keyboard = get_period_navigation_keyboard(period_type, offset, user_id)
+    keyboard = get_period_navigation_keyboard(period_type, offset, context.user_data['user_id'])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
@@ -144,8 +142,6 @@ async def view_period_stats(update: Update, context: ContextTypes.DEFAULT_TYPE,
 CUSTOM_PERIOD = "CUSTOM_PERIOD"
 async def custom_period(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle amount input from user"""
-    push_state(context)
-    context.user_data['previous_state'] = CUSTOM_PERIOD
     if not update.message or not update.message.from_user:
         return CUSTOM_PERIOD
 
@@ -184,14 +180,11 @@ async def custom_period(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CUSTOM_PERIOD
 
     try:
-        # Parse the date input and show stats for that period
-        # period_data = await get_custom_period_statistics(
-        #     user_id, period_type, date_input
-        # )
         context.user_data['date'] = get_target_date(period_type, date_input)
-        return await period_view_screen(update, context)
-        # context.user_data['period_type'] = period_type
-        # context.user_data['offset'] = 0
+        context.user_data['period_type'] = period_type
+        context.user_data['offset'] = 0
+        context.user_data['user_id'] = update.message.from_user.id
+        return await period_view_screen(update, context, True)
 
     except ValueError as e:
         keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]

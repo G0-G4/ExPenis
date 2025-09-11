@@ -6,7 +6,7 @@ import calendar
 from dateutil.relativedelta import relativedelta, MO, SU
 
 from core.database import  get_session_async, session_maker
-from core.helpers import calculate_period_dates, parse_custom_period_dates
+from core.helpers import calculate_period_dates, get_target_date
 from core.models.transaction import Transaction
 from core.service.account_service import AccountService, get_account_by_id
 
@@ -174,13 +174,14 @@ async def _get_period_statistics_data(user_id: int, start_date: datetime, end_da
 
 async def get_period_statistics(user_id: int, period_type: str, offset: int = 0) -> dict:
     """Get statistics for a specific period (day, week, month, year) with offset"""
-    start_date, end_date, period_label = await calculate_period_dates(period_type, offset)
+    start_date, end_date, period_label = await calculate_period_dates(date.today(), period_type, offset)
     return await _get_period_statistics_data(user_id, start_date, end_date, period_label)
 
 
-async def get_custom_period_statistics(user_id: int, period_type: str, date_input: str) -> dict:
+async def get_custom_period_statistics(user_id: int, period_type: str, date_input: str, offset: int) -> dict:
     """Get statistics for a custom period based on user input"""
-    start_date, end_date, period_label = await parse_custom_period_dates(period_type, date_input)
+    base_date = await get_target_date(period_type, date_input)
+    start_date, end_date, period_label = await calculate_period_dates(base_date, period_type, offset)
     return await _get_period_statistics_data(user_id, start_date, end_date, period_label)
 
 

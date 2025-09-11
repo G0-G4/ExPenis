@@ -66,19 +66,3 @@ def get_transaction_type_keyboard():
         [InlineKeyboardButton("⬅️ Back", callback_data="back")]
     ]
 
-def get_period_navigation_keyboard(period_type, period_value, user_id):
-    """Create navigation keyboard for period viewing"""
-    keyboard = []
-
-    # Navigation buttons
-    nav_row = [
-        InlineKeyboardButton("⬅️ Previous", callback_data=f"prev_{period_type}_{period_value}"),
-        InlineKeyboardButton("📅 Choose Date", callback_data=f"choose_custom_period"),
-        InlineKeyboardButton("Next ➡️", callback_data=f"next_{period_type}_{period_value}")
-    ]
-    keyboard.append(nav_row)
-
-    # Back to period selection
-    keyboard.append([InlineKeyboardButton("🔙 Back to Periods", callback_data="select_period")])
-
-    return keyboard

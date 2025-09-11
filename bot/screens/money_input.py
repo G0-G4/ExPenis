@@ -1,4 +1,6 @@
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
+
+from bot.screens.main import start
 from core.helpers import format_percentage
 from bot.messages import *
 from bot.bot_config import *
@@ -95,12 +97,9 @@ async def money_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 parse_mode="HTML"
             )
 
-        # Clear user data for this transaction
-        self.user_data[user_id] = {}
-
         # Show main menu with today's transaction
 
-        return await self.start(update, context)
+        return await start(update, context)
 
     except ValueError:
         keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")]]
