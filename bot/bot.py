@@ -1,11 +1,11 @@
 from cmath import acosh
 
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
 
 from core.helpers import format_percentage
-from messages import *
-from bot_config import *
-from keyboards import  *
+from bot.messages import *
+from bot.bot_config import *
+from bot.keyboards import  *
 from core.config import TOKEN
 from core.service.transaction_service import TransactionService
 from core.service.category_service import CategoryService
@@ -360,7 +360,7 @@ class ExpenseBot:
             
             # Show account selection with calculated balances
             accounts = await self.account_service.get_user_accounts(user_id)
-            keyboard = await create_account_keyboard_with_balances(accounts, user_id)
+            keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Create a formatted transaction display with account name instead of ID
