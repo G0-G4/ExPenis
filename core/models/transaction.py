@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime, UTC
 
@@ -9,19 +9,21 @@ class Transaction(Base):
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
+    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
     amount = Column(Float, nullable=False)
     category = Column(String, nullable=False)
     type = Column(String, nullable=False)  # 'income' or 'expense'
     created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     
     def __repr__(self):
-        return f"<Transaction(user_id={self.user_id}, amount={self.amount}, category='{self.category}', type='{self.type}')>"
+        return f"<Transaction(user_id={self.user_id}, account_id={self.account_id}, amount={self.amount}, category='{self.category}', type='{self.type}')>"
     
     def to_dict(self):
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'account_id': self.account_id,
             'amount': self.amount,
             'category': self.category,
             'type': self.type,
