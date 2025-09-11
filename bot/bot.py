@@ -1,7 +1,11 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-import asyncio
+from cmath import acosh
 
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+
+from core.helpers import format_percentage
+from messages import *
+from bot_config import *
+from keyboards import  *
 from core.config import TOKEN
 from core.service.transaction_service import TransactionService
 from core.service.category_service import CategoryService
@@ -15,59 +19,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
-# Define conversation states
-ENTER_TRANSACTION, ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD, ENTER_ACCOUNT_NAME, ENTER_ACCOUNT_AMOUNT = range(9)
-
-# UI constants
-CATEGORIES_PER_ROW = 3
-
-# Message constants with improved formatting
-WELCOME_MESSAGE = "🎯 <b>Welcome to Expense Tracker Bot!</b>\n\nClick the button below to enter a transaction."
-TODAYS_TRANSACTIONS_MESSAGE = "📋 <b>Today's Transactions:</b>"
-NO_TRANSACTIONS_MESSAGE = "📭 <i>No transactions today.</i>"
-TOTAL_INCOME_MESSAGE = "🟢 <b>Total Income:  {total_income}</b>"
-TOTAL_EXPENSE_MESSAGE = "🔴 <b>Total Expense: {total_expense}</b>"
-NET_TOTAL_MESSAGE = "📊 <b>Net Total:     {net_total}</b>"
-TRANSACTION_TYPE_MESSAGE = "CALLTYPE <b>Select transaction type:</b>"
-INCOME_CATEGORY_MESSAGE = "💰 <b>Select income category:</b>"
-EXPENSE_CATEGORY_MESSAGE = "🛒 <b>Select expense category:</b>"
-AMOUNT_PROMPT_MESSAGE = "💵 <b>Please enter the amount:</b>"
-INVALID_AMOUNT_MESSAGE = "⚠️ <i>Please enter a valid number for the amount.</i>"
-THANK_YOU_MESSAGE = "🙏 <b>Thank you!</b>"
-MAIN_MENU_MESSAGE = "📋 <b>What would you like to do next?</b>"
-VIEW_TRANSACTIONS_MESSAGE = "📜 <b>Here are your recent transactions:</b>"
-TRANSACTION_NOT_FOUND_MESSAGE = "❌ <i>Transaction not found or access denied.</i>"
-EDIT_TRANSACTION_MESSAGE = "✏️ <b>Editing transaction:</b>"
-CHOOSE_OPTION_MESSAGE = "🔧 <b>Choose an option:</b>"
-TRANSACTION_DELETED_MESSAGE = "🗑️ <b>Transaction deleted successfully!</b>"
-ERROR_DELETING_TRANSACTION_MESSAGE = "💥 <i>Error deleting transaction.</i>"
-TRANSACTION_RECORDED_MESSAGE = "💾 <b>Transaction recorded:</b>"
-ERROR_SAVING_TRANSACTION_MESSAGE = "⚠️ <i>Note: Failed to save to database.</i>"
-TRANSACTION_UPDATED_MESSAGE = "🔄 <b>Transaction updated:</b>"
-ERROR_UPDATING_TRANSACTION_MESSAGE = "💥 <i>Error updating transaction.</i>"
-ERROR_NO_TRANSACTION_SELECTED = "❌ <i>Error: No transaction selected for editing.</i>"
-TRANSACTION_ID_MESSAGE = "🆔 <b>Transaction ID:</b>"
-PERIOD_VIEW_MESSAGE = "📅 <b>Select a period to view:</b>"
-PERIOD_STATS_MESSAGE = "📈 <b>Period Statistics</b>"
-NO_DATA_MESSAGE = "📭 <i>No data for this period.</i>"
-ACCOUNT_SELECTION_MESSAGE = "💳 <b>Select an account:</b>"
-NO_ACCOUNTS_MESSAGE = "📭 <i>You don't have any accounts yet. Please create an account first.</i>"
-
-# Account creation messages
-ADD_ACCOUNT_MESSAGE = "🏦 <b>Please enter the account name:</b>"
-ADD_ACCOUNT_AMOUNT_MESSAGE = "💰 <b>Please enter the initial amount:</b>"
-ACCOUNT_CREATED_MESSAGE = "✅ <b>Account created successfully!</b>"
-
-# Helper function to format numbers with thousands separator
-def format_amount(amount):
-    """Format amount with thousands separator and 2 decimal places"""
-    return f"{amount:,.2f}"
-
-# Helper function to format percentage
-def format_percentage(value):
-    """Format percentage with 1 decimal place"""
-    return f"{value:.1f}"
-
 
 class ExpenseBot:
     def __init__(self):
@@ -77,84 +28,6 @@ class ExpenseBot:
         self.category_service = CategoryService()
         self.application = None
 
-    def create_category_keyboard(self, categories, prefix):
-        """Create a keyboard with categories arranged in columns"""
-        keyboard = []
-        row = []
-        for i, category in enumerate(categories):
-            row.append(InlineKeyboardButton(category, callback_data=f'{prefix}_{category}'))
-            if len(row) == CATEGORIES_PER_ROW or i == len(categories) - 1:
-                keyboard.append(row)
-                row = []
-        # Add back button to category selection
-        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")])
-        return keyboard
-
-    def create_account_keyboard(self, accounts):
-        """Create a keyboard with accounts arranged in columns"""
-        keyboard = []
-        row = []
-        for i, account in enumerate(accounts):
-            # Display the account name and its calculated balance
-            # We'll calculate the balance here instead of using the stored amount
-            row.append(InlineKeyboardButton(f"{account.name}", 
-                                           callback_data=f'account_{account.id}'))
-            if len(row) == CATEGORIES_PER_ROW or i == len(accounts) - 1:
-                keyboard.append(row)
-                row = []
-        # Add back button to account selection
-        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
-        return keyboard
-
-    async def create_account_keyboard_with_balances(self, accounts, user_id):
-        """Create a keyboard with accounts and their calculated balances"""
-        keyboard = []
-        row = []
-        for i, account in enumerate(accounts):
-            # Calculate the current balance for this account
-            current_balance = await self.account_service.calculate_account_balance(account.id, user_id)
-            row.append(InlineKeyboardButton(f"{account.name} ({format_amount(current_balance)})", 
-                                           callback_data=f'account_{account.id}'))
-            if len(row) == CATEGORIES_PER_ROW or i == len(accounts) - 1:
-                keyboard.append(row)
-                row = []
-        # Add back button to account selection
-        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
-        return keyboard
-
-    def get_main_menu_keyboard(self):
-        """Create the main menu keyboard"""
-        return [
-            [InlineKeyboardButton("➕ Enter Transaction", callback_data='enter_transaction')],
-            [InlineKeyboardButton("📊 View by Period", callback_data='select_period')]
-        ]
-
-    def get_transaction_type_keyboard(self):
-        """Create the transaction type selection keyboard"""
-        return [
-            [
-                InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
-                InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
-            ],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_account_selection")]
-        ]
-
-    def get_period_navigation_keyboard(self, period_type, period_value, user_id):
-        """Create navigation keyboard for period viewing"""
-        keyboard = []
-        
-        # Navigation buttons
-        nav_row = [
-            InlineKeyboardButton("⬅️ Previous", callback_data=f"prev_{period_type}_{period_value}"),
-            InlineKeyboardButton("📅 Choose Date", callback_data=f"choose_custom_period"),
-            InlineKeyboardButton("Next ➡️", callback_data=f"next_{period_type}_{period_value}")
-        ]
-        keyboard.append(nav_row)
-        
-        # Back to period selection
-        keyboard.append([InlineKeyboardButton("🔙 Back to Periods", callback_data="select_period")])
-        
-        return keyboard
 
     async def show_period_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show period selection menu"""
@@ -194,7 +67,7 @@ class ExpenseBot:
         )
         
         # Add navigation keyboard - this will be used in both cases
-        keyboard = self.get_period_navigation_keyboard(period_type, offset, user_id)
+        keyboard = get_period_navigation_keyboard(period_type, offset, user_id)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
@@ -278,7 +151,7 @@ class ExpenseBot:
             keyboard.append([InlineKeyboardButton("───────────────", callback_data="separator")])
         
         # Add main menu button
-        keyboard.extend(self.get_main_menu_keyboard())
+        keyboard.extend(get_main_menu_keyboard())
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -407,7 +280,7 @@ class ExpenseBot:
                 return
             
             # Create account keyboard with calculated balances
-            keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
+            keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
@@ -487,7 +360,7 @@ class ExpenseBot:
             
             # Show account selection with calculated balances
             accounts = await self.account_service.get_user_accounts(user_id)
-            keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
+            keyboard = await create_account_keyboard_with_balances(accounts, user_id)
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Create a formatted transaction display with account name instead of ID
@@ -517,7 +390,7 @@ class ExpenseBot:
         
         elif query.data == 'back_to_type_selection':
             # Show transaction type selection again
-            reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
+            reply_markup = InlineKeyboardMarkup(get_transaction_type_keyboard())
             await query.edit_message_text(
                 text=TRANSACTION_TYPE_MESSAGE,
                 reply_markup=reply_markup,
@@ -528,7 +401,7 @@ class ExpenseBot:
             # Return to account selection
             accounts = await self.account_service.get_user_accounts(user_id)
             if accounts:
-                keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
+                keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await query.edit_message_text(
                     text=ACCOUNT_SELECTION_MESSAGE,
@@ -541,7 +414,7 @@ class ExpenseBot:
             income_cats, _ = await self.category_service.ensure_user_has_categories(user_id)
             user_income_categories = [cat.name for cat in income_cats]
             
-            keyboard = self.create_category_keyboard(user_income_categories, 'income')
+            keyboard = create_category_keyboard(user_income_categories, 'income')
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=INCOME_CATEGORY_MESSAGE,
@@ -559,7 +432,7 @@ class ExpenseBot:
             _, expense_cats = await self.category_service.ensure_user_has_categories(user_id)
             user_expense_categories = [cat.name for cat in expense_cats]
             
-            keyboard = self.create_category_keyboard(user_expense_categories, 'expense')
+            keyboard = create_category_keyboard(user_expense_categories, 'expense')
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=EXPENSE_CATEGORY_MESSAGE,
@@ -581,7 +454,7 @@ class ExpenseBot:
             self.user_data[user_id]['account_id'] = account_id
             
             # Now show transaction type selection
-            reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
+            reply_markup = InlineKeyboardMarkup(get_transaction_type_keyboard())
             await query.edit_message_text(
                 text=TRANSACTION_TYPE_MESSAGE,
                 reply_markup=reply_markup,
@@ -735,7 +608,7 @@ class ExpenseBot:
                 )
                 
                 # Add navigation keyboard for custom periods
-                keyboard = self.get_period_navigation_keyboard(period_type, 0, user_id)
+                keyboard = get_period_navigation_keyboard(period_type, 0, user_id)
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 if not period_data or (not period_data["income_categories"] and not period_data["expense_categories"]):
