@@ -10,14 +10,14 @@ from core.config import TOKEN
 from core.service.transaction_service import TransactionService
 from core.service.category_service import CategoryService
 from core.service.account_service import AccountService
-import logging
+# import logging
 
 # Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+# logging.basicConfig(
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+# )
+# logger = logging.getLogger(__name__)
+# logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
 
 ACCOUNT_SELECTION_SCREEN, ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD, ENTER_ACCOUNT_NAME, ENTER_ACCOUNT_AMOUNT, MAIN_SCREEN, TRANSACTION_TYPE_SELECTION_SCREEN, CATEGORY_SELECTION_SCREEN, MONEY_INPUT_SCREEN, TRANSACTION_VIEW_SCREEN= range(
     14)
@@ -128,6 +128,7 @@ class ExpenseBot:
         return [cat.name for cat in categories] if categories else []
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self.push_state(context)
         """Send welcome message and show main menu with today's transactions"""
         user_id = update.message.from_user.id if update.message else update.callback_query.from_user.id
         
@@ -203,6 +204,7 @@ class ExpenseBot:
 
     async def transaction_view_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle transaction editing"""
+        self.push_state(TRANSACTION_VIEW_SCREEN)
         query = update.callback_query
         await query.answer()
 
@@ -235,7 +237,7 @@ class ExpenseBot:
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
-        context.user_data['previous_state'] = MAIN_SCREEN
+        context.user_data['previous_state'] = TRANSACTION_VIEW_SCREEN
         return TRANSACTION_VIEW_SCREEN
 
     async def delete_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_id: int):
@@ -260,21 +262,33 @@ class ExpenseBot:
         # After deletion, show main menu
         await self.refresh_main_menu(update, context)
 
-    def get_previous_state(self):
-        ...
+    def get_previous_state(self, context: ContextTypes.DEFAULT_TYPE):
+        if len(context.user_data['stack']) == 0:
+            return MAIN_SCREEN
+        state = context.user_data['stack'].pop()
+        print("poped from stack -> " + str(context.user_data['stack']))
+        return state
 
-    def push_state(self, context: ContextTypes.DEFAULT_TYPE, state):
-        if not 'previous_state' in context.user_data['previous_state']:
-            context.user_data['previous_state'] = []
-        stack = context.user_data['previous_state']
-        stack.append(state)
+    def push_state(self, context: ContextTypes.DEFAULT_TYPE):
+        if not 'stack' in context.user_data:
+            context.user_data['previous_state'] = MAIN_SCREEN
+            context.user_data['stack'] = []
+            context.user_data['set_previous'] = True
+        if context.user_data['set_previous']:
+            if len(context.user_data['stack']) != 0 and context.user_data['stack'][-1] == context.user_data['previous_state']:
+                return
+            context.user_data['stack'].append(context.user_data['previous_state'])
+            print("pushed to stack -> " + str(context.user_data['stack']))
+        else:
+            context.user_data['set_previous'] = True
 
     async def back_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
 
         # Get previous state from user_data
-        previous_state = context.user_data.get('previous_state', MAIN_SCREEN)
+        previous_state = self.get_previous_state(context)
+        context.user_data['set_previous'] = False
 
         # Handle going back to previous state
         if previous_state == MAIN_SCREEN:
@@ -289,6 +303,7 @@ class ExpenseBot:
         return previous_state
 
     async def account_selection_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self.push_state(context)
         query = update.callback_query
         await query.answer()
 
@@ -315,7 +330,7 @@ class ExpenseBot:
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
-        context.user_data['previous_state'] = MAIN_SCREEN
+        context.user_data['previous_state'] = ACCOUNT_SELECTION_SCREEN
         return ACCOUNT_SELECTION_SCREEN
 
 
@@ -347,6 +362,7 @@ class ExpenseBot:
     #     return ACCOUNT_SELECTION
 
     async def transaction_type_selection_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self.push_state(context)
         query = update.callback_query
         await query.answer()
 
@@ -357,10 +373,11 @@ class ExpenseBot:
             reply_markup=reply_markup,
             parse_mode="HTML")
 
-        context.user_data['previous_state'] = ACCOUNT_SELECTION_SCREEN
+        context.user_data['previous_state'] = TRANSACTION_TYPE_SELECTION_SCREEN
         return TRANSACTION_TYPE_SELECTION_SCREEN
 
     async def category_selection_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self.push_state(context)
         query = update.callback_query
         await query.answer()
         # TODO get type
@@ -382,7 +399,7 @@ class ExpenseBot:
             self.user_data[user_id] = {}
         self.user_data[user_id]['type'] = 'income'
 
-        context.user_data['previous_state'] = TRANSACTION_TYPE_SELECTION_SCREEN
+        context.user_data['previous_state'] = CATEGORY_SELECTION_SCREEN
         return CATEGORY_SELECTION_SCREEN
 
     async def money_input_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
