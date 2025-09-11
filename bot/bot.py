@@ -131,7 +131,7 @@ class ExpenseBot:
                 InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
                 InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
             ],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
+            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_account_selection")]
         ]
 
     def get_period_navigation_keyboard(self, period_type, period_value, user_id):
@@ -487,6 +487,18 @@ class ExpenseBot:
                 reply_markup=reply_markup,
                 parse_mode="HTML"
             )
+        
+        elif query.data == 'back_to_account_selection':
+            # Return to account selection
+            accounts = await self.account_service.get_user_accounts(user_id)
+            if accounts:
+                keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    text=ACCOUNT_SELECTION_MESSAGE,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
         
         elif query.data == 'type_income':
             # Ensure user has categories, creating defaults if needed
