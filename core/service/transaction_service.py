@@ -8,8 +8,13 @@ from dateutil.relativedelta import relativedelta, MO, SU
 from core.database import  get_session_async, session_maker
 from core.helpers import calculate_period_dates, parse_custom_period_dates
 from core.models.transaction import Transaction
+from core.service.account_service import AccountService
+
 
 class TransactionService:
+
+    def __init__(self, account_service: AccountService):
+        self.account_service = account_service
 
     async def create_transaction(
         self, 
@@ -20,11 +25,9 @@ class TransactionService:
         account_id: int
     ) -> Transaction:
         """Create a new transaction"""
-        async with session_maker() as session:
+        async with session_maker() as session, session.begin():
             # First, get the account to verify it exists and belongs to the user
-            from core.service.account_service import AccountService
-            account_service = AccountService()
-            account = await account_service.get_account_by_id(account_id, user_id)
+            account = await self.account_service.get_account_by_id(account_id, user_id, session)
             
             if not account:
                 raise Exception(f"Account {account_id} not found for user {user_id}")
@@ -38,9 +41,7 @@ class TransactionService:
                 account_id=account_id
             )
             session.add(transaction)
-            await session.commit()
-            await session.refresh(transaction)
-            return transaction
+        return transaction
     
     async def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
         """Get a transaction by its ID"""

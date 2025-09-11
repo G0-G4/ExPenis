@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime, UTC
 
+from core.models.account import Account
+
 Base = declarative_base()
 
 class Transaction(Base):
@@ -9,7 +11,7 @@ class Transaction(Base):
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
-    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
+    account_id = Column(Integer, ForeignKey(Account.id), nullable=False)
     amount = Column(Float, nullable=False)
     category = Column(String, nullable=False)
     type = Column(String, nullable=False)  # 'income' or 'expense'

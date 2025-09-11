@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 # Define conversation states
-ENTER_TRANSACTION, ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD = range(7)
+ENTER_TRANSACTION, ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD, ENTER_ACCOUNT_NAME, ENTER_ACCOUNT_AMOUNT = range(9)
 
 # UI constants
 CATEGORIES_PER_ROW = 3
@@ -52,6 +52,11 @@ PERIOD_STATS_MESSAGE = "📈 <b>Period Statistics</b>"
 NO_DATA_MESSAGE = "📭 <i>No data for this period.</i>"
 ACCOUNT_SELECTION_MESSAGE = "💳 <b>Select an account:</b>"
 NO_ACCOUNTS_MESSAGE = "📭 <i>You don't have any accounts yet. Please create an account first.</i>"
+
+# Account creation messages
+ADD_ACCOUNT_MESSAGE = "🏦 <b>Please enter the account name:</b>"
+ADD_ACCOUNT_AMOUNT_MESSAGE = "💰 <b>Please enter the initial amount:</b>"
+ACCOUNT_CREATED_MESSAGE = "✅ <b>Account created successfully!</b>"
 
 # Helper function to format numbers with thousands separator
 def format_amount(amount):
@@ -295,6 +300,25 @@ class ExpenseBot:
             await update.message.reply_text(message_text, reply_markup=reply_markup, parse_mode="HTML")
         elif update.callback_query:
             await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode="HTML")
+
+    async def add_account(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the account creation process"""
+        user_id = update.message.from_user.id
+        
+        # Initialize user data for account creation
+        if user_id not in self.user_data:
+            self.user_data[user_id] = {}
+        self.user_data[user_id]['state'] = 'ENTER_ACCOUNT_NAME'
+        
+        # Ask for account name
+        keyboard = [[InlineKeyboardButton("⬅️ Cancel", callback_data="back_to_main")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            ADD_ACCOUNT_MESSAGE,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
 
     async def refresh_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Refresh the main menu view"""
@@ -582,6 +606,78 @@ class ExpenseBot:
             
         user_id = update.message.from_user.id
         
+        # Handle account name input
+        if user_id in self.user_data and self.user_data[user_id].get('state') == 'ENTER_ACCOUNT_NAME':
+            account_name = update.message.text.strip()
+            if not account_name:
+                keyboard = [[InlineKeyboardButton("⬅️ Cancel", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    "⚠️ <i>Please enter a valid account name.</i>",
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                return
+                
+            # Store account name
+            self.user_data[user_id]['account_name'] = account_name
+            self.user_data[user_id]['state'] = 'ENTER_ACCOUNT_AMOUNT'
+            
+            # Ask for initial amount
+            keyboard = [[InlineKeyboardButton("⬅️ Cancel", callback_data="back_to_main")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                ADD_ACCOUNT_AMOUNT_MESSAGE,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+            return
+        
+        # Handle account amount input
+        if user_id in self.user_data and self.user_data[user_id].get('state') == 'ENTER_ACCOUNT_AMOUNT':
+            try:
+                amount_text = update.message.text.strip()
+                initial_amount = float(amount_text) if amount_text else 0.0
+                
+                # Create the account
+                account_name = self.user_data[user_id]['account_name']
+                account = await self.account_service.create_account(
+                    user_id=user_id,
+                    name=account_name,
+                    initial_amount=initial_amount
+                )
+                
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    f"{ACCOUNT_CREATED_MESSAGE}\n\n"
+                    f"🏦 <b>Account:</b> {account.name}\n"
+                    f"💰 <b>Initial Amount:</b> {format_amount(initial_amount)}",
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                
+                # Clear user data
+                self.user_data[user_id] = {}
+                
+                # Refresh main menu
+                await self.refresh_main_menu(update, context)
+                return
+                
+            except ValueError:
+                keyboard = [[InlineKeyboardButton("⬅️ Cancel", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    INVALID_AMOUNT_MESSAGE,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                return
+        
         # Check if we're expecting a date input
         if (user_id in self.user_data and 
             self.user_data[user_id].get('state') == 'CHOOSING_DATE'):
@@ -853,6 +949,7 @@ class ExpenseBot:
         """Set bot commands menu"""
         commands = [
             BotCommand("start", "Open the main menu"),
+            BotCommand("add_account", "Create a new account"),
         ]
         await self.application.bot.set_my_commands(commands)
 
@@ -866,6 +963,7 @@ class ExpenseBot:
         
         # Register command handlers
         self.application.add_handler(CommandHandler('start', self.start))
+        self.application.add_handler(CommandHandler('add_account', self.add_account))
         
         # Register callback query handler
         self.application.add_handler(CallbackQueryHandler(self.button_handler))
