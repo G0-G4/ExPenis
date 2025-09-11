@@ -458,7 +458,6 @@ class ExpenseBot:
             await self.edit_transaction(update, context)
         
         elif query.data.startswith('edit_full_'):
-            # Handle full transaction editing
             transaction_id = int(query.data.split('_')[2])
             
             # Get transaction details
@@ -472,14 +471,19 @@ class ExpenseBot:
             account = await self.account_service.get_account_by_id(transaction.account_id, user_id)
             account_name = account.name if account else f"Account {transaction.account_id}"
             
-            # Store editing state
+            # Store ALL editing state including original values
             if user_id not in self.user_data:
                 self.user_data[user_id] = {}
-            self.user_data[user_id]['editing_transaction_id'] = transaction_id
-            self.user_data[user_id]['account_id'] = transaction.account_id
-            self.user_data[user_id]['type'] = transaction.type
-            self.user_data[user_id]['category'] = transaction.category
-            self.user_data[user_id]['state'] = 'EDITING_TRANSACTION'
+            self.user_data[user_id].update({
+                'editing_transaction_id': transaction_id,
+                'original_account_id': transaction.account_id,
+                'original_type': transaction.type,
+                'original_category': transaction.category,
+                'account_id': transaction.account_id,  # current selected during edit
+                'type': transaction.type,              # current selected during edit  
+                'category': transaction.category,      # current selected during edit
+                'state': 'EDITING_TRANSACTION'
+            })
             
             # Show account selection with calculated balances
             accounts = await self.account_service.get_user_accounts(user_id)
@@ -909,13 +913,14 @@ class ExpenseBot:
                 
                 # Update transaction in database
                 try:
+                    transaction_id = self.user_data[user_id]['editing_transaction_id']
                     updated_transaction = await self.transaction_service.update_transaction(
                         transaction_id=transaction_id,
                         user_id=user_id,
                         amount=amount,
-                        category=category,
-                        transaction_type=transaction_type,
-                        account_id=account_id
+                        category=self.user_data[user_id]['category'],
+                        transaction_type=self.user_data[user_id]['type'],
+                        account_id=self.user_data[user_id]['account_id']
                     )
                     
                     if updated_transaction:
