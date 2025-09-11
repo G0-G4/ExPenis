@@ -18,8 +18,10 @@ class AccountService:
             )
             return list(result.scalars().all())
     
-    async def get_account_by_id(self, account_id: int, user_id: int, session) -> Optional[Account]:
+    async def get_account_by_id(self, account_id: int, user_id: int, session=None) -> Optional[Account]:
         """Get a specific account by ID for a user"""
+        if session is None:
+            session = session_maker()
         result = await session.execute(
             select(Account)
             .where(Account.id == account_id, Account.user_id == user_id)
