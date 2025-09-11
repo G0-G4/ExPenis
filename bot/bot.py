@@ -90,6 +90,7 @@ class ExpenseBot:
         keyboard = []
         row = []
         for i, account in enumerate(accounts):
+            # Display the account name and its calculated balance
             row.append(InlineKeyboardButton(f"{account.name} ({format_amount(account.amount)})", 
                                            callback_data=f'account_{account.id}'))
             if len(row) == CATEGORIES_PER_ROW or i == len(accounts) - 1:
@@ -507,6 +508,9 @@ class ExpenseBot:
         elif query.data.startswith('account_'):
             account_id = int(query.data.split('_')[1])
             
+            # Calculate the current balance for this account
+            current_balance = await self.account_service.calculate_account_balance(account_id, user_id)
+            
             # Store selected account
             if user_id not in self.user_data:
                 self.user_data[user_id] = {}
@@ -515,7 +519,7 @@ class ExpenseBot:
             # Now show transaction type selection
             reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
             await query.edit_message_text(
-                text=TRANSACTION_TYPE_MESSAGE,
+                text=f"{TRANSACTION_TYPE_MESSAGE}\n\n💳 <b>Account Balance: {format_amount(current_balance)}</b>",
                 reply_markup=reply_markup,
                 parse_mode="HTML"
             )
