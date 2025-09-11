@@ -468,6 +468,10 @@ class ExpenseBot:
                 await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
                 return
             
+            # Get account name for display
+            account = await self.account_service.get_account_by_id(transaction.account_id, user_id, None)
+            account_name = account.name if account else f"Account {transaction.account_id}"
+            
             # Store editing state
             if user_id not in self.user_data:
                 self.user_data[user_id] = {}
@@ -482,8 +486,18 @@ class ExpenseBot:
             keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
             reply_markup = InlineKeyboardMarkup(keyboard)
             
+            # Create a formatted transaction display with account name instead of ID
+            transaction_display = (
+                f"ID: {transaction.id}\n"
+                f"Amount: {format_amount(transaction.amount)}\n"
+                f"Type: {transaction.type}\n"
+                f"Category: {transaction.category}\n"
+                f"Account: {account_name}\n"
+                f"Date: {transaction.date.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
             await query.edit_message_text(
-                text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction.to_dict()}</pre>\n\n{ACCOUNT_SELECTION_MESSAGE}",
+                text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction_display}</pre>\n\n{ACCOUNT_SELECTION_MESSAGE}",
                 reply_markup=reply_markup,
                 parse_mode="HTML"
             )
