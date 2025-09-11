@@ -341,7 +341,7 @@ class ExpenseBot:
         
         # Create edit options
         keyboard = [
-            [InlineKeyboardButton("✏️ Edit Amount", callback_data=f"edit_amount_{transaction.id}")],
+            [InlineKeyboardButton("✏️ Edit Transaction", callback_data=f"edit_full_{transaction.id}")],
             [InlineKeyboardButton("🗑️ Delete", callback_data=f"delete_{transaction.id}")],
             [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
         ]
@@ -354,41 +354,6 @@ class ExpenseBot:
         
         await query.edit_message_text(
             text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{CHOOSE_OPTION_MESSAGE}",
-            reply_markup=reply_markup,
-            parse_mode="HTML"
-        )
-
-    async def edit_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle transaction editing"""
-        query = update.callback_query
-        await query.answer()
-        
-        user_id = query.from_user.id
-        transaction_id = int(query.data.split('_')[1])
-        
-        # Get transaction details
-        transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
-        
-        if not transaction or transaction.user_id != user_id:
-            await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
-            return
-        
-        # Store editing state
-        if user_id not in self.user_data:
-            self.user_data[user_id] = {}
-        self.user_data[user_id]['editing_transaction_id'] = transaction_id
-        self.user_data[user_id]['account_id'] = transaction.account_id
-        self.user_data[user_id]['type'] = transaction.type
-        self.user_data[user_id]['category'] = transaction.category
-        self.user_data[user_id]['state'] = 'EDITING_TRANSACTION'
-        
-        # Show account selection with calculated balances
-        accounts = await self.account_service.get_user_accounts(user_id)
-        keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction.to_dict()}</pre>\n\n{ACCOUNT_SELECTION_MESSAGE}",
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
@@ -489,8 +454,39 @@ class ExpenseBot:
                 parse_mode="HTML"
             )
         
-        elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
+        elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_') and not query.data.startswith('edit_full_'):
             await self.edit_transaction(update, context)
+        
+        elif query.data.startswith('edit_full_'):
+            # Handle full transaction editing
+            transaction_id = int(query.data.split('_')[2])
+            
+            # Get transaction details
+            transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
+            
+            if not transaction or transaction.user_id != user_id:
+                await query.edit_message_text(TRANSACTION_NOT_FOUND_MESSAGE, parse_mode="HTML")
+                return
+            
+            # Store editing state
+            if user_id not in self.user_data:
+                self.user_data[user_id] = {}
+            self.user_data[user_id]['editing_transaction_id'] = transaction_id
+            self.user_data[user_id]['account_id'] = transaction.account_id
+            self.user_data[user_id]['type'] = transaction.type
+            self.user_data[user_id]['category'] = transaction.category
+            self.user_data[user_id]['state'] = 'EDITING_TRANSACTION'
+            
+            # Show account selection with calculated balances
+            accounts = await self.account_service.get_user_accounts(user_id)
+            keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction.to_dict()}</pre>\n\n{ACCOUNT_SELECTION_MESSAGE}",
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
         
         
         elif query.data.startswith('delete_'):

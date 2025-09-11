@@ -51,18 +51,6 @@ class TransactionService:
             )
             return result.scalar_one_or_none()
 
-    async def update_transaction_amount(self, transaction_id: int, user_id: int, amount: float) -> Transaction:
-        """Get a transaction by its ID"""
-        async with session_maker() as session, session.begin():
-            transaction = (await session.execute(
-                select(Transaction).where(Transaction.id == transaction_id, Transaction.user_id == user_id)
-            )).scalar_one_or_none()
-            if transaction is None:
-                raise Exception(f"transaction {transaction_id} not found for user {user_id}")
-            transaction.amount = amount
-            session.add(transaction)
-            session.flush()
-        return transaction
 
     async def update_transaction(
         self, 
