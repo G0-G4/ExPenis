@@ -387,7 +387,7 @@ class ExpenseBot:
         user_id = query.from_user.id
         
         if query.data == 'enter_transaction':
-            # First, show account selection
+            # First, show account selection with calculated balances
             accounts = await self.account_service.get_user_accounts(user_id)
             
             if not accounts:
@@ -401,7 +401,20 @@ class ExpenseBot:
                 )
                 return
             
-            keyboard = self.create_account_keyboard(accounts)
+            # Create account keyboard with calculated balances
+            keyboard = []
+            row = []
+            for i, account in enumerate(accounts):
+                # Calculate the current balance for this account
+                current_balance = await self.account_service.calculate_account_balance(account.id, user_id)
+                row.append(InlineKeyboardButton(f"{account.name} ({format_amount(current_balance)})", 
+                                               callback_data=f'account_{account.id}'))
+                if len(row) == CATEGORIES_PER_ROW or i == len(accounts) - 1:
+                    keyboard.append(row)
+                    row = []
+            # Add back button to account selection
+            keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
+            
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
                 text=ACCOUNT_SELECTION_MESSAGE,
