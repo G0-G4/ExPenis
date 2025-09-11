@@ -64,6 +64,34 @@ class TransactionService:
             session.flush()
         return transaction
 
+    async def update_transaction(
+        self, 
+        transaction_id: int,
+        user_id: int, 
+        amount: float, 
+        category: str, 
+        transaction_type: str,
+        account_id: int
+    ) -> Transaction:
+        """Update an existing transaction"""
+        async with session_maker() as session, session.begin():
+            # First, get the transaction to verify it exists and belongs to the user
+            transaction = (await session.execute(
+                select(Transaction).where(Transaction.id == transaction_id, Transaction.user_id == user_id)
+            )).scalar_one_or_none()
+            
+            if not transaction:
+                raise Exception(f"Transaction {transaction_id} not found for user {user_id}")
+            
+            # Update the transaction
+            transaction.amount = amount
+            transaction.category = category
+            transaction.type = transaction_type
+            transaction.account_id = account_id
+            
+            session.add(transaction)
+        return transaction
+
     async def get_todays_transactions(self, user_id: int) -> List[Transaction]:
         """Get today's transactions for a specific user"""
         today = date.today()

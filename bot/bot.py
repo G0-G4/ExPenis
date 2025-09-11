@@ -358,13 +358,13 @@ class ExpenseBot:
             parse_mode="HTML"
         )
 
-    async def edit_transaction_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle amount editing for a transaction"""
+    async def edit_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle transaction editing"""
         query = update.callback_query
         await query.answer()
         
         user_id = query.from_user.id
-        transaction_id = int(query.data.split('_')[2])
+        transaction_id = int(query.data.split('_')[1])
         
         # Get transaction details
         transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
@@ -377,18 +377,18 @@ class ExpenseBot:
         if user_id not in self.user_data:
             self.user_data[user_id] = {}
         self.user_data[user_id]['editing_transaction_id'] = transaction_id
-        self.user_data[user_id]['state'] = 'EDITING_AMOUNT'
+        self.user_data[user_id]['account_id'] = transaction.account_id
+        self.user_data[user_id]['type'] = transaction.type
+        self.user_data[user_id]['category'] = transaction.category
+        self.user_data[user_id]['state'] = 'EDITING_TRANSACTION'
         
-        emoji = "🟢" if transaction.type == "income" else "🔴"
-        formatted_amount = format_amount(transaction.amount)
-        transaction_text = f"{emoji} {formatted_amount} ({transaction.category})"
-        
-        # Add back button to amount editing
-        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+        # Show account selection with calculated balances
+        accounts = await self.account_service.get_user_accounts(user_id)
+        keyboard = await self.create_account_keyboard_with_balances(accounts, user_id)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{AMOUNT_PROMPT_MESSAGE}",
+            text=f"{EDIT_TRANSACTION_MESSAGE}\n<pre>{transaction.to_dict()}</pre>\n\n{ACCOUNT_SELECTION_MESSAGE}",
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
@@ -492,8 +492,6 @@ class ExpenseBot:
         elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_'):
             await self.edit_transaction(update, context)
         
-        elif query.data.startswith('edit_amount_'):
-            await self.edit_transaction_amount(update, context)
         
         elif query.data.startswith('delete_'):
             transaction_id = int(query.data.split('_')[1])
@@ -858,8 +856,8 @@ class ExpenseBot:
                     parse_mode="HTML"
                 )
         
-        # Check if we're editing an existing transaction amount
-        elif user_id in self.user_data and self.user_data[user_id].get('state') == 'EDITING_AMOUNT':
+        # Check if we're editing an existing transaction
+        elif user_id in self.user_data and self.user_data[user_id].get('state') == 'EDITING_TRANSACTION':
             try:
                 amount_text = update.message.text
                 if not amount_text:
@@ -887,22 +885,35 @@ class ExpenseBot:
                     )
                     return
                 
+                # Get transaction details for display
+                transaction_type = self.user_data[user_id]['type']
+                category = self.user_data[user_id]['category']
+                account_id = self.user_data[user_id]['account_id']
+                
+                # Format transaction for display
+                formatted_amount = format_amount(amount)
+                if transaction_type == 'income':
+                    transaction_text = f"🟢 Income: +{formatted_amount} ({category})"
+                else:
+                    transaction_text = f"🔴 Expense: -{formatted_amount} ({category})"
+                
                 # Update transaction in database
                 try:
-                    updated_transaction = await self.transaction_service.update_transaction_amount(
+                    updated_transaction = await self.transaction_service.update_transaction(
                         transaction_id=transaction_id,
                         user_id=user_id,
-                        amount=amount
+                        amount=amount,
+                        category=category,
+                        transaction_type=transaction_type,
+                        account_id=account_id
                     )
                     
                     if updated_transaction:
-                        emoji = "🟢" if updated_transaction.type == "income" else "🔴"
-                        formatted_amount = format_amount(updated_transaction.amount)
                         keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         
                         await update.message.reply_text(
-                            f"{TRANSACTION_UPDATED_MESSAGE}\n<pre>{emoji} {formatted_amount} ({updated_transaction.category})</pre>\n\n{THANK_YOU_MESSAGE}",
+                            f"{TRANSACTION_UPDATED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{THANK_YOU_MESSAGE}",
                             reply_markup=reply_markup,
                             parse_mode="HTML"
                         )
