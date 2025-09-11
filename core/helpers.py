@@ -83,3 +83,11 @@ async def _calculate_period_boundaries(base_date: date, period_type: str) -> tup
         raise ValueError("Invalid period type")
 
     return start_date, end_date, period_label
+
+def format_amount(amount):
+    """Format amount with thousands separator and 2 decimal places"""
+    return f"{amount:,.2f}"
+
+def format_percentage(value):
+    """Format percentage with 1 decimal place"""
+    return f"{value:.1f}"

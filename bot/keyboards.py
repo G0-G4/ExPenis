@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from bot_config import CATEGORIES_PER_ROW
+from bot.bot_config import CATEGORIES_PER_ROW
 from core.helpers import format_amount
 from core.service.account_service import AccountService
 
@@ -14,7 +14,7 @@ def create_category_keyboard(categories, prefix):
             keyboard.append(row)
             row = []
     # Add back button to category selection
-    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")])
+    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
     return keyboard
 
 def create_account_keyboard(accounts):
@@ -30,7 +30,7 @@ def create_account_keyboard(accounts):
             keyboard.append(row)
             row = []
     # Add back button to account selection
-    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
+    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
     return keyboard
 
 async def create_account_keyboard_with_balances(accounts, user_id, account_service: AccountService):
@@ -46,7 +46,7 @@ async def create_account_keyboard_with_balances(accounts, user_id, account_servi
             keyboard.append(row)
             row = []
     # Add back button to account selection
-    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
+    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
     return keyboard
 
 def get_main_menu_keyboard():
@@ -63,7 +63,7 @@ def get_transaction_type_keyboard():
             InlineKeyboardButton("🟢 Income (+)", callback_data='type_income'),
             InlineKeyboardButton("🔴 Expense (-)", callback_data='type_expense'),
         ],
-        [InlineKeyboardButton("⬅️ Back", callback_data="back_to_account_selection")]
+        [InlineKeyboardButton("⬅️ Back", callback_data="back")]
     ]
 
 def get_period_navigation_keyboard(period_type, period_value, user_id):

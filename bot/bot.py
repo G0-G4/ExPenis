@@ -19,6 +19,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
+ACCOUNT_SELECTION_SCREEN, ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD, ENTER_ACCOUNT_NAME, ENTER_ACCOUNT_AMOUNT, MAIN_SCREEN, TRANSACTION_TYPE_SELECTION_SCREEN, CATEGORY_SELECTION_SCREEN, MONEY_INPUT_SCREEN, TRANSACTION_VIEW_SCREEN= range(
+    14)
+
 
 class ExpenseBot:
     def __init__(self):
@@ -144,7 +147,7 @@ class ExpenseBot:
             emoji = "🟢" if transaction.type == "income" else "🔴"
             formatted_amount = format_amount(transaction.amount)
             button_text = f"{emoji} {formatted_amount:>10} ({transaction.category})"
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_{transaction.id}")])
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"view_transaction_{transaction.id}")])
         
         # Add separator if there are transactions
         if todays_transactions:
@@ -173,6 +176,7 @@ class ExpenseBot:
             await update.message.reply_text(message_text, reply_markup=reply_markup, parse_mode="HTML")
         elif update.callback_query:
             await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode="HTML")
+        return MAIN_SCREEN
 
     async def add_account(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Start the account creation process"""
@@ -197,13 +201,14 @@ class ExpenseBot:
         """Refresh the main menu view"""
         await self.start(update, context)
 
-    async def edit_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def transaction_view_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle transaction editing"""
         query = update.callback_query
         await query.answer()
-        
+
+        # TODO get values from context not call_back
         user_id = query.from_user.id
-        transaction_id = int(query.data.split('_')[1])
+        transaction_id = int(query.data.split('_')[2])
         
         # Get transaction details
         transaction = await self.transaction_service.get_transaction_by_id(transaction_id)
@@ -214,9 +219,9 @@ class ExpenseBot:
         
         # Create edit options
         keyboard = [
-            [InlineKeyboardButton("✏️ Edit Transaction", callback_data=f"edit_full_{transaction.id}")],
+            [InlineKeyboardButton("✏️ Edit Transaction", callback_data=f"edit_transaction_{transaction.id}")],
             [InlineKeyboardButton("🗑️ Delete", callback_data=f"delete_{transaction.id}")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]
+            [InlineKeyboardButton("⬅️ Back", callback_data="back")]
         ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -230,6 +235,8 @@ class ExpenseBot:
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
+        context.user_data['previous_state'] = MAIN_SCREEN
+        return TRANSACTION_VIEW_SCREEN
 
     async def delete_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_id: int):
         """Delete a transaction"""
@@ -253,6 +260,242 @@ class ExpenseBot:
         # After deletion, show main menu
         await self.refresh_main_menu(update, context)
 
+    def get_previous_state(self):
+        ...
+
+    def push_state(self, context: ContextTypes.DEFAULT_TYPE, state):
+        if not 'previous_state' in context.user_data['previous_state']:
+            context.user_data['previous_state'] = []
+        stack = context.user_data['previous_state']
+        stack.append(state)
+
+    async def back_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+
+        # Get previous state from user_data
+        previous_state = context.user_data.get('previous_state', MAIN_SCREEN)
+
+        # Handle going back to previous state
+        if previous_state == MAIN_SCREEN:
+            return await self.start(update, context)
+        if previous_state == ACCOUNT_SELECTION_SCREEN:
+            return await self.account_selection_screen(update, context)
+        elif previous_state == TRANSACTION_TYPE_SELECTION_SCREEN:
+            return await self.transaction_type_selection_screen(update, context)
+        elif previous_state == CATEGORY_SELECTION_SCREEN:
+            return await self.category_selection_screen(update, context)
+
+        return previous_state
+
+    async def account_selection_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+
+        user_id = query.from_user.id
+        accounts = await self.account_service.get_user_accounts(user_id)
+
+        if not accounts:
+            # Handle case where user has no accounts
+            keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text=NO_ACCOUNTS_MESSAGE,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+            return MAIN_SCREEN
+
+        # Create account keyboard with calculated balances
+        keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=ACCOUNT_SELECTION_MESSAGE,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+        context.user_data['previous_state'] = MAIN_SCREEN
+        return ACCOUNT_SELECTION_SCREEN
+
+
+
+    # async def account_selection_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    #     query = update.callback_query
+    #     await query.answer()
+    #
+    #     user_id = query.from_user.id
+    #     accounts = await self.account_service.get_user_accounts(user_id)
+    #     if not accounts:
+    #         keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]
+    #         reply_markup = InlineKeyboardMarkup(keyboard)
+    #         await query.edit_message_text(
+    #             text=NO_ACCOUNTS_MESSAGE,
+    #             reply_markup=reply_markup,
+    #             parse_mode="HTML"
+    #         )
+    #         return ACCOUNT_SELECTION
+    #     keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
+    #
+    #     reply_markup = InlineKeyboardMarkup(keyboard)
+    #     await query.edit_message_text(
+    #         text=ACCOUNT_SELECTION_MESSAGE,
+    #         reply_markup=reply_markup,
+    #         parse_mode="HTML"
+    #     )
+    #     context.user_data['previous_state'] = MAIN
+    #     return ACCOUNT_SELECTION
+
+    async def transaction_type_selection_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+
+        user_id = query.from_user.id
+        reply_markup = InlineKeyboardMarkup(get_transaction_type_keyboard())
+        await query.edit_message_text(
+            text=TRANSACTION_TYPE_MESSAGE,
+            reply_markup=reply_markup,
+            parse_mode="HTML")
+
+        context.user_data['previous_state'] = ACCOUNT_SELECTION_SCREEN
+        return TRANSACTION_TYPE_SELECTION_SCREEN
+
+    async def category_selection_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        # TODO get type
+        user_id = query.from_user.id
+
+        income_cats, expense_cats = await self.category_service.ensure_user_has_categories(user_id)
+        user_income_categories = [cat.name for cat in income_cats]
+
+        keyboard = create_category_keyboard(user_income_categories, 'income')
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=INCOME_CATEGORY_MESSAGE,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+
+        # Store transaction type for this user
+        if user_id not in self.user_data:
+            self.user_data[user_id] = {}
+        self.user_data[user_id]['type'] = 'income'
+
+        context.user_data['previous_state'] = TRANSACTION_TYPE_SELECTION_SCREEN
+        return CATEGORY_SELECTION_SCREEN
+
+    async def money_input_screen(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+
+        user_id = query.from_user.id
+        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        category = "category"
+        await query.edit_message_text(
+            text=f"🏷️ <b>Selected category: {category}</b>\n\n{AMOUNT_PROMPT_MESSAGE}",
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+        user_id = update.message.from_user.id
+        try:
+            amount_text = update.message.text
+            if not amount_text:
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await update.message.reply_text(
+                    INVALID_AMOUNT_MESSAGE,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                return
+
+            amount = float(amount_text)
+
+            # Get transaction details
+            transaction_type = self.user_data[user_id]['type']
+            category = self.user_data[user_id]['category']
+
+            # Format transaction for display
+            formatted_amount = format_amount(amount)
+            if transaction_type == 'income':
+                transaction_text = f"🟢 Income: +{formatted_amount} ({category})"
+            else:
+                transaction_text = f"🔴 Expense: -{formatted_amount} ({category})"
+
+            # Save transaction to database using transaction service
+            try:
+                transaction = await self.transaction_service.create_transaction(
+                    user_id=user_id,
+                    amount=amount,
+                    category=category,
+                    transaction_type=transaction_type,
+                    account_id=self.user_data[user_id]['account_id']
+                )
+
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await update.message.reply_text(
+                    f"{TRANSACTION_RECORDED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{TRANSACTION_ID_MESSAGE} {transaction.id}\n\n{THANK_YOU_MESSAGE}",
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"Error saving transaction: {e}")
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await update.message.reply_text(
+                    f"{TRANSACTION_RECORDED_MESSAGE}\n<pre>{transaction_text}</pre>\n\n{ERROR_SAVING_TRANSACTION_MESSAGE}\n\n{THANK_YOU_MESSAGE}",
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+
+            # Clear user data for this transaction
+            self.user_data[user_id] = {}
+
+            # Show main menu with today's transaction
+
+            return await self.start(update, context)
+
+        except ValueError:
+            keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                INVALID_AMOUNT_MESSAGE,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+
+    # async def category_selection_screen_expense(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    #     query = update.callback_query
+    #     await query.answer()
+    #
+    #     user_id = query.from_user.id
+    #
+    #     _, expense_cats = await self.category_service.ensure_user_has_categories(user_id)
+    #     user_income_categories = [cat.name for cat in expense_cats]
+    #
+    #     keyboard = create_category_keyboard(user_income_categories, 'expense')
+    #     reply_markup = InlineKeyboardMarkup(keyboard)
+    #     await query.edit_message_text(
+    #         text=INCOME_CATEGORY_MESSAGE,
+    #         reply_markup=reply_markup,
+    #         parse_mode="HTML"
+    #     )
+    #
+    #     # Store transaction type for this user
+    #     if user_id not in self.user_data:
+    #         self.user_data[user_id] = {}
+    #     self.user_data[user_id]['type'] = 'expense'
+    #
+    #     context.user_data['previous_state'] = TRANSACTION_TYPE_SELECTION_SCREEN
+    #     return CATEGORY_SELECTION_SCREEN
+
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle all button presses"""
         query = update.callback_query
@@ -262,34 +505,56 @@ class ExpenseBot:
             
         await query.answer()
         
-        user_id = query.from_user.id
-        
-        if query.data == 'enter_transaction':
-            # First, show account selection with calculated balances
-            accounts = await self.account_service.get_user_accounts(user_id)
-            
-            if not accounts:
-                # Handle case where user has no accounts
-                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(
-                    text=NO_ACCOUNTS_MESSAGE,
-                    reply_markup=reply_markup,
-                    parse_mode="HTML"
-                )
-                return
-            
-            # Create account keyboard with calculated balances
-            keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
 
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text=ACCOUNT_SELECTION_MESSAGE,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
+
+        # Create account keyboard with calculated balances
+        # accounts = await self.account_service.get_user_accounts(user_id)
+        # if not accounts:
+        #     keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+        #     reply_markup = InlineKeyboardMarkup(keyboard)
+        #     await query.edit_message_text(
+        #         text=NO_ACCOUNTS_MESSAGE,
+        #         reply_markup=reply_markup,
+        #         parse_mode="HTML"
+        #     )
+        #     return MAIN
+        # keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
+        #
+        # reply_markup = InlineKeyboardMarkup(keyboard)
+        # await query.edit_message_text(
+        #     text=ACCOUNT_SELECTION_MESSAGE,
+        #     reply_markup=reply_markup,
+        #     parse_mode="HTML"
+        # )
+        # return ACCOUNT_SELECTION
         
-        elif query.data == 'select_period':
+        # if query.data == 'enter_transaction':
+            # First, show account selection with calculated balances
+            # accounts = await self.account_service.get_user_accounts(user_id)
+            #
+            # if not accounts:
+            #     # Handle case where user has no accounts
+            #     keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+            #     reply_markup = InlineKeyboardMarkup(keyboard)
+            #     await query.edit_message_text(
+            #         text=NO_ACCOUNTS_MESSAGE,
+            #         reply_markup=reply_markup,
+            #         parse_mode="HTML"
+            #     )
+            #     return
+            #
+            # # Create account keyboard with calculated balances
+            # keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
+            #
+            # reply_markup = InlineKeyboardMarkup(keyboard)
+            # await query.edit_message_text(
+            #     text=ACCOUNT_SELECTION_MESSAGE,
+            #     reply_markup=reply_markup,
+            #     parse_mode="HTML"
+            # )
+            # return ACCOUNT_SELECTION
+
+        if query.data == 'select_period':
             await self.show_period_selection(update, context)
         
         elif query.data.startswith('view_period_'):
@@ -328,7 +593,7 @@ class ExpenseBot:
             )
         
         elif query.data.startswith('edit_') and not query.data.startswith('edit_amount_') and not query.data.startswith('edit_full_'):
-            await self.edit_transaction(update, context)
+            await self.transaction_view_screen(update, context)
         
         elif query.data.startswith('edit_full_'):
             transaction_id = int(query.data.split('_')[2])
@@ -383,31 +648,8 @@ class ExpenseBot:
         elif query.data.startswith('delete_'):
             transaction_id = int(query.data.split('_')[1])
             await self.delete_transaction(update, context, transaction_id)
-        
-        elif query.data == 'back_to_main':
-            # Refresh the main view with updated transactions
-            await self.refresh_main_menu(update, context)
-        
-        elif query.data == 'back_to_type_selection':
-            # Show transaction type selection again
-            reply_markup = InlineKeyboardMarkup(get_transaction_type_keyboard())
-            await query.edit_message_text(
-                text=TRANSACTION_TYPE_MESSAGE,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
-        
-        elif query.data == 'back_to_account_selection':
-            # Return to account selection
-            accounts = await self.account_service.get_user_accounts(user_id)
-            if accounts:
-                keyboard = await create_account_keyboard_with_balances(accounts, user_id, self.account_service)
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(
-                    text=ACCOUNT_SELECTION_MESSAGE,
-                    reply_markup=reply_markup,
-                    parse_mode="HTML"
-                )
+
+
         
         elif query.data == 'type_income':
             # Ensure user has categories, creating defaults if needed
@@ -445,23 +687,7 @@ class ExpenseBot:
                 self.user_data[user_id] = {}
             self.user_data[user_id]['type'] = 'expense'
         
-        elif query.data.startswith('account_'):
-            account_id = int(query.data.split('_')[1])
-            
-            # Store selected account
-            if user_id not in self.user_data:
-                self.user_data[user_id] = {}
-            self.user_data[user_id]['account_id'] = account_id
-            
-            # Now show transaction type selection
-            reply_markup = InlineKeyboardMarkup(get_transaction_type_keyboard())
-            await query.edit_message_text(
-                text=TRANSACTION_TYPE_MESSAGE,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
-        
-        elif query.data and (query.data.startswith('income_') or query.data.startswith('expense_')):
+        if query.data and (query.data.startswith('income_') or query.data.startswith('expense_')):
             # Category selected, ask for amount
             if query.data:
                 parts = query.data.split('_', 1)  # Split only on first underscore
@@ -861,15 +1087,44 @@ class ExpenseBot:
         self.application = ApplicationBuilder().token(TOKEN).build()
         
         # Register command handlers
-        self.application.add_handler(CommandHandler('start', self.start))
+        # self.application.add_handler(CommandHandler('start', self.start))
         self.application.add_handler(CommandHandler('add_account', self.add_account))
         
         # Register callback query handler
-        self.application.add_handler(CallbackQueryHandler(self.button_handler))
+        # self.application.add_handler(CallbackQueryHandler(self.button_handler))
         
         # Register message handler
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_amount))
-        
+
+        self.application.add_handler(ConversationHandler(
+            entry_points=[CommandHandler('start', self.start)],
+            states={
+                MAIN_SCREEN: [
+                    CallbackQueryHandler(self.account_selection_screen, pattern='^enter_transaction$'),
+                    CallbackQueryHandler(self.transaction_view_screen, pattern='^view_transaction_'),
+                    CallbackQueryHandler(self.show_period_selection, pattern='^select_period$'),
+                ],
+                ACCOUNT_SELECTION_SCREEN: [
+                    CallbackQueryHandler(self.transaction_type_selection_screen, pattern='^account_'),
+                    CallbackQueryHandler(self.back_handler, pattern='^back$')
+                ],
+                TRANSACTION_TYPE_SELECTION_SCREEN: [
+                    CallbackQueryHandler(self.category_selection_screen, pattern='^type_'),
+                    CallbackQueryHandler(self.back_handler, pattern='^back$')
+                ],
+                CATEGORY_SELECTION_SCREEN: [
+                    CallbackQueryHandler(self.money_input_screen, pattern='^income_|expense_'),
+                    CallbackQueryHandler(self.back_handler, pattern='^back$')
+                ],
+                TRANSACTION_VIEW_SCREEN: [
+                    CallbackQueryHandler(self.account_selection_screen, pattern='^edit_transaction_'),
+                    CallbackQueryHandler(self.back_handler, pattern='^back$')
+                ]
+            },
+            fallbacks=[CommandHandler('start', self.start)]
+        ))
+
+
         return True
 
     async def post_init(self, application):

@@ -1,6 +1,11 @@
+from bot import ExpenseBot
+
+
 def main():
-    print("Hello from expenis!")
+    """Run the bot."""
+    bot = ExpenseBot()
+    bot.run()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
