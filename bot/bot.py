@@ -490,6 +490,7 @@ class ExpenseBot:
                     CallbackQueryHandler(account_selection_screen, pattern='^enter_transaction$'),
                     CallbackQueryHandler(transaction_view_screen, pattern='^view_transaction_'),
                     CallbackQueryHandler(self.show_period_selection, pattern='^select_period$'),
+                    CallbackQueryHandler(add_account, pattern='^add_account$'),
                 ],
                 ACCOUNT_SELECTION_SCREEN: [
                     CallbackQueryHandler(transaction_type_selection_screen, pattern='^account_'),

@@ -16,52 +16,54 @@ ADD_ACCOUNT_SCREEN = 'ADD_ACCOUNT_SCREEN'
 async def add_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start the account creation process"""
     push_state(context)
+    
+    if update.message:
+        await update.message.reply_text(
+            ADD_ACCOUNT_MESSAGE,
+            parse_mode="HTML"
+        )
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(
+            ADD_ACCOUNT_MESSAGE,
+            parse_mode="HTML"
+        )
+    
+    context.user_data['previous_state'] = MAIN_SCREEN
+    return ACCOUNT_NAME
 
-    await update.callback_query.edit_message_text(
-        ADD_ACCOUNT_MESSAGE,
-        parse_mode="HTML"
-    )
-    context.user_data['previous_state'] = ADD_ACCOUNT_SCREEN
-    return ADD_ACCOUNT_SCREEN
-
-ACCOUNT_NAME = 'ACCOUNT_NAME'
 async def account_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     push_state(context)
-
-    # Handle account name input
+    
     account_name = update.message.text.strip()
     if not account_name:
-        keyboard = [[InlineKeyboardButton("⬅️ back", callback_data="back")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await update.callback_query.edit_message_text(
+        await update.message.reply_text(
             "⚠️ <i>Please enter a valid account name.</i>",
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
         return ACCOUNT_NAME
 
-    # Store account name
     context.user_data['account_name'] = account_name
-    # Ask for initial amount
-    keyboard = [[InlineKeyboardButton("⬅️ back", callback_data="back")]]
+    
+    keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.callback_query.edit_message_text(
+    await update.message.reply_text(
         ADD_ACCOUNT_AMOUNT_MESSAGE,
         reply_markup=reply_markup,
         parse_mode="HTML"
     )
-    context.user_data['previous_state'] = ACCOUNT_NAME
-    return ACCOUNT_NAME
+    return ENTER_ACCOUNT_AMOUNT
 
 async def create_account_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.callback_query.from_user.id
+    user_id = update.message.from_user.id
     try:
         amount_text = update.message.text.strip()
         initial_amount = float(amount_text) if amount_text else 0.0
 
-        # Create the account
         account_name = context.user_data['account_name']
         account = await create_account(
             user_id=user_id,
@@ -69,10 +71,10 @@ async def create_account_handler(update: Update, context: ContextTypes.DEFAULT_T
             initial_amount=initial_amount
         )
 
-        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back to Main", callback_data="back_to_main")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await update.callback_query.edit_message_text(
+        await update.message.reply_text(
             f"{ACCOUNT_CREATED_MESSAGE}\n\n"
             f"🏦 <b>Account:</b> {account.name}\n"
             f"💰 <b>Initial Amount:</b> {format_amount(initial_amount)}",
@@ -80,10 +82,11 @@ async def create_account_handler(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="HTML"
         )
 
-        return start(update, context)
+        context.user_data.clear()
+        return MAIN_SCREEN
 
     except ValueError:
-        keyboard = [[InlineKeyboardButton("⬅️ back", callback_data="back")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await update.message.reply_text(
@@ -91,4 +94,4 @@ async def create_account_handler(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=reply_markup,
             parse_mode="HTML"
         )
-        return
+        return ENTER_ACCOUNT_AMOUNT
