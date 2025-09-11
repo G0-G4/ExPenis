@@ -469,7 +469,7 @@ class ExpenseBot:
                 return
             
             # Get account name for display
-            account = await self.account_service.get_account_by_id(transaction.account_id, user_id, None)
+            account = await self.account_service.get_account_by_id(transaction.account_id, user_id)
             account_name = account.name if account else f"Account {transaction.account_id}"
             
             # Store editing state
@@ -493,7 +493,7 @@ class ExpenseBot:
                 f"Type: {transaction.type}\n"
                 f"Category: {transaction.category}\n"
                 f"Account: {account_name}\n"
-                f"Date: {transaction.date.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"Date: {transaction.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
             )
             
             await query.edit_message_text(
