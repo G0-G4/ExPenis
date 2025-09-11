@@ -16,18 +16,31 @@ class TransactionService:
         user_id: int, 
         amount: float, 
         category: str, 
-        transaction_type: str, 
+        transaction_type: str,
+        account_id: int
     ) -> Transaction:
         """Create a new transaction"""
-        async with session_maker() as session, session.begin():
+        async with session_maker() as session:
+            # First, get the account to verify it exists and belongs to the user
+            from core.service.account_service import AccountService
+            account_service = AccountService()
+            account = await account_service.get_account_by_id(account_id, user_id)
+            
+            if not account:
+                raise Exception(f"Account {account_id} not found for user {user_id}")
+            
+            # Create the transaction
             transaction = Transaction(
                 user_id=user_id,
                 amount=amount,
                 category=category,
-                type=transaction_type
+                type=transaction_type,
+                account_id=account_id
             )
             session.add(transaction)
-        return transaction
+            await session.commit()
+            await session.refresh(transaction)
+            return transaction
     
     async def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
         """Get a transaction by its ID"""

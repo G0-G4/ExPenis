@@ -5,6 +5,7 @@ import asyncio
 from core.config import TOKEN
 from core.service.transaction_service import TransactionService
 from core.service.category_service import CategoryService
+from core.service.account_service import AccountService
 import logging
 
 # Enable logging
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 # Define conversation states
-ENTER_TRANSACTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD = range(6)
+ENTER_TRANSACTION, ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD = range(7)
 
 # UI constants
 CATEGORIES_PER_ROW = 3
@@ -49,6 +50,8 @@ TRANSACTION_ID_MESSAGE = "🆔 <b>Transaction ID:</b>"
 PERIOD_VIEW_MESSAGE = "📅 <b>Select a period to view:</b>"
 PERIOD_STATS_MESSAGE = "📈 <b>Period Statistics</b>"
 NO_DATA_MESSAGE = "📭 <i>No data for this period.</i>"
+ACCOUNT_SELECTION_MESSAGE = "💳 <b>Select an account:</b>"
+NO_ACCOUNTS_MESSAGE = "📭 <i>You don't have any accounts yet. Please create an account first.</i>"
 
 # Helper function to format numbers with thousands separator
 def format_amount(amount):
@@ -66,6 +69,7 @@ class ExpenseBot:
         self.user_data = {}
         self.transaction_service = TransactionService()
         self.category_service = CategoryService()
+        self.account_service = AccountService()
         self.application = None
 
     def create_category_keyboard(self, categories, prefix):
@@ -79,6 +83,20 @@ class ExpenseBot:
                 row = []
         # Add back button to category selection
         keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_type_selection")])
+        return keyboard
+
+    def create_account_keyboard(self, accounts):
+        """Create a keyboard with accounts arranged in columns"""
+        keyboard = []
+        row = []
+        for i, account in enumerate(accounts):
+            row.append(InlineKeyboardButton(f"{account.name} ({format_amount(account.amount)})", 
+                                           callback_data=f'account_{account.id}'))
+            if len(row) == CATEGORIES_PER_ROW or i == len(accounts) - 1:
+                keyboard.append(row)
+                row = []
+        # Add back button to account selection
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")])
         return keyboard
 
     def get_main_menu_keyboard(self):
@@ -367,10 +385,24 @@ class ExpenseBot:
         user_id = query.from_user.id
         
         if query.data == 'enter_transaction':
-            # Show transaction type selection (+ or -)
-            reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
+            # First, show account selection
+            accounts = await self.account_service.get_user_accounts(user_id)
+            
+            if not accounts:
+                # Handle case where user has no accounts
+                keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    text=NO_ACCOUNTS_MESSAGE,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                return
+            
+            keyboard = self.create_account_keyboard(accounts)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                text=TRANSACTION_TYPE_MESSAGE,
+                text=ACCOUNT_SELECTION_MESSAGE,
                 reply_markup=reply_markup,
                 parse_mode="HTML"
             )
@@ -471,6 +503,22 @@ class ExpenseBot:
             if user_id not in self.user_data:
                 self.user_data[user_id] = {}
             self.user_data[user_id]['type'] = 'expense'
+        
+        elif query.data.startswith('account_'):
+            account_id = int(query.data.split('_')[1])
+            
+            # Store selected account
+            if user_id not in self.user_data:
+                self.user_data[user_id] = {}
+            self.user_data[user_id]['account_id'] = account_id
+            
+            # Now show transaction type selection
+            reply_markup = InlineKeyboardMarkup(self.get_transaction_type_keyboard())
+            await query.edit_message_text(
+                text=TRANSACTION_TYPE_MESSAGE,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
         
         elif query.data and (query.data.startswith('income_') or query.data.startswith('expense_')):
             # Category selected, ask for amount
@@ -644,6 +692,7 @@ class ExpenseBot:
                         amount=amount,
                         category=category,
                         transaction_type=transaction_type,
+                        account_id=self.user_data[user_id]['account_id']
                     )
                     
                     keyboard = [[InlineKeyboardButton("⬅️ Back", callback_data="back_to_main")]]
