@@ -27,9 +27,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
 
-ACCOUNT_SELECTION, SELECT_TYPE, SELECT_CATEGORY, ENTER_AMOUNT, SELECT_PERIOD, VIEW_PERIOD, ENTER_ACCOUNT_NAME, ENTER_ACCOUNT_AMOUNT, = range(
-    8)
-
 
 
 
@@ -474,17 +471,9 @@ class ExpenseBot:
             return False
             
         self.application = ApplicationBuilder().token(TOKEN).build()
-        
-        # self.application.add_handler(CommandHandler('add_account', add_account))
-        
-        # Register callback query handler
-        # self.application.add_handler(CallbackQueryHandler(self.button_handler))
-        
-        # Register message handler
-        # self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_amount))
 
         self.application.add_handler(ConversationHandler(
-            entry_points=[CommandHandler('start', start), CommandHandler('add_account', add_account)],
+            entry_points=[CommandHandler('start', start)],
             states={
                 MAIN_SCREEN: [
                     CallbackQueryHandler(account_selection_screen, pattern='^enter_transaction$'),
@@ -513,6 +502,12 @@ class ExpenseBot:
                     CallbackQueryHandler(delete_transaction_handler, pattern='^delete_'),
                     CallbackQueryHandler(self.back_handler, pattern='^back')
                 ],
+            },
+            fallbacks=[CommandHandler('start', start)]
+        ))
+        self.application.add_handler(ConversationHandler(
+            entry_points=[CommandHandler('add_account', add_account)],
+            states={
                 ADD_ACCOUNT_SCREEN: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, account_name),
                     CallbackQueryHandler(self.back_handler, pattern='^back')
@@ -523,7 +518,7 @@ class ExpenseBot:
                 ]
 
             },
-            fallbacks=[CommandHandler('start', start)]
+            fallbacks=[CommandHandler('add_account', add_account)]
         ))
         return True
 

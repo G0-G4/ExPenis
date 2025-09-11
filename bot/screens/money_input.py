@@ -1,14 +1,13 @@
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
-
 from core.helpers import format_percentage
 from bot.messages import *
 from bot.bot_config import *
 from bot.keyboards import  *
-from core.config import TOKEN
 from core.service.transaction_service import create_transaction, get_todays_totals, \
     get_todays_transactions, \
     update_transaction
 from core.service.account_service import AccountService
+
 MONEY_INPUT_SCREEN = 'MONEY_INPUT_SCREEN'
 async def money_input_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     push_state(context)

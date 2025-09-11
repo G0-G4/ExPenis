@@ -1,16 +1,7 @@
-from cmath import acosh
-from os import supports_effective_ids
-
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
-
-from core.helpers import format_percentage
 from bot.messages import *
 from bot.bot_config import *
 from bot.keyboards import  *
-from core.config import TOKEN
 from core.service.category_service import ensure_user_has_categories
-from core.service.transaction_service import get_todays_totals, get_todays_transactions
-from core.service.account_service import AccountService
 CATEGORY_SELECTION_SCREEN = "CATEGORY_SELECTION_SCREEN"
 async def category_selection_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     push_state(context)
