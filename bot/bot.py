@@ -67,9 +67,9 @@ def format_percentage(value):
 class ExpenseBot:
     def __init__(self):
         self.user_data = {}
-        self.transaction_service = TransactionService()
-        self.category_service = CategoryService()
         self.account_service = AccountService()
+        self.transaction_service = TransactionService(self.account_service)
+        self.category_service = CategoryService()
         self.application = None
 
     def create_category_keyboard(self, categories, prefix):
