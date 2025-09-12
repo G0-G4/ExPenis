@@ -17,7 +17,7 @@ class Category(Base):
     def __repr__(self):
         return f"<Category(user_id={self.user_id}, type='{self.type}', name='{self.name}')>"
     
-    def to_dict(self):
+    def to_dict(self, recursive):
         return {
             'id': self.id,
             'user_id': self.user_id,
