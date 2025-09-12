@@ -1,3 +1,6 @@
+from typing import List
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 class Component:
     def __init__(self, component_id: str = None):
         self.component_id = component_id or str(id(self))
