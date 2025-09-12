@@ -17,9 +17,7 @@ class TransactionEditScreen:
         self.transaction_type = 'expense'
         self.category = None
         application.add_handler(CallbackQueryHandler(self.enter_transaction_handler, pattern='^enter_transaction$'))
-        application.add_handler(CallbackQueryHandler(self.account_select_handler, pattern='^account_'))
-        application.add_handler(CallbackQueryHandler(self.transaction_type_select_handler, pattern='^type_'))
-        application.add_handler(CallbackQueryHandler(self.category_select_handler, pattern='^income_|expense_'))
+        application.add_handler(CallbackQueryHandler(self.handle_component_callback))
 
     async def enter_transaction_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.callback_query.from_user.id
@@ -34,10 +32,18 @@ class TransactionEditScreen:
         self.account_id = int(update.callback_query.data.split("_")[1])
         await self.display_on(update, "account selected", await self.get_accounts_markup(user_id))
 
-    async def category_select_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_component_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        callback_data = update.callback_query.data
         user_id = update.callback_query.from_user.id
-        self.category = update.callback_query.data.split("_")[1]
-        await self.display_on(update, "category selected", await self.get_accounts_markup(user_id))
+        
+        if not self.current_panel.handle_callback(callback_data):
+            # Handle non-component callbacks
+            if callback_data.startswith('account_'):
+                self.account_id = int(callback_data.split("_")[1])
+            elif callback_data == 'back':
+                return await self.back_handler(update, context)
+                
+        await self.display_on(update, "selection updated", await self.get_accounts_markup(user_id))
 
     async def transaction_type_select_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.callback_query.from_user.id
@@ -84,17 +90,35 @@ class TransactionEditScreen:
         ]
 
     def get_category_selection_keyboard(self):
-        """Create a keyboard with categories arranged in columns"""
-        keyboard = []
-        row = []
+        panel = Panel()
+        type_group = CheckBoxGroup("transaction_type", 
+                                 on_change=lambda cb: setattr(self, 'transaction_type', cb.text.split()[1].lower()))
+        
+        # Add transaction type selection
+        type_panel = Panel()
+        income_cb = CheckBox("🟢 Income (+)", self.transaction_type == 'income', "transaction_type")
+        expense_cb = CheckBox("🔴 Expense (-)", self.transaction_type == 'expense', "transaction_type")
+        type_group.add(income_cb)
+        type_group.add(expense_cb)
+        type_panel.add(income_cb)
+        type_panel.add(expense_cb)
+        panel.add(type_panel)
+        
+        # Add categories
         cats = self.expense_cats if self.transaction_type == 'expense' else self.income_cats
-        for i, category in enumerate(cats):
-            row.append(InlineKeyboardButton(category.name + self.select if category.name == self.category else category.name, callback_data=f'{self.transaction_type}_{category.name}'))
-            if len(row) == CATEGORIES_PER_ROW or i == len(cats) - 1:
-                keyboard.append(row)
-                row = []
-        # Add back button to category selection
-        return keyboard
+        category_group = CheckBoxGroup("category", 
+                                      on_change=lambda cb: setattr(self, 'category', cb.text))
+        
+        for category in cats:
+            cb = CheckBox(
+                category.name, 
+                category.name == self.category,
+                "category"
+            )
+            category_group.add(cb)
+            panel.add(cb)
+            
+        return panel.render()
 
     async def display_on(self, update: Update, text, markup):
         try:
