@@ -6,7 +6,7 @@ from core.service.account_service import get_user_accounts
 from core.service.category_service import ensure_user_has_categories
 from core.service.transaction_service import get_todays_totals, get_todays_transactions
 from telegram.error import BadRequest
-class TransactionScreen:
+class TransactionEditScreen:
 
     def __init__(self, application: Application):
         self.income_cats = []
