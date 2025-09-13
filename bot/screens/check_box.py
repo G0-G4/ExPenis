@@ -24,6 +24,13 @@ class Component:
         """Return True if callback was handled, False otherwise"""
         return False
 
+    # async def call_on_change(self):
+    #     if not self.()
+    #     if inspect.iscoroutinefunction(self.on_change):
+    #         await self.on_change(self)
+    #     else:
+    #         self.on_change(self)
+
 class CheckBox(Component):
     def __init__(self, text: str = "", selected: bool = False,
                  callback_prefix: str = "cb_", on_change: callable = None, component_id = None, group: "CheckBoxGroup" = None):
@@ -171,18 +178,6 @@ class Screen:
 
     async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         raise NotImplementedError
-        # query = update.callback_query
-        # user_id = query.from_user.id
-        # initiated = self.initiated
-        # if not self.initiated:
-        #     await self._init(user_id)
-        #     self.initiated = True
-        # if not initiated or await self.panel.handle_callback(query.data):
-        #     await self.display_on(
-        #         update,
-        #         self.message,
-        #         self.panel
-        #     )
 
     async def display_on(self, update: Update, text: str, markup):
         """Display the panel on the given update"""

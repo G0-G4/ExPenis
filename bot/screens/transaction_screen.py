@@ -16,23 +16,43 @@ class TransactionEdit(Screen):
 
     def __init__(self, application: Application):
         super().__init__("")
-        self.account_selector = AccountSelector(application)
-        self.category_selector = CategorySelector(application)
+        self.account_selector = CategorySelector()
 
-
-class AccountSelector(Screen): # TODO screen not component
-
-    def __init__(self, application: Application):
-        super().__init__(ACCOUNT_SELECTION_MESSAGE)
-        self.account_id = None
-        self.accounts = []
-        self.balance_map = {}
         application.add_handler(CallbackQueryHandler(
             self.handle_user_presses,
             pattern='^cb_|^back$|^enter_transaction$'
         ))
 
-    async def _init(self, user_id, *args, **kwargs):
+    async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        user_id = query.from_user.id
+        initiated = self.account_selector.initiated
+        if not self.account_selector.initiated:
+            await self.account_selector.init(user_id, update)
+        if not initiated or await self.account_selector.handle_callback(query.data):
+            await self.display_on(
+                update,
+                "transaction edit",
+                self.account_selector
+            )
+
+
+class AccountSelector(Component):
+
+    def __init__(self, on_change: callable = None):
+        super().__init__()
+        self.on_change = on_change
+        self.account_id = None
+        self.accounts = []
+        self.balance_map = {}
+        self.panel  = Panel()
+        self.initiated = False
+        # application.add_handler(CallbackQueryHandler(
+        #     self.handle_user_presses,
+        #     pattern='^cb_|^back$|^enter_transaction$'
+        # ))
+
+    async def init(self, user_id):
         self.accounts = await get_user_accounts(user_id)
         for account in self.accounts:
             balance = await calculate_account_balance(account.id, user_id)
@@ -57,27 +77,25 @@ class AccountSelector(Screen): # TODO screen not component
             else:
                 self.account_id = None
         print("account set to " + str(self.account_id))
+        if self.on_change:
+            self.call_on_change()
 
-    async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        user_id = query.from_user.id
-        initiated = self.initiated
-        if not self.initiated:
-            await self._init(user_id)
-            self.initiated = True
-        if not initiated or await self.panel.handle_callback(query.data):
-            await self.display_on(
-                update,
-                self.message,
-                self.panel
-            )
+    async def call_on_change(self):
+        if asyncio.iscoroutinefunction(self.on_change):
+            await self.on_change(self)
+        else:
+            self.on_change(self)
 
+    async def handle_callback(self, callback_data: str) -> bool:
+        return await self.panel.handle_callback(callback_data)
 
+    def render(self):
+        return self.panel.render()
 
 
-class CategorySelector(Screen):
+class CategorySelector(Component):
 
-    def __init__(self, application: Application, transaction_type='expense'):
+    def __init__(self, transaction_type='expense', on_change:callable=None):
         super().__init__(INCOME_CATEGORY_MESSAGE)
         self.income_cats = []
         self.expense_cats = []
@@ -86,11 +104,9 @@ class CategorySelector(Screen):
         self.panel = None
         self.category_map = {}
         self.initiated = False
-        application.add_handler(CallbackQueryHandler(
-            self.handle_user_presses,
-            pattern='^cb_|^back$|^enter_transaction$'
-        ))
-    async def _init(self, user_id: int, update: Update, transaction_type='expense'):
+        self.on_change = on_change
+
+    async def init(self, user_id: int, update: Update, transaction_type='expense'):
         self.panel = Panel()
         self.transaction_type = transaction_type
         async def decorated(x):
@@ -134,18 +150,30 @@ class CategorySelector(Screen):
         self.panel.add(category_panel)
         self.initiated = True
 
+    async def call_on_change(self):
+        if not self.on_change:
+            return
+        if asyncio.iscoroutinefunction(self.on_change):
+            await self.on_change(self)
+        else:
+            self.on_change(self)
+
+    async def handle_callback(self, callback_data: str) -> bool:
+        return await self.panel.handle_callback(callback_data)
+
     async def _handle_type_change(self, cbg: CheckBoxGroup, update: Update):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.transaction_type = cbg.selected_check_box.component_id
                 user_id  = update.callback_query.from_user.id
-                await self._init(user_id, update, self.transaction_type)
-                await self.display_on(update, ACCOUNT_SELECTION_MESSAGE, self.panel) # TODO
+                await self.init(user_id, update, self.transaction_type)
+                # await self.display_on(update, ACCOUNT_SELECTION_MESSAGE, self.panel) # TODO
             else:
                 self.transaction_type= None
         print("type set to " + str(self.transaction_type))
+        await self.call_on_change()
 
-    def _handle_category_change(self, cbg: CheckBoxGroup):
+    async def _handle_category_change(self, cbg: CheckBoxGroup):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 category_id = int(cbg.selected_check_box.component_id.split("_")[1])
@@ -153,17 +181,7 @@ class CategorySelector(Screen):
             else:
                 self.category = None
         print("category set " + self.category)
+        await self.call_on_change()
 
-    async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        user_id = query.from_user.id
-        initiated = self.initiated
-        if not self.initiated:
-            await self._init(user_id, update=update)
-            self.initiated = True
-        if not initiated or await self.panel.handle_callback(query.data):
-            await self.display_on(
-                update,
-                self.message,
-                self.panel
-            )
+    def render(self):
+        return self.panel.render()
