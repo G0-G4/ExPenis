@@ -34,3 +34,4 @@ NO_ACCOUNTS_MESSAGE = "📭 <i>You don't have any accounts yet. Please create an
 ADD_ACCOUNT_MESSAGE = "🏦 <b>Please enter the account name:</b>"
 ADD_ACCOUNT_AMOUNT_MESSAGE = "💰 <b>Please enter the initial amount:</b>"
 ACCOUNT_CREATED_MESSAGE = "✅ <b>Account created successfully!</b>"
+TRANSACTION_INPUT_PROMPT = "💵 <b>Please enter the transaction amount:</b>"
