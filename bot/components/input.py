@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Input:
-    def __init__(self, on_input: Optional[Callable[[str], Any]] = None):
+    def __init__(self, on_input: Optional[Callable] = None):
         """
         Initialize the Input component.
         
@@ -38,7 +38,7 @@ class Input:
         
         if self.on_input:
             try:
-                await self.on_input(self.value)
+                await self.on_input(self, update, context)
             except Exception as e:
                 logger.error(f"Error in input callback: {e}")
                 return False

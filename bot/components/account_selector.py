@@ -18,7 +18,9 @@ class AccountSelector(Component):
 
     def __init__(self, on_change: callable = None):
         super().__init__(on_change=on_change)
-        self.on_change = on_change
+        self.accounts = None
+        self.clear()
+    def clear(self):
         self.account_id = None
         self.accounts = []
         self.balance_map = {}

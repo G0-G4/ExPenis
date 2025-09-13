@@ -18,6 +18,10 @@ class CategorySelector(Component):
 
     def __init__(self, transaction_type='expense', on_change:callable=None):
         super().__init__(on_change=on_change)
+        self.clear(transaction_type)
+
+
+    def clear(self, transaction_type="expense"):
         self.income_cats = []
         self.expense_cats = []
         self.transaction_type = transaction_type
@@ -25,7 +29,6 @@ class CategorySelector(Component):
         self.panel = None
         self.category_map = {}
         self.initiated = False
-        self.on_change = on_change
 
     async def init(self, user_id: int, update: Update, transaction_type='expense'):
         self.panel = Panel()
@@ -71,14 +74,6 @@ class CategorySelector(Component):
         self.panel.add(category_panel)
         self.initiated = True
 
-    async def call_on_change(self):
-        if not self.on_change:
-            return
-        if asyncio.iscoroutinefunction(self.on_change):
-            await self.on_change(self)
-        else:
-            self.on_change(self)
-
     async def handle_callback(self, callback_data: str) -> bool:
         return await self.panel.handle_callback(callback_data)
 
@@ -86,11 +81,11 @@ class CategorySelector(Component):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.transaction_type = cbg.selected_check_box.component_id
+                self.category = None
                 user_id  = update.callback_query.from_user.id
                 await self.init(user_id, update, self.transaction_type)
             else:
                 self.transaction_type= None
-        print("type set to " + str(self.transaction_type))
         await self.call_on_change()
 
     async def _handle_category_change(self, cbg: CheckBoxGroup):
@@ -100,7 +95,6 @@ class CategorySelector(Component):
                 self.category = self.category_map[category_id].name
             else:
                 self.category = None
-        print("category set " + self.category)
         await self.call_on_change()
 
     def render(self):
