@@ -9,10 +9,9 @@ from bot.components.panel import Panel
 
 class Screen:
 
-    def __init__(self, message: str = ""):
+    def __init__(self):
         self.panel = Panel()
         self.initiated = False
-        self.message = message
 
     async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         raise NotImplementedError

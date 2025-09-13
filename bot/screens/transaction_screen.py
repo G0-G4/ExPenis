@@ -10,9 +10,10 @@ from bot.screens.check_box import Screen
 class TransactionEdit(Screen):
 
     def __init__(self, application: Application):
-        super().__init__("")
+        super().__init__()
         self.account_selector = AccountSelector()
         self.category_selector = CategorySelector()
+        self.message="input transaction"
 
         application.add_handler(CallbackQueryHandler(
             self.handle_user_presses,
@@ -32,7 +33,7 @@ class TransactionEdit(Screen):
         if not initiated or handle_account or handle_category:
             await self.display_on(
                 update,
-                "transaction edit",
+                self.message,
                 self
             )
 

@@ -17,7 +17,7 @@ from core.helpers import format_amount
 class CategorySelector(Component):
 
     def __init__(self, transaction_type='expense', on_change:callable=None):
-        super().__init__()
+        super().__init__(on_change=on_change)
         self.income_cats = []
         self.expense_cats = []
         self.transaction_type = transaction_type

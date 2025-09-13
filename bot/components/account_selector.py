@@ -17,13 +17,14 @@ from core.helpers import format_amount
 class AccountSelector(Component):
 
     def __init__(self, on_change: callable = None):
-        super().__init__()
+        super().__init__(on_change=on_change)
         self.on_change = on_change
         self.account_id = None
         self.accounts = []
         self.balance_map = {}
         self.panel  = Panel()
         self.initiated = False
+        self.selected_account = None
 
     async def init(self, user_id):
         self.accounts = await get_user_accounts(user_id)
@@ -43,15 +44,19 @@ class AccountSelector(Component):
             )
             self.panel.add(cb)
         self.initiated = True
-    def account_selection_call_back(self, cbg: CheckBoxGroup):
+    async def account_selection_call_back(self, cbg: CheckBoxGroup):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.account_id = int(cbg.selected_check_box.component_id.split("_")[1])
+                # todo refactor to avoid loop
+                for account in self.accounts:
+                    if account.id == self.account_id:
+                        self.selected_account = account
             else:
                 self.account_id = None
         print("account set to " + str(self.account_id))
         if self.on_change:
-            self.call_on_change()
+            await self.call_on_change()
 
     async def call_on_change(self):
         if asyncio.iscoroutinefunction(self.on_change):
