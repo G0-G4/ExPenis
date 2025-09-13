@@ -1,3 +1,5 @@
+import asyncio
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
@@ -5,146 +7,163 @@ from typing import Optional
 
 from bot.messages import *
 from bot.bot_config import *
-from bot.screens.check_box import CheckBox, CheckBoxGroup, Panel
+from bot.screens.check_box import CheckBox, CheckBoxGroup, Component, Panel, Screen
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 from core.helpers import format_amount
 
-class TransactionEditScreen:
+class TransactionEdit(Screen):
+
     def __init__(self, application: Application):
-        self.income_cats = []
-        self.expense_cats = []
+        super().__init__("")
+        self.account_selector = AccountSelector(application)
+        self.category_selector = CategorySelector(application)
+
+
+class AccountSelector(Screen): # TODO screen not component
+
+    def __init__(self, application: Application):
+        super().__init__(ACCOUNT_SELECTION_MESSAGE)
+        self.account_id = None
         self.accounts = []
-        self.account_id: Optional[int] = None
-        self.transaction_type = 'expense'
-        self.category: Optional[str] = None
-        self.current_panel = Panel()
-        
+        self.balance_map = {}
         application.add_handler(CallbackQueryHandler(
-            self.enter_transaction_handler, 
-            pattern='^enter_transaction$'
-        ))
-        application.add_handler(CallbackQueryHandler(
-            self.handle_callback,
-            pattern='^cb_|^back$'
+            self.handle_user_presses,
+            pattern='^cb_|^back$|^enter_transaction$'
         ))
 
-    async def enter_transaction_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.callback_query.from_user.id
-        await self.fetch_data(user_id)
-        
-        if not self.accounts:
-            return await self.display_on(
-                update, 
-                NO_ACCOUNTS_MESSAGE, 
-                InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="back")]])
-            )
-            
-        await self.display_on(
-            update,
-            ACCOUNT_SELECTION_MESSAGE,
-            await self.create_transaction_panel(user_id)
-        )
-
-    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        user_id = query.from_user.id
-        
-        if query.data == 'back':
-            # Handle back button
-            return await self.display_on(
-                update,
-                MAIN_MENU_MESSAGE,
-                get_main_menu_keyboard()
-            )
-            
-        # Let the panel handle component callbacks
-        if self.current_panel.handle_callback(query.data):
-            await self.display_on(
-                update,
-                ACCOUNT_SELECTION_MESSAGE,
-                await self.create_transaction_panel(user_id)
-            )
-
-    async def create_transaction_panel(self, user_id: int) -> Panel:
-        panel = Panel()
-        
-        # Account selection
-        account_group = CheckBoxGroup("accounts", 
-                                    on_change=lambda cb: setattr(self, 'account_id', int(cb.component_id)))
+    async def _init(self, user_id, *args, **kwargs):
+        self.accounts = await get_user_accounts(user_id)
         for account in self.accounts:
             balance = await calculate_account_balance(account.id, user_id)
+            self.balance_map[account.id] = balance
+
+        # Account selection
+        account_group = CheckBoxGroup("accounts",
+                                      on_change=self.account_selection_call_back)
+        for account in self.accounts:
             cb = CheckBox(
-                f"{account.name} ({format_amount(balance)})",
-                account.id == self.account_id,
-                component_id=str(account.id)
+                f"{account.name} ({format_amount(self.balance_map[account.id])})",
+                selected=self.account_id == account.id,
+                component_id="acc_" + str(account.id),
+                group=account_group
             )
-            account_group.add(cb)
-            panel.add(cb)
-        
-        # Transaction type selection
-        type_group = CheckBoxGroup("transaction_type", 
-                                 on_change=lambda cb: self._handle_type_change(cb))
+            self.panel.add(cb)
+        self.initiated = True
+    def account_selection_call_back(self, cbg: CheckBoxGroup):
+        if cbg.selected_check_box is not None:
+            if cbg.selected_check_box.selected:
+                self.account_id = int(cbg.selected_check_box.component_id.split("_")[1])
+            else:
+                self.account_id = None
+        print("account set to " + str(self.account_id))
+
+    async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        user_id = query.from_user.id
+        initiated = self.initiated
+        if not self.initiated:
+            await self._init(user_id)
+            self.initiated = True
+        if not initiated or await self.panel.handle_callback(query.data):
+            await self.display_on(
+                update,
+                self.message,
+                self.panel
+            )
+
+
+
+
+class CategorySelector(Screen):
+
+    def __init__(self, application: Application, transaction_type='expense'):
+        super().__init__(INCOME_CATEGORY_MESSAGE)
+        self.income_cats = []
+        self.expense_cats = []
+        self.transaction_type = transaction_type
+        self.category = None
+        self.panel = None
+        self.category_map = {}
+        self.initiated = False
+        application.add_handler(CallbackQueryHandler(
+            self.handle_user_presses,
+            pattern='^cb_|^back$|^enter_transaction$'
+        ))
+    async def _init(self, user_id: int, update: Update, transaction_type='expense'):
+        self.panel = Panel()
+        self.transaction_type = transaction_type
+        async def decorated(x):
+            await self._handle_type_change(x, update)
+        self.income_cats, self.expense_cats = await ensure_user_has_categories(user_id)
+        type_group = CheckBoxGroup("type_group",
+                                   on_change=decorated)
         income_cb = CheckBox(
             "🟢 Income (+)",
             self.transaction_type == 'income',
-            component_id="income"
+            component_id="income",
+            group=type_group
         )
         expense_cb = CheckBox(
-            "🔴 Expense (-)", 
+            "🔴 Expense (-)",
             self.transaction_type == 'expense',
-            component_id="expense"
+            component_id="expense",
+            group=type_group
         )
-        type_group.add(income_cb)
-        type_group.add(expense_cb)
-        panel.add(Panel([income_cb, expense_cb]))
-        
-        # Category selection
-        if self.transaction_type and self.account_id:
-            cats = self.expense_cats if self.transaction_type == 'expense' else self.income_cats
-            msg = EXPENSE_CATEGORY_MESSAGE if self.transaction_type == 'expense' else INCOME_CATEGORY_MESSAGE
-            
-            category_group = CheckBoxGroup("categories",
-                                         on_change=lambda cb: setattr(self, 'category', cb.text))
-            for category in cats:
-                cb = CheckBox(
-                    category.name,
-                    category.name == self.category,
-                    component_id=f"cat_{category.id}"
-                )
-                category_group.add(cb)
-                panel.add(cb)
-        
-        # Back button
-        panel.add(CheckBox("⬅️ Back", False, component_id="back"))
-        
-        self.current_panel = panel
-        return panel
+        type_panel = Panel()
+        type_panel.add(income_cb)
+        type_panel.add(expense_cb)
 
-    def _handle_type_change(self, checkbox: CheckBox):
-        """Handle transaction type change and reset category"""
-        self.transaction_type = checkbox.component_id
-        self.category = None
+        category_panel = Panel()
+        category_group = CheckBoxGroup("categories",
+                                       on_change=self._handle_category_change)
+        cats = self.expense_cats if self.transaction_type == 'expense' else self.income_cats
+        for category in cats:
+            cb = CheckBox(
+                category.name,
+                category.name == self.category,
+                component_id=f"cat_{category.id}",
+                group=category_group
+            )
+            category_group.add(cb)
+            category_panel.add(cb)
+        for category in self.expense_cats + self.income_cats:
+            self.category_map[category.id] = category
 
-    async def fetch_data(self, user_id: int):
-        """Fetch accounts and categories for the user"""
-        self.accounts = await get_user_accounts(user_id)
-        self.income_cats, self.expense_cats = await ensure_user_has_categories(user_id)
+        self.panel.add(type_panel)
+        self.panel.add(category_panel)
+        self.initiated = True
 
-    async def display_on(self, update: Update, text: str, markup):
-        """Display the panel on the given update"""
-        try:
-            if update.message:
-                await update.message.reply_text(
-                    text=text,
-                    reply_markup=markup.render(),
-                    parse_mode="HTML"
-                )
-            elif update.callback_query:
-                await update.callback_query.edit_message_text(
-                    text=text,
-                    reply_markup=markup.render(),
-                    parse_mode="HTML"
-                )
-        except BadRequest as e:
-            print(f"No modifications needed: {e.message}")
+    async def _handle_type_change(self, cbg: CheckBoxGroup, update: Update):
+        if cbg.selected_check_box is not None:
+            if cbg.selected_check_box.selected:
+                self.transaction_type = cbg.selected_check_box.component_id
+                user_id  = update.callback_query.from_user.id
+                await self._init(user_id, update, self.transaction_type)
+                await self.display_on(update, ACCOUNT_SELECTION_MESSAGE, self.panel) # TODO
+            else:
+                self.transaction_type= None
+        print("type set to " + str(self.transaction_type))
+
+    def _handle_category_change(self, cbg: CheckBoxGroup):
+        if cbg.selected_check_box is not None:
+            if cbg.selected_check_box.selected:
+                category_id = int(cbg.selected_check_box.component_id.split("_")[1])
+                self.category = self.category_map[category_id].name
+            else:
+                self.category = None
+        print("category set " + self.category)
+
+    async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        user_id = query.from_user.id
+        initiated = self.initiated
+        if not self.initiated:
+            await self._init(user_id, update=update)
+            self.initiated = True
+        if not initiated or await self.panel.handle_callback(query.data):
+            await self.display_on(
+                update,
+                self.message,
+                self.panel
+            )
