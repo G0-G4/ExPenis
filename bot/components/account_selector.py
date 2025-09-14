@@ -10,7 +10,6 @@ from bot.components.component import Component
 from bot.components.panel import Panel
 from bot.messages import *
 from bot.bot_config import *
-from bot.screens.check_box import Screen
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 from core.helpers import format_amount

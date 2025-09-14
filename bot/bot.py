@@ -3,18 +3,12 @@ from os import supports_effective_ids
 
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler, Application
 
-from bot.screens.back_handler import back_handler
-from bot.screens.account_selection import ACCOUNT_SELECTION_SCREEN, account_selection_screen
-from bot.screens.add_acount import ACCOUNT_NAME, ADD_ACCOUNT_SCREEN, account_name, add_account, create_account_handler
-from bot.screens.category_selection import CATEGORY_SELECTION_SCREEN, category_selection_screen
-from bot.screens.main import MAIN_SCREEN, start
 from bot.screens.main_screen import MainScreen
 from bot.screens.money_input import MONEY_INPUT_SCREEN, money_input_handler, money_input_screen
 from bot.screens.periods import PERIOD_SELECTION_SCREEN, PERIOD_VIEW_SCREEN, custom_period, period_view_screen, \
     period_selection_screen
 from bot.screens.transaction_screen import AccountSelector, CategorySelector, TransactionEdit
-from bot.screens.transaction_type_selection import TRANSACTION_TYPE_SELECTION_SCREEN, transaction_type_selection_screen
-from bot.screens.transaction_view import TRANSACTION_VIEW_SCREEN, delete_transaction_handler, transaction_view_screen
+
 from core.helpers import format_percentage
 from bot.messages import *
 from bot.bot_config import *

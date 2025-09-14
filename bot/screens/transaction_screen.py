@@ -7,8 +7,8 @@ from bot.components.account_selector import AccountSelector
 from bot.components.category_selector import CategorySelector
 from bot.components.input import Input
 from bot.bot_config import *
-from bot.screens.check_box import Screen
 from bot.messages import *
+from bot.screens.screen import Screen
 from core.service.transaction_service import create_transaction
 
 class TransactionEdit(Screen):

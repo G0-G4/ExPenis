@@ -3,14 +3,13 @@ import asyncio
 from telegram import Update
 from telegram.ext import Application
 from telegram.error import BadRequest
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from bot.components.check_box import CheckBox, CheckBoxGroup
 from bot.components.component import Component
 from bot.components.panel import Panel
 from bot.messages import *
 from bot.bot_config import *
-from bot.screens.check_box import Screen
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 from core.helpers import format_amount
