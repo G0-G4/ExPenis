@@ -6,14 +6,14 @@ from telegram.error import BadRequest
 from typing import Optional
 
 from bot.components.check_box import CheckBox, CheckBoxGroup
-from bot.components.component import Component
+from bot.components.component import UiComponent
 from bot.components.panel import Panel
 from bot.messages import *
 from bot.bot_config import *
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 from core.helpers import format_amount
-class AccountSelector(Component):
+class AccountSelector(UiComponent):
 
     def __init__(self, on_change: callable = None):
         super().__init__(on_change=on_change)
@@ -45,7 +45,7 @@ class AccountSelector(Component):
             )
             self.panel.add(cb)
         self.initiated = True
-    async def account_selection_call_back(self, cbg: CheckBoxGroup):
+    async def account_selection_call_back(self, cbg: CheckBoxGroup, update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.account_id = int(cbg.selected_check_box.component_id.split("_")[1])
@@ -55,18 +55,10 @@ class AccountSelector(Component):
                         self.selected_account = account
             else:
                 self.account_id = None
-        print("account set to " + str(self.account_id))
-        if self.on_change:
-            await self.call_on_change()
+        await self.call_on_change(update, context)
 
-    async def call_on_change(self):
-        if asyncio.iscoroutinefunction(self.on_change):
-            await self.on_change(self)
-        else:
-            self.on_change(self)
+    async def handle_callback(self, update, context, callback_data: str) -> bool:
+        return await self.panel.handle_callback(update, context, callback_data)
 
-    async def handle_callback(self, callback_data: str) -> bool:
-        return await self.panel.handle_callback(callback_data)
-
-    def render(self):
-        return self.panel.render()
+    def render(self, update, context):
+        return self.panel.render(update, context)

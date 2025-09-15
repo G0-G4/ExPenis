@@ -6,14 +6,14 @@ from telegram.error import BadRequest
 from typing import Any, Dict, Optional
 
 from bot.components.check_box import CheckBox, CheckBoxGroup
-from bot.components.component import Component
+from bot.components.component import UiComponent
 from bot.components.panel import Panel
 from bot.messages import *
 from bot.bot_config import *
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 from core.helpers import format_amount
-class CategorySelector(Component):
+class CategorySelector(UiComponent):
 
     def __init__(self, transaction_type='expense', on_change:callable=None):
         super().__init__(on_change=on_change)
@@ -32,11 +32,9 @@ class CategorySelector(Component):
     async def init(self, user_id: int, update: Update, transaction_type='expense'):
         self.panel = Panel()
         self.transaction_type = transaction_type
-        async def decorated(x):
-            await self._handle_type_change(x, update)
         self.income_cats, self.expense_cats = await ensure_user_has_categories(user_id)
         type_group = CheckBoxGroup("type_group",
-                                   on_change=decorated)
+                                   on_change=self._handle_type_change)
         income_cb = CheckBox(
             "🟢 Income (+)",
             self.transaction_type == 'income',
@@ -73,10 +71,10 @@ class CategorySelector(Component):
         self.panel.add(category_panel)
         self.initiated = True
 
-    async def handle_callback(self, callback_data: str) -> bool:
-        return await self.panel.handle_callback(callback_data)
+    async def handle_callback(self, update, context, callback_data: str) -> bool:
+        return await self.panel.handle_callback(update, context, callback_data)
 
-    async def _handle_type_change(self, cbg: CheckBoxGroup, update: Update):
+    async def _handle_type_change(self, cbg: CheckBoxGroup, update: Update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.transaction_type = cbg.selected_check_box.component_id
@@ -85,16 +83,16 @@ class CategorySelector(Component):
                 await self.init(user_id, update, self.transaction_type)
             else:
                 self.transaction_type= None
-        await self.call_on_change()
+        await self.call_on_change(update, context)
 
-    async def _handle_category_change(self, cbg: CheckBoxGroup):
+    async def _handle_category_change(self, cbg: CheckBoxGroup, update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 category_id = int(cbg.selected_check_box.component_id.split("_")[1])
                 self.category = self.category_map[category_id].name
             else:
                 self.category = None
-        await self.call_on_change()
+        await self.call_on_change(update, context)
 
-    def render(self):
-        return self.panel.render()
+    def render(self, update, context):
+        return self.panel.render(update, context)

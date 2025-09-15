@@ -3,46 +3,44 @@ from telegram.ext import ContextTypes
 from typing import Optional, Callable, Any
 import logging
 
+from bot.components.component import Component, UiComponent
+
 logger = logging.getLogger(__name__)
 
-class Input:
-    def __init__(self, on_input: Optional[Callable] = None):
+class Input(Component):
+    def __init__(self, component_id:str = None, on_change: Optional[Callable] = None):
         """
         Initialize the Input component.
         
         Args:
-            on_input: Callback function that will be called with the input value
+            on_change: Callback function that will be called with the input value
         """
+        super().__init__(component_id=component_id, on_change=on_change)
         self.value = None
-        self.on_input = on_input
         self._is_active = False
 
-    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message) -> bool:
         """
         Handle incoming text messages.
         
         Args:
             update: Telegram update object
             context: Telegram context object
+            message: Telegram message object
             
         Returns:
             bool: True if message was handled, False otherwise
         """
-        if not update.message or not update.message.text:
+        if not message or not message.text:
             return False
             
         if not self._is_active:
             return False
             
-        self.value = update.message.text.strip()
+        self.value = message.text.strip()
         
-        if self.on_input:
-            try:
-                await self.on_input(self, update, context)
-            except Exception as e:
-                logger.error(f"Error in input callback: {e}")
-                return False
-                
+        await self.call_on_change(update, context)
+
         self._is_active = False
         return True
 
