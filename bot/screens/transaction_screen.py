@@ -80,6 +80,10 @@ class TransactionEdit(Screen):
             await account_selector.init(context.user_data['user_id'])
         if not category_selector.initiated:
             await category_selector.init(context.user_data['user_id'], update)
+
+    async def clear_state(self, update, context):
+        del context.user_data['transaction_edit']
+
     async def handle_callback(self, update, context, query_data: str):
         user_state = self.get_user_state(update, context)
         account_selector = user_state['account_selector']
@@ -95,11 +99,11 @@ class TransactionEdit(Screen):
         return account_selector.render(update, context) + category_selector.render(update, context)
     
 
-    async def on_amount_input(self, input: Input, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def on_amount_input(self, inp: Input, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.message.from_user.id
         user_state = self.get_user_state(update, context)
 
-        amount_decimal = Decimal(input.value)
+        amount_decimal = Decimal(inp.value)
         if amount_decimal <= 0:
             raise ValueError("Amount must be positive")
 
@@ -114,13 +118,7 @@ class TransactionEdit(Screen):
             account_id=account_selector.account_id
         )
 
-        chat_id = update.effective_chat.id
-        message_id_to_delete = update.message.id
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
-
-        # Reset the user state for a new transaction
-        buttons_update = context.user_data['update'] # TODO to base class
-        del context.user_data['transaction_edit']
+        buttons_update = context.user_data['update']
+        await self.clear_state(buttons_update, context)
         await self.init(buttons_update, context)
-        await self.display_on(buttons_update, await self.get_message(update, context), self.render(update, context))
 

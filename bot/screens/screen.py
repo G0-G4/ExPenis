@@ -44,8 +44,13 @@ class Screen(UiComponent):
         message = update.message
         initiated = await self.initiated(update, context)
         handled = await self.handle_message(update, context, message)
+        buttons_update = context.user_data['update'] or update
         if not initiated or handled:
-            await self.display_on(context.user_data['update'] or update, await self.get_message(update, context), self.render(update, context))
+            await self.display_on(buttons_update, await self.get_message(buttons_update, context), self.render(buttons_update, context))
+        if handled:
+            chat_id = update.effective_chat.id
+            message_id_to_delete = update.message.id
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
 
     @abstractmethod
     def get_user_state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,6 +62,10 @@ class Screen(UiComponent):
 
     @abstractmethod
     async def init(self, update, context):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def clear_state(self, update, context):
         raise NotImplementedError
 
     @abstractmethod
