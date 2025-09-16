@@ -1,21 +1,11 @@
-from cmath import acosh
-from os import supports_effective_ids
 
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler, Application
+from telegram.ext import ApplicationBuilder
+from telegram import BotCommand, Update
 
-from bot.screens.main_screen import MainScreen
-from bot.screens.transaction_screen import AccountSelector, CategorySelector, TransactionEdit
-
-from core.helpers import format_percentage
-from bot.messages import *
-from bot.bot_config import *
-from bot.keyboards import  *
+from bot.screens.unified_main_screen import UnifiedMainScreen
 from core.config import TOKEN
-from core.service.transaction_service import create_transaction, delete_transaction, get_custom_period_statistics, \
-    get_transaction_by_id, \
-    update_transaction
-from core.service.category_service import get_user_expense_categories, get_user_income_categories
-from core.service.account_service import AccountService, get_account_by_id, get_user_accounts
+from core.service.account_service import AccountService
+from telegram.ext import ContextTypes
 import logging
 
 logging.basicConfig(
@@ -58,12 +48,7 @@ class ExpenseBot:
             return False
 
         self.application = ApplicationBuilder().token(TOKEN).build()
-        # screen = Screen(application=self.application)
-        main = MainScreen(self.application)
-        # acs = AccountSelector(self.application)
-        # acs = CategorySelector(self.application)
-        te = TransactionEdit(self.application)
-        # transaction_screen = TransactionEditScreen(self.application)
+        unified_main_screen = UnifiedMainScreen(self.application)
 
         return True
 
