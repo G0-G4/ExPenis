@@ -57,3 +57,22 @@ class DeleteDialog(UiComponent):
             handled = await self.delete_button.handle_callback(update, context, callback_data)
         
         return handled
+
+    async def init(self, update, context, *args, **kwargs):
+        """Initialize delete dialog and buttons"""
+        await self.cancel_button.init(update, context, *args, **kwargs)
+        await self.delete_button.init(update, context, *args, **kwargs)
+        self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear delete dialog state"""
+        await self.cancel_button.clear_state(update, context)
+        await self.delete_button.clear_state(update, context)
+        self.visible = False
+        self.initiated = False
+
+    async def get_message(self, update, context):
+        """Get delete dialog message"""
+        if self.visible:
+            return self.message
+        return ""

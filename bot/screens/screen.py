@@ -5,6 +5,7 @@ from telegram.error import BadRequest
 
 from bot.bot_config import *
 from bot.components.component import UiComponent
+from telegram.ext import ContextTypes
 from abc import abstractmethod
 from bot.components.panel import Panel
 
@@ -33,19 +34,19 @@ class Screen(UiComponent):
 
     async def handle_user_presses(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
-        initiated = await self.initiated(update, context)
-        if not initiated:
+        if not self.initiated:
             await self.init(update, context)
         handled = await self.handle_callback(update, context, query.data)
-        if not initiated or handled:
+        if not self.initiated or handled:
             await self.display_on(update, await self.get_message(update, context), self.render(update, context))
 
     async def handle_user_messages(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = update.message
-        initiated = await self.initiated(update, context)
+        if not self.initiated:
+            await self.init(update, context)
         handled = await self.handle_message(update, context, message)
         buttons_update = context.user_data['update'] or update
-        if not initiated or handled:
+        if not self.initiated or handled:
             await self.display_on(buttons_update, await self.get_message(buttons_update, context), self.render(buttons_update, context))
         if handled:
             chat_id = update.effective_chat.id
@@ -56,17 +57,8 @@ class Screen(UiComponent):
     def get_user_state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         raise NotImplementedError
 
-    @abstractmethod
-    async def initiated(self, update, context): # TODO change to typed state. store in object not dict
-        raise NotImplementedError
-
-    @abstractmethod
-    async def init(self, update, context):
-        raise NotImplementedError
-
-    @abstractmethod
-    async def clear_state(self, update, context):
-        raise NotImplementedError
+    # Note: init, clear_state are inherited from UiComponent
+    # initiated is a property inherited from StatefulComponent
 
     @abstractmethod
     async def handle_message(self, update, context, message):

@@ -53,6 +53,19 @@ class CheckBox(UiComponent):
             return True
         return False
 
+    async def init(self, update, context, *args, **kwargs):
+        """Initialize checkbox"""
+        self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear checkbox state"""
+        self._selected = False
+        self.initiated = False
+
+    async def get_message(self, update, context):
+        """Get checkbox message"""
+        return f"Checkbox: {self.display_text}"
+
 class CheckBoxGroup(UiComponent):
     def __init__(self, name: str, on_change: callable = None):
         super().__init__(on_change=on_change)
@@ -78,5 +91,27 @@ class CheckBoxGroup(UiComponent):
     def render(self, update, context):
         return [cb.render(update, context) for cb in self.checkboxes]
 
-    def handle_callback(self, update, context, callback_data: str) -> bool:
-        return any([cb.handle(update, context) for cb in self.checkboxes])
+    async def handle_callback(self, update, context, callback_data: str) -> bool:
+        for cb in self.checkboxes:
+            if await cb.handle_callback(update, context, callback_data):
+                return True
+        return False
+
+    async def init(self, update, context, *args, **kwargs):
+        """Initialize checkbox group and all checkboxes"""
+        for cb in self.checkboxes:
+            await cb.init(update, context, *args, **kwargs)
+        self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear checkbox group state"""
+        for cb in self.checkboxes:
+            await cb.clear_state(update, context)
+        self._selected_check_box = None
+        self.initiated = False
+
+    async def get_message(self, update, context):
+        """Get checkbox group message"""
+        if self._selected_check_box:
+            return f"Selected: {self._selected_check_box.text}"
+        return f"Checkbox group: {self.name}"

@@ -23,3 +23,15 @@ class Button(UiComponent):
             await self.click(update, context)
             return True
         return False
+
+    async def init(self, update, context, *args, **kwargs):
+        """Initialize button"""
+        self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear button state"""
+        self.initiated = False
+
+    async def get_message(self, update, context):
+        """Get button message"""
+        return f"Button: {self.text}"

@@ -11,11 +11,23 @@ from core.helpers import format_amount
 class MainMenu(UiComponent):
     def __init__(self, component_id: str = None, on_change: callable = None):
         super().__init__(component_id, on_change)
-        self.initiated = False
 
-    async def init(self, user_id: int, context: ContextTypes.DEFAULT_TYPE):
+    async def init(self, update, context, user_id: int = None):
+        """Initialize with consistent signature - user_id can come from context or parameter"""
+        if user_id is None:
+            user_id = context.user_data.get('user_id') or context._user_id
         await self.fetch_data(user_id, context)
         self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear component state"""
+        self.initiated = False
+        # Clear stored data from context
+        context.user_data.pop('todays_transactions', None)
+        context.user_data.pop('totals', None)
+        context.user_data.pop('total_income', None)
+        context.user_data.pop('total_expense', None)
+        context.user_data.pop('net_total', None)
 
     async def fetch_data(self, user_id: int, context: ContextTypes.DEFAULT_TYPE):
         todays_transactions = await get_todays_transactions(user_id)
@@ -47,7 +59,8 @@ class MainMenu(UiComponent):
         
         return keyboard
 
-    def get_message(self, context: ContextTypes.DEFAULT_TYPE):
+    async def get_message(self, update, context):
+        """Get message text for this component with consistent signature"""
         # Get user-specific data
         total_income = context.user_data.get('total_income', 0)
         total_expense = context.user_data.get('total_expense', 0)

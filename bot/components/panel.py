@@ -41,3 +41,21 @@ class Panel(UiComponent):
             if await component.handle_callback(update, context, callback_data):
                 return True
         return False
+
+    async def init(self, update, context, *args, **kwargs):
+        """Initialize panel and all its components"""
+        for component in self.components:
+            if hasattr(component, 'init'):
+                await component.init(update, context, *args, **kwargs)
+        self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear state of panel and all its components"""
+        for component in self.components:
+            if hasattr(component, 'clear_state'):
+                await component.clear_state(update, context)
+        self.initiated = False
+
+    async def get_message(self, update, context):
+        """Get message for panel - panels typically don't have their own message"""
+        return ""

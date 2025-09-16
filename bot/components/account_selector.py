@@ -27,7 +27,11 @@ class AccountSelector(UiComponent):
         self.initiated = False
         self.selected_account = None
 
-    async def init(self, user_id):
+    async def init(self, update, context, user_id: int = None):
+        """Initialize with consistent signature"""
+        if user_id is None:
+            user_id = context.user_data.get('user_id') or context._user_id
+            
         # Clear panel to avoid duplicates
         self.panel = Panel()
         
@@ -48,6 +52,16 @@ class AccountSelector(UiComponent):
             )
             self.panel.add(cb)
         self.initiated = True
+
+    async def clear_state(self, update, context):
+        """Clear component state with consistent signature"""
+        self.clear()
+
+    async def get_message(self, update, context):
+        """Get message for account selector"""
+        if self.selected_account:
+            return f"Selected account: {self.selected_account.name}"
+        return "Select an account:"
     async def account_selection_call_back(self, cbg: CheckBoxGroup, update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:

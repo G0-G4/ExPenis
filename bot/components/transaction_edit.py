@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from decimal import Decimal
 
-from bot.components.component import UiComponent
+from bot.components.component import MessageHandlerComponent
 from bot.components.account_selector import AccountSelector
 from bot.components.category_selector import CategorySelector
 from bot.components.input import Input
@@ -10,7 +10,7 @@ from bot.messages import *
 from core.service.transaction_service import create_transaction, get_transaction_by_id, update_transaction
 
 
-class TransactionEdit(UiComponent):
+class TransactionEdit(MessageHandlerComponent):
     def __init__(self, component_id: str = None, on_change: callable = None):
         super().__init__(component_id, on_change)
         self.account_selector = AccountSelector(on_change=self.on_selection_change)
@@ -18,11 +18,13 @@ class TransactionEdit(UiComponent):
         self.amount_input = Input(on_change=self.on_amount_input)
         self.message = "Please select both account and category first"
         self.ready_for_input = False
-        self.initiated = False
         self.transaction_id = None  # For editing existing transactions
 
-    async def init(self, user_id: int, update=None, transaction_id: int = None):
-        """Initialize component, optionally with existing transaction data"""
+    async def init(self, update, context, user_id: int = None, transaction_id: int = None):
+        """Initialize component with consistent signature"""
+        if user_id is None:
+            user_id = context.user_data.get('user_id') or context._user_id
+            
         self.transaction_id = transaction_id
 
         if transaction_id:
@@ -35,8 +37,8 @@ class TransactionEdit(UiComponent):
                 self.category_selector.transaction_type = transaction.type
                 
                 # Initialize selectors with the pre-set values
-                await self.account_selector.init(user_id)
-                await self.category_selector.init(user_id, update, transaction.type)
+                await self.account_selector.init(update, context, user_id=user_id)
+                await self.category_selector.init(update, context, user_id=user_id, transaction_type=transaction.type)
                 
                 # Set ready for input and activate amount input since both selectors have values
                 self.ready_for_input = True
@@ -45,15 +47,14 @@ class TransactionEdit(UiComponent):
         else:
             # Initialize selectors for new transaction
             if not self.account_selector.initiated:
-                await self.account_selector.init(user_id)
+                await self.account_selector.init(update, context, user_id=user_id)
             if not self.category_selector.initiated:
-                await self.category_selector.init(user_id, update)
+                await self.category_selector.init(update, context, user_id=user_id)
             
-
         self.initiated = True
 
-    def clear_state(self):
-        """Reset component state"""
+    async def clear_state(self, update, context):
+        """Reset component state with consistent signature"""
         self.account_selector = AccountSelector(on_change=self.on_selection_change)
         self.category_selector = CategorySelector(on_change=self.on_selection_change)
         self.amount_input = Input(on_change=self.on_amount_input)
@@ -118,8 +119,8 @@ class TransactionEdit(UiComponent):
         """Render the transaction edit UI"""
         return self.account_selector.render(update, context) + self.category_selector.render(update, context)
 
-    def get_message(self):
-        """Get current message to display"""
+    async def get_message(self, update, context):
+        """Get current message to display with consistent signature"""
         return self.message
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message):

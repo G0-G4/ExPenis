@@ -29,7 +29,11 @@ class CategorySelector(UiComponent):
         self.category_map = {}
         self.initiated = False
 
-    async def init(self, user_id: int, update: Update, transaction_type='expense'):
+    async def init(self, update, context, user_id: int = None, transaction_type='expense'):
+        """Initialize with consistent signature"""
+        if user_id is None:
+            user_id = context.user_data.get('user_id') or context._user_id
+            
         # Clear panel to avoid duplicates
         self.panel = Panel()
         self.category_map = {}
@@ -74,6 +78,17 @@ class CategorySelector(UiComponent):
         self.panel.add(category_panel)
         self.initiated = True
 
+    async def clear_state(self, update, context):
+        """Clear component state with consistent signature"""
+        self.clear()
+
+    async def get_message(self, update, context):
+        """Get message for category selector"""
+        if self.category:
+            type_text = "income" if self.transaction_type == 'income' else "expense"
+            return f"Selected {type_text} category: {self.category}"
+        return f"Select transaction type and category:"
+
     async def handle_callback(self, update, context, callback_data: str) -> bool:
         return await self.panel.handle_callback(update, context, callback_data)
 
@@ -83,7 +98,7 @@ class CategorySelector(UiComponent):
                 self.transaction_type = cbg.selected_check_box.component_id
                 self.category = None
                 user_id  = update.callback_query.from_user.id
-                await self.init(user_id, update, self.transaction_type)
+                await self.init(update, context, user_id=user_id, transaction_type=self.transaction_type)
             else:
                 self.transaction_type= None
         await self.call_on_change(update, context)

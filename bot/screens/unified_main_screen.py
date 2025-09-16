@@ -59,7 +59,7 @@ class UnifiedMainScreen(Screen):
         """Handle transaction edit completion - return to main menu"""
         user_state = self.get_user_state(update, context)
         user_state['current_component'] = 'main_menu'
-        user_state['components']['transaction_edit'].clear_state()
+        await user_state['components']['transaction_edit'].clear_state(update, context)
         
         # Refresh main menu data
         await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
@@ -72,27 +72,30 @@ class UnifiedMainScreen(Screen):
         
         return current_component.initiated if current_component else False
 
-    async def init(self, update, context):
-        """Initialize current component"""
+    async def init(self, update, context, *args, **kwargs):
+        """Initialize current component with consistent signatures"""
         user_state = self.get_user_state(update, context)
         current_component_name = user_state['current_component']
         current_component = user_state['components'].get(current_component_name)
         user_id = context.user_data['user_id']
         
         if current_component:
-            if current_component_name == 'main_menu':
-                await current_component.init(user_id, context)
-            else:
-                await current_component.init(user_id, update)
+            await current_component.init(update, context, user_id=user_id)
+        
+        # Mark the UnifiedMainScreen itself as initiated
+        self.initiated = True
 
     async def clear_state(self, update, context):
-        """Clear component state"""
+        """Clear component state with consistent signatures"""
         user_state = self.get_user_state(update, context)
         current_component_name = user_state['current_component']
         current_component = user_state['components'].get(current_component_name)
         
-        if current_component and hasattr(current_component, 'clear_state'):
-            current_component.clear_state()
+        if current_component:
+            await current_component.clear_state(update, context)
+        
+        # Mark the UnifiedMainScreen as not initiated
+        self.initiated = False
 
     async def handle_message(self, update, context, message):
         """Handle text messages - delegate to current component"""
@@ -111,15 +114,15 @@ class UnifiedMainScreen(Screen):
         # Handle navigation callbacks
         if query_data == 'enter_transaction':
             # Clear transaction edit state for new transaction
-            user_state['components']['transaction_edit'].clear_state()
+            await user_state['components']['transaction_edit'].clear_state(update, context)
             user_state['current_component'] = 'transaction_edit'
-            await user_state['components']['transaction_edit'].init(context.user_data['user_id'], update)
+            await user_state['components']['transaction_edit'].init(update, context, user_id=context.user_data['user_id'])
             return True
         elif query_data.startswith('view_transaction_'):
             # Extract transaction ID and switch to edit mode
             transaction_id = int(query_data.split('_')[-1])
             user_state['current_component'] = 'transaction_edit'
-            await user_state['components']['transaction_edit'].init(context.user_data['user_id'], update, transaction_id)
+            await user_state['components']['transaction_edit'].init(update, context, user_id=context.user_data['user_id'], transaction_id=transaction_id)
             return True
         elif query_data == 'back':
             user_state['current_component'] = 'main_menu'
@@ -162,9 +165,4 @@ class UnifiedMainScreen(Screen):
         if not current_component:
             return "Welcome!"
             
-        if current_component_name == 'main_menu':
-            return current_component.get_message(context)
-        else:
-            return current_component.get_message()
-        
-        return "Welcome!"
+        return await current_component.get_message(update, context)
