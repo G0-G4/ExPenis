@@ -6,8 +6,9 @@ from bot.components.component import MessageHandlerComponent
 from bot.components.account_selector import AccountSelector
 from bot.components.category_selector import CategorySelector
 from bot.components.input import Input
+from bot.components.delete_dialog import DeleteDialog
 from bot.messages import *
-from core.service.transaction_service import create_transaction, get_transaction_by_id, update_transaction
+from core.service.transaction_service import create_transaction, get_transaction_by_id, update_transaction, delete_transaction
 
 
 class TransactionEdit(MessageHandlerComponent):
@@ -31,6 +32,12 @@ class TransactionEdit(MessageHandlerComponent):
             on_change=self.on_selection_change
         )
         self.amount_input = Input(on_change=self.on_amount_input)
+        self.delete_dialog = DeleteDialog(
+            message="Are you sure you want to delete this transaction?",
+            on_confirm=self.on_delete_confirm,
+            on_cancel=self.on_delete_cancel,
+            component_id=f"transaction_edit_{id(self)}"
+        )
         
         self.transaction_id = transaction_data.get('id') if transaction_data else None
         self._update_ready_state_and_message(transaction_data)
@@ -128,12 +135,41 @@ class TransactionEdit(MessageHandlerComponent):
         # Notify parent component about completion
         await self.call_on_change(update, context)
 
+    async def on_delete_confirm(self, dialog, update, context):
+        """Handle delete confirmation"""
+        if self.transaction_id:
+            user_id = update.callback_query.from_user.id
+            success = await delete_transaction(self.transaction_id, user_id)
+            if success:
+                self.message = "✅ Transaction deleted successfully"
+            else:
+                self.message = "❌ Failed to delete transaction"
+            
+            # Notify parent component about completion
+            await self.call_on_change(update, context)
+
+    async def on_delete_cancel(self, dialog, update, context):
+        """Handle delete cancellation"""
+        self.message = "Delete cancelled"
+
     def render(self, update, context):
         """Render the transaction edit UI"""
-        return self.account_selector.render(update, context) + self.category_selector.render(update, context)
+        keyboard = self.account_selector.render(update, context) + self.category_selector.render(update, context)
+        
+        # Add delete button only when editing existing transaction
+        if self.transaction_id and not self.delete_dialog.visible:
+            from telegram import InlineKeyboardButton
+            keyboard.append([InlineKeyboardButton("🗑 Delete Transaction", callback_data=f"delete_transaction_{self.transaction_id}")])
+        
+        # Add delete dialog if visible
+        keyboard += self.delete_dialog.render(update, context)
+        
+        return keyboard
 
     def get_message(self):
         """Get current message to display"""
+        if self.delete_dialog.visible:
+            return self.delete_dialog.get_message()
         return self.message
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message):
@@ -144,6 +180,16 @@ class TransactionEdit(MessageHandlerComponent):
 
     async def handle_callback(self, update, context, callback_data: str) -> bool:
         """Handle button callbacks"""
+        # Handle delete transaction button
+        if callback_data.startswith('delete_transaction_'):
+            await self.delete_dialog.show(update, context)
+            return True
+            
+        # Handle delete dialog callbacks
+        delete_handled = await self.delete_dialog.handle_callback(update, context, callback_data)
+        if delete_handled:
+            return True
+            
         handle_account = await self.account_selector.handle_callback(update, context, callback_data)
         handle_category = await self.category_selector.handle_callback(update, context, callback_data)
         return handle_account or handle_category

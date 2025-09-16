@@ -20,7 +20,7 @@ class UnifiedMainScreen(Screen):
         application.add_handler(CommandHandler('start', self.start_handler))
         self.press_handler = CallbackQueryHandler(
             self.handle_user_presses,
-            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$'
+            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_confirm_|^delete_cancel_'
         )
         self.input_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_user_messages)
         application.add_handler(self.press_handler)
