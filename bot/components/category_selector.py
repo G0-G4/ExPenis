@@ -30,7 +30,10 @@ class CategorySelector(UiComponent):
         self.initiated = False
 
     async def init(self, user_id: int, update: Update, transaction_type='expense'):
+        # Clear panel to avoid duplicates
         self.panel = Panel()
+        self.category_map = {}
+        
         self.transaction_type = transaction_type
         self.income_cats, self.expense_cats = await ensure_user_has_categories(user_id)
         type_group = CheckBoxGroup("type_group",

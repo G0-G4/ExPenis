@@ -40,8 +40,10 @@ class UnifiedMainScreen(Screen):
         
         if 'unified_main_screen' not in context.user_data:
             context.user_data['unified_main_screen'] = {
-                'main_menu': MainMenu(on_change=self.on_main_menu_change),
-                'transaction_edit': TransactionEdit(on_change=self.on_transaction_edit_change),
+                'components': {
+                    'main_menu': MainMenu(on_change=self.on_main_menu_change),
+                    'transaction_edit': TransactionEdit(on_change=self.on_transaction_edit_change),
+                },
                 'current_component': 'main_menu',
                 'message': 'Welcome!'
             }
@@ -51,54 +53,55 @@ class UnifiedMainScreen(Screen):
         """Handle main menu component changes (like viewing transaction details)"""
         # For now, just refresh the main menu
         user_state = self.get_user_state(update, context)
-        await user_state['main_menu'].fetch_data(context.user_data['user_id'], context)
+        await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
 
     async def on_transaction_edit_change(self, component, update, context):
         """Handle transaction edit completion - return to main menu"""
         user_state = self.get_user_state(update, context)
         user_state['current_component'] = 'main_menu'
-        user_state['transaction_edit'].clear_state()
+        user_state['components']['transaction_edit'].clear_state()
         
         # Refresh main menu data
-        await user_state['main_menu'].fetch_data(context.user_data['user_id'], context)
+        await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
 
     async def initiated(self, update, context):
         """Check if current component is initiated"""
         user_state = self.get_user_state(update, context)
-        current_component = user_state['current_component']
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
         
-        if current_component == 'main_menu':
-            return user_state['main_menu'].initiated
-        elif current_component == 'transaction_edit':
-            return user_state['transaction_edit'].initiated
-        return False
+        return current_component.initiated if current_component else False
 
     async def init(self, update, context):
         """Initialize current component"""
         user_state = self.get_user_state(update, context)
-        current_component = user_state['current_component']
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
         user_id = context.user_data['user_id']
         
-        if current_component == 'main_menu':
-            await user_state['main_menu'].init(user_id, context)
-        elif current_component == 'transaction_edit':
-            await user_state['transaction_edit'].init(user_id, update)
+        if current_component:
+            if current_component_name == 'main_menu':
+                await current_component.init(user_id, context)
+            else:
+                await current_component.init(user_id, update)
 
     async def clear_state(self, update, context):
         """Clear component state"""
         user_state = self.get_user_state(update, context)
-        current_component = user_state['current_component']
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
         
-        if current_component == 'transaction_edit':
-            user_state['transaction_edit'].clear_state()
+        if current_component and hasattr(current_component, 'clear_state'):
+            current_component.clear_state()
 
     async def handle_message(self, update, context, message):
         """Handle text messages - delegate to current component"""
         user_state = self.get_user_state(update, context)
-        current_component = user_state['current_component']
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
         
-        if current_component == 'transaction_edit':
-            return await user_state['transaction_edit'].handle_message(update, context, message)
+        if current_component and hasattr(current_component, 'handle_message'):
+            return await current_component.handle_message(update, context, message)
         return False
 
     async def handle_callback(self, update, context, query_data: str):
@@ -107,53 +110,61 @@ class UnifiedMainScreen(Screen):
         
         # Handle navigation callbacks
         if query_data == 'enter_transaction':
+            # Clear transaction edit state for new transaction
+            user_state['components']['transaction_edit'].clear_state()
             user_state['current_component'] = 'transaction_edit'
-            await user_state['transaction_edit'].init(context.user_data['user_id'], update)
+            await user_state['components']['transaction_edit'].init(context.user_data['user_id'], update)
             return True
         elif query_data.startswith('view_transaction_'):
             # Extract transaction ID and switch to edit mode
             transaction_id = int(query_data.split('_')[-1])
             user_state['current_component'] = 'transaction_edit'
-            await user_state['transaction_edit'].init(context.user_data['user_id'], update, transaction_id)
+            await user_state['components']['transaction_edit'].init(context.user_data['user_id'], update, transaction_id)
             return True
         elif query_data == 'back':
             user_state['current_component'] = 'main_menu'
-            await user_state['main_menu'].fetch_data(context.user_data['user_id'], context)
+            await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
             return True
         
         # Delegate to current component
-        current_component = user_state['current_component']
-        if current_component == 'main_menu':
-            return await user_state['main_menu'].handle_callback(update, context, query_data)
-        elif current_component == 'transaction_edit':
-            return await user_state['transaction_edit'].handle_callback(update, context, query_data)
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
+        
+        if current_component and hasattr(current_component, 'handle_callback'):
+            return await current_component.handle_callback(update, context, query_data)
         
         return False
 
     def render(self, update, context):
         """Render current component"""
         user_state = self.get_user_state(update, context)
-        current_component = user_state['current_component']
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
         
-        if current_component == 'main_menu':
-            return user_state['main_menu'].render(update, context)
-        elif current_component == 'transaction_edit':
-            keyboard = user_state['transaction_edit'].render(update, context)
-            # Add back button for transaction edit
+        if not current_component:
+            return []
+            
+        keyboard = current_component.render(update, context)
+        
+        # Add back button for transaction edit
+        if current_component_name == 'transaction_edit':
             from telegram import InlineKeyboardButton
             keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
-            return keyboard
-        
-        return []
+            
+        return keyboard
 
     async def get_message(self, update, context):
         """Get message for current component"""
         user_state = self.get_user_state(update, context)
-        current_component = user_state['current_component']
+        current_component_name = user_state['current_component']
+        current_component = user_state['components'].get(current_component_name)
         
-        if current_component == 'main_menu':
-            return user_state['main_menu'].get_message(context)
-        elif current_component == 'transaction_edit':
-            return user_state['transaction_edit'].get_message()
+        if not current_component:
+            return "Welcome!"
+            
+        if current_component_name == 'main_menu':
+            return current_component.get_message(context)
+        else:
+            return current_component.get_message()
         
         return "Welcome!"

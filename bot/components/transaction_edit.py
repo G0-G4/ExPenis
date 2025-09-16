@@ -29,18 +29,25 @@ class TransactionEdit(UiComponent):
             # Load existing transaction data and populate selectors
             transaction = await get_transaction_by_id(transaction_id)
             if transaction:
+                # Set values BEFORE initializing selectors so checkboxes show correctly
                 self.account_selector.account_id = transaction.account_id
                 self.category_selector.category = transaction.category
                 self.category_selector.transaction_type = transaction.type
-                self.message = f"Editing transaction: {transaction.amount} ({transaction.category})"
+                
+                # Initialize selectors with the pre-set values
+                await self.account_selector.init(user_id)
+                await self.category_selector.init(user_id, update, transaction.type)
+                
+                # Set ready for input and activate amount input since both selectors have values
                 self.ready_for_input = True
-                self.account_selector.initiated = True
-                self.category_selector.initiated = True
-
-        if not self.account_selector.initiated:
-            await self.account_selector.init(user_id)
-        if not self.category_selector.initiated:
-            await self.category_selector.init(user_id, update)
+                self.message = f"Editing transaction: {transaction.amount} - Enter new amount or keep current"
+                self.amount_input.activate()
+        else:
+            # Initialize selectors for new transaction
+            if not self.account_selector.initiated:
+                await self.account_selector.init(user_id)
+            if not self.category_selector.initiated:
+                await self.category_selector.init(user_id, update)
             
 
         self.initiated = True
@@ -72,32 +79,40 @@ class TransactionEdit(UiComponent):
         """Handle amount input and create/update transaction"""
         user_id = update.message.from_user.id
 
-        amount_decimal = Decimal(inp.value)
-        if amount_decimal <= 0:
-            raise ValueError("Amount must be positive")
+        try:
+            amount_decimal = Decimal(inp.value)
+            if amount_decimal <= 0:
+                self.message = "❌ Amount must be positive"
+                return
 
-        if self.transaction_id:
-            # Update existing transaction
-            await update_transaction(
-                transaction_id=self.transaction_id,
-                user_id=user_id,
-                amount=float(amount_decimal),
-                category=self.category_selector.category,
-                transaction_type=self.category_selector.transaction_type,
-                account_id=self.account_selector.account_id
-            )
-        else:
-            # Create new transaction
-            await create_transaction(
-                user_id=user_id,
-                amount=float(amount_decimal),
-                category=self.category_selector.category,
-                transaction_type=self.category_selector.transaction_type,
-                account_id=self.account_selector.account_id
-            )
+            if self.transaction_id:
+                # Update existing transaction
+                await update_transaction(
+                    transaction_id=self.transaction_id,
+                    user_id=user_id,
+                    amount=float(amount_decimal),
+                    category=self.category_selector.category,
+                    transaction_type=self.category_selector.transaction_type,
+                    account_id=self.account_selector.account_id
+                )
+                self.message = f"✅ Transaction updated: {amount_decimal} ({self.category_selector.category})"
+            else:
+                # Create new transaction
+                await create_transaction(
+                    user_id=user_id,
+                    amount=float(amount_decimal),
+                    category=self.category_selector.category,
+                    transaction_type=self.category_selector.transaction_type,
+                    account_id=self.account_selector.account_id
+                )
+                self.message = f"✅ Transaction created: {amount_decimal} ({self.category_selector.category})"
 
-        # Notify parent component about completion
-        await self.call_on_change(update, context)
+            # Notify parent component about completion
+            await self.call_on_change(update, context)
+        except ValueError as e:
+            self.message = f"❌ Invalid amount: {inp.value}"
+        except Exception as e:
+            self.message = f"❌ Error creating transaction: {str(e)}"
 
     def render(self, update, context):
         """Render the transaction edit UI"""

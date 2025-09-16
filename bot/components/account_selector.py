@@ -28,6 +28,9 @@ class AccountSelector(UiComponent):
         self.selected_account = None
 
     async def init(self, user_id):
+        # Clear panel to avoid duplicates
+        self.panel = Panel()
+        
         self.accounts = await get_user_accounts(user_id)
         for account in self.accounts:
             balance = await calculate_account_balance(account.id, user_id)
