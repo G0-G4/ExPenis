@@ -15,9 +15,7 @@ class TransactionEdit(MessageHandlerComponent):
         super().__init__(component_id, on_change)
         
         # Initialize with provided data or defaults
-        selected_account_id = transaction_data.get('account_id') if transaction_data else None
-        selected_category = transaction_data.get('category') if transaction_data else None
-        transaction_type = transaction_data.get('type', 'expense') if transaction_data else 'expense'
+        selected_account_id, selected_category, transaction_type = self._extract_transaction_data(transaction_data)
         
         self.account_selector = AccountSelector(
             accounts=accounts,
@@ -35,18 +33,31 @@ class TransactionEdit(MessageHandlerComponent):
         self.amount_input = Input(on_change=self.on_amount_input)
         
         self.transaction_id = transaction_data.get('id') if transaction_data else None
-        self.ready_for_input = bool(selected_account_id and selected_category)
+        self._update_ready_state_and_message(transaction_data)
+        self.initiated = True
+
+    def _extract_transaction_data(self, transaction_data):
+        """Extract account_id, category, and type from transaction data"""
+        if transaction_data:
+            return (
+                transaction_data.get('account_id'),
+                transaction_data.get('category'),
+                transaction_data.get('type', 'expense')
+            )
+        return None, None, 'expense'
+
+    def _update_ready_state_and_message(self, transaction_data):
+        """Update ready_for_input state and message based on current selections"""
+        self.ready_for_input = bool(self.account_selector.account_id and self.category_selector.category)
         
         if self.ready_for_input:
-            if self.transaction_id:
+            if self.transaction_id and transaction_data:
                 self.message = f"Editing transaction: {transaction_data.get('amount', 0)} - Enter new amount or keep current"
             else:
                 self.message = TRANSACTION_INPUT_PROMPT
             self.amount_input.activate()
         else:
             self.message = "Please select both account and category first"
-        
-        self.initiated = True
 
     def update_data(self, accounts=None, balance_map=None, income_categories=None, expense_categories=None, transaction_data=None):
         """Update component with new data"""
@@ -59,8 +70,12 @@ class TransactionEdit(MessageHandlerComponent):
             )
             
         if income_categories is not None or expense_categories is not None or transaction_data is not None:
-            selected_category = transaction_data.get('category') if transaction_data else self.category_selector.category
-            transaction_type = transaction_data.get('type', 'expense') if transaction_data else self.category_selector.transaction_type
+            selected_account_id, selected_category, transaction_type = self._extract_transaction_data(transaction_data)
+            if selected_category is None:
+                selected_category = self.category_selector.category
+            if transaction_type == 'expense' and not transaction_data:
+                transaction_type = self.category_selector.transaction_type
+                
             self.category_selector.update_data(
                 income_categories=income_categories,
                 expense_categories=expense_categories,
@@ -70,40 +85,15 @@ class TransactionEdit(MessageHandlerComponent):
         
         if transaction_data:
             self.transaction_id = transaction_data.get('id')
-            self.ready_for_input = bool(self.account_selector.account_id and self.category_selector.category)
-            
-            if self.ready_for_input:
-                if self.transaction_id:
-                    self.message = f"Editing transaction: {transaction_data.get('amount', 0)} - Enter new amount or keep current"
-                else:
-                    self.message = TRANSACTION_INPUT_PROMPT
-                self.amount_input.activate()
-            else:
-                self.message = "Please select both account and category first"
         else:
-            # For new transactions, always start with fresh state
             self.transaction_id = None
-            self.ready_for_input = bool(self.account_selector.account_id and self.category_selector.category)
-            if self.ready_for_input:
-                self.message = TRANSACTION_INPUT_PROMPT
-                self.amount_input.activate()
-            else:
-                self.message = "Please select both account and category first"
-        
+            
+        self._update_ready_state_and_message(transaction_data)
         self.initiated = True
 
     async def on_selection_change(self, component, update, context):
         """Handle account/category selection changes"""
-        self.ready_for_input = (
-            self.account_selector.account_id is not None and
-            self.category_selector.category is not None
-        )
-
-        if self.ready_for_input:
-            self.message = TRANSACTION_INPUT_PROMPT
-            self.amount_input.activate()
-        else:
-            self.message = "Please select both account and category first"
+        self._update_ready_state_and_message(None)
 
     async def on_amount_input(self, inp: Input, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle amount input and create/update transaction"""
