@@ -7,6 +7,7 @@ class Button(UiComponent):
         super().__init__(component_id, on_click)
         self.text = text
         self.callback_data = callback_data or f"btn_{self.component_id}"
+        self.initiated = True
         
     async def click(self, update, context):
         if self.on_change:
@@ -24,14 +25,14 @@ class Button(UiComponent):
             return True
         return False
 
-    async def init(self, update, context, *args, **kwargs):
-        """Initialize button"""
+    def update_data(self, text=None, callback_data=None):
+        """Update button data"""
+        if text is not None:
+            self.text = text
+        if callback_data is not None:
+            self.callback_data = callback_data
         self.initiated = True
 
-    async def clear_state(self, update, context):
-        """Clear button state"""
-        self.initiated = False
-
-    async def get_message(self, update, context):
+    def get_message(self):
         """Get button message"""
         return f"Button: {self.text}"

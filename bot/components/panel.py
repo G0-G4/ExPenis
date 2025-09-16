@@ -9,6 +9,7 @@ class Panel(UiComponent):
         self.components = components or []
         self._component_map = {c.component_id: c for c in self.components}
         self._per_row = per_row
+        self.initiated = True
 
     def add(self, component: UiComponent):
         self.components.append(component)
@@ -42,20 +43,15 @@ class Panel(UiComponent):
                 return True
         return False
 
-    async def init(self, update, context, *args, **kwargs):
-        """Initialize panel and all its components"""
-        for component in self.components:
-            if hasattr(component, 'init'):
-                await component.init(update, context, *args, **kwargs)
+    def update_data(self, components=None, per_row=None):
+        """Update panel data"""
+        if components is not None:
+            self.components = components
+            self._component_map = {c.component_id: c for c in self.components}
+        if per_row is not None:
+            self._per_row = per_row
         self.initiated = True
 
-    async def clear_state(self, update, context):
-        """Clear state of panel and all its components"""
-        for component in self.components:
-            if hasattr(component, 'clear_state'):
-                await component.clear_state(update, context)
-        self.initiated = False
-
-    async def get_message(self, update, context):
+    def get_message(self):
         """Get message for panel - panels typically don't have their own message"""
         return ""

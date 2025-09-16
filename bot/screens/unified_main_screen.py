@@ -4,6 +4,9 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Callb
 from bot.components.main_menu import MainMenu
 from bot.components.transaction_edit import TransactionEdit
 from bot.screens.screen import Screen
+from core.service.transaction_service import get_todays_totals, get_todays_transactions, get_transaction_by_id
+from core.service.account_service import get_user_accounts, calculate_account_balance
+from core.service.category_service import ensure_user_has_categories
 
 
 class UnifiedMainScreen(Screen):
@@ -39,10 +42,11 @@ class UnifiedMainScreen(Screen):
         context.user_data['user_id'] = context._user_id
         
         if 'unified_main_screen' not in context.user_data:
+            # Initialize with empty components - will be populated with data later
             context.user_data['unified_main_screen'] = {
                 'components': {
-                    'main_menu': MainMenu(on_change=self.on_main_menu_change),
-                    'transaction_edit': TransactionEdit(on_change=self.on_transaction_edit_change),
+                    'main_menu': None,
+                    'transaction_edit': None,
                 },
                 'current_component': 'main_menu',
                 'message': 'Welcome!'
@@ -51,51 +55,30 @@ class UnifiedMainScreen(Screen):
 
     async def on_main_menu_change(self, component, update, context):
         """Handle main menu component changes (like viewing transaction details)"""
-        # For now, just refresh the main menu
+        # Refresh main menu data
         user_state = self.get_user_state(update, context)
-        await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
+        await self._ensure_main_menu_data(update, context)
 
     async def on_transaction_edit_change(self, component, update, context):
         """Handle transaction edit completion - return to main menu"""
         user_state = self.get_user_state(update, context)
         user_state['current_component'] = 'main_menu'
-        await user_state['components']['transaction_edit'].clear_state(update, context)
         
-        # Refresh main menu data
-        await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
-
-    async def initiated(self, update, context):
-        """Check if current component is initiated"""
-        user_state = self.get_user_state(update, context)
-        current_component_name = user_state['current_component']
-        current_component = user_state['components'].get(current_component_name)
-        
-        return current_component.initiated if current_component else False
+        # Refresh main menu data and recreate component
+        await self._ensure_main_menu_data(update, context)
 
     async def init(self, update, context, *args, **kwargs):
-        """Initialize current component with consistent signatures"""
+        """Initialize current component with data orchestration"""
         user_state = self.get_user_state(update, context)
         current_component_name = user_state['current_component']
-        current_component = user_state['components'].get(current_component_name)
-        user_id = context.user_data['user_id']
         
-        if current_component:
-            await current_component.init(update, context, user_id=user_id)
+        if current_component_name == 'main_menu':
+            await self._ensure_main_menu_data(update, context)
+        elif current_component_name == 'transaction_edit':
+            await self._ensure_transaction_edit_data(update, context)
         
         # Mark the UnifiedMainScreen itself as initiated
         self.initiated = True
-
-    async def clear_state(self, update, context):
-        """Clear component state with consistent signatures"""
-        user_state = self.get_user_state(update, context)
-        current_component_name = user_state['current_component']
-        current_component = user_state['components'].get(current_component_name)
-        
-        if current_component:
-            await current_component.clear_state(update, context)
-        
-        # Mark the UnifiedMainScreen as not initiated
-        self.initiated = False
 
     async def handle_message(self, update, context, message):
         """Handle text messages - delegate to current component"""
@@ -113,20 +96,23 @@ class UnifiedMainScreen(Screen):
         
         # Handle navigation callbacks
         if query_data == 'enter_transaction':
-            # Clear transaction edit state for new transaction
-            await user_state['components']['transaction_edit'].clear_state(update, context)
+            # Switch to transaction edit for new transaction
+            # Clear any existing transaction_edit component to start fresh
+            user_state['components']['transaction_edit'] = None
             user_state['current_component'] = 'transaction_edit'
-            await user_state['components']['transaction_edit'].init(update, context, user_id=context.user_data['user_id'])
+            await self._ensure_transaction_edit_data(update, context)
             return True
         elif query_data.startswith('view_transaction_'):
             # Extract transaction ID and switch to edit mode
             transaction_id = int(query_data.split('_')[-1])
+            # Clear any existing transaction_edit component for fresh edit
+            user_state['components']['transaction_edit'] = None
             user_state['current_component'] = 'transaction_edit'
-            await user_state['components']['transaction_edit'].init(update, context, user_id=context.user_data['user_id'], transaction_id=transaction_id)
+            await self._ensure_transaction_edit_data(update, context, transaction_id=transaction_id)
             return True
         elif query_data == 'back':
             user_state['current_component'] = 'main_menu'
-            await user_state['components']['main_menu'].fetch_data(context.user_data['user_id'], context)
+            await self._ensure_main_menu_data(update, context)
             return True
         
         # Delegate to current component
@@ -155,6 +141,72 @@ class UnifiedMainScreen(Screen):
             keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
             
         return keyboard
+    
+    async def _ensure_main_menu_data(self, update, context):
+        """Ensure main menu component has fresh data"""
+        user_state = self.get_user_state(update, context)
+        user_id = context.user_data['user_id']
+        
+        # Fetch fresh data
+        todays_transactions = await get_todays_transactions(user_id)
+        totals = await get_todays_totals(user_id)
+        
+        # Create or update main menu component
+        if user_state['components']['main_menu'] is None:
+            user_state['components']['main_menu'] = MainMenu(
+                todays_transactions=todays_transactions,
+                totals=totals,
+                on_change=self.on_main_menu_change
+            )
+        else:
+            user_state['components']['main_menu'].update_data(
+                todays_transactions=todays_transactions,
+                totals=totals
+            )
+    
+    async def _ensure_transaction_edit_data(self, update, context, transaction_id=None):
+        """Ensure transaction edit component has necessary data"""
+        user_state = self.get_user_state(update, context)
+        user_id = context.user_data['user_id']
+        
+        # Fetch required data
+        accounts = await get_user_accounts(user_id)
+        balance_map = {}
+        for account in accounts:
+            balance_map[account.id] = await calculate_account_balance(account.id, user_id)
+        
+        income_cats, expense_cats = await ensure_user_has_categories(user_id)
+        
+        transaction_data = None
+        if transaction_id:
+            transaction = await get_transaction_by_id(transaction_id)
+            if transaction:
+                transaction_data = {
+                    'id': transaction.id,
+                    'account_id': transaction.account_id,
+                    'category': transaction.category,
+                    'type': transaction.type,
+                    'amount': transaction.amount
+                }
+        
+        # Create or update transaction edit component
+        if user_state['components']['transaction_edit'] is None:
+            user_state['components']['transaction_edit'] = TransactionEdit(
+                accounts=accounts,
+                balance_map=balance_map,
+                income_categories=income_cats,
+                expense_categories=expense_cats,
+                transaction_data=transaction_data,
+                on_change=self.on_transaction_edit_change
+            )
+        else:
+            user_state['components']['transaction_edit'].update_data(
+                accounts=accounts,
+                balance_map=balance_map,
+                income_categories=income_cats,
+                expense_categories=expense_cats,
+                transaction_data=transaction_data
+            )
 
     async def get_message(self, update, context):
         """Get message for current component"""
@@ -165,4 +217,4 @@ class UnifiedMainScreen(Screen):
         if not current_component:
             return "Welcome!"
             
-        return await current_component.get_message(update, context)
+        return current_component.get_message()

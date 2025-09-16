@@ -2,30 +2,32 @@ from telegram import Update
 from bot.components.check_box import CheckBox, CheckBoxGroup
 from bot.components.component import MessageHandlerComponent, UiComponent
 from bot.components.panel import Panel
-from core.service.category_service import ensure_user_has_categories
 class CategorySelector(UiComponent):
 
-    def __init__(self, component_id: str = None, on_change: callable = None):
+    def __init__(self, income_categories=None, expense_categories=None, selected_category=None, transaction_type='expense', component_id: str = None, on_change: callable = None):
         super().__init__(component_id, on_change)
-        self.income_cats = []
-        self.expense_cats = []
-        self.transaction_type = "expense"
-        self.category = None
-        self.panel = None
+        self.income_cats = income_categories or []
+        self.expense_cats = expense_categories or []
+        self.transaction_type = transaction_type
+        self.category = selected_category
+        self.panel = Panel()
         self.category_map = {}
-        self.initiated = False
+        self._build_ui()
+        self.initiated = len(self.income_cats) > 0 or len(self.expense_cats) > 0
 
-    async def init(self, update, context, user_id: int = None, transaction_type='expense'):
-        """Initialize with consistent signature"""
-        if user_id is None:
-            user_id = context.user_data.get('user_id') or context._user_id
-            
-        # Clear panel to avoid duplicates
+    def _build_ui(self):
+        """Build UI components from current data"""
         self.panel = Panel()
         self.category_map = {}
         
-        self.transaction_type = transaction_type
-        self.income_cats, self.expense_cats = await ensure_user_has_categories(user_id)
+        if not (self.income_cats or self.expense_cats):
+            return
+        
+        # Build category map for lookup
+        for category in self.expense_cats + self.income_cats:
+            self.category_map[category.id] = category
+            
+        # Transaction type selection
         type_group = CheckBoxGroup("type_group",
                                    on_change=self._handle_type_change)
         income_cb = CheckBox(
@@ -44,6 +46,7 @@ class CategorySelector(UiComponent):
         type_panel.add(income_cb)
         type_panel.add(expense_cb)
 
+        # Category selection
         category_panel = Panel()
         category_group = CheckBoxGroup("categories",
                                        on_change=self._handle_category_change)
@@ -57,25 +60,26 @@ class CategorySelector(UiComponent):
             )
             category_group.add(cb)
             category_panel.add(cb)
-        for category in self.expense_cats + self.income_cats:
-            self.category_map[category.id] = category
 
         self.panel.add(type_panel)
         self.panel.add(category_panel)
-        self.initiated = True
 
-    async def clear_state(self, update, context):
-        """Reset component state with consistent signature"""
-        self.income_cats = []
-        self.expense_cats = []
-        self.transaction_type = "expense"
-        self.category = None
-        self.panel = None
-        self.category_map = {}
-        self.initiated = False
+    def update_data(self, income_categories=None, expense_categories=None, selected_category=None, transaction_type=None):
+        """Update component data and rebuild UI"""
+        if income_categories is not None:
+            self.income_cats = income_categories
+        if expense_categories is not None:
+            self.expense_cats = expense_categories
+        if selected_category is not None:
+            self.category = selected_category
+        if transaction_type is not None:
+            self.transaction_type = transaction_type
+        
+        self._build_ui()
+        self.initiated = len(self.income_cats) > 0 or len(self.expense_cats) > 0
 
-    async def get_message(self, update, context):
-        """Get current message to display with consistent signature"""
+    def get_message(self):
+        """Get current message to display"""
         if self.category:
             type_text = "income" if self.transaction_type == 'income' else "expense"
             return f"Selected {type_text} category: {self.category}"
@@ -89,10 +93,9 @@ class CategorySelector(UiComponent):
             if cbg.selected_check_box.selected:
                 self.transaction_type = cbg.selected_check_box.component_id
                 self.category = None
-                user_id  = update.callback_query.from_user.id
-                await self.init(update, context, user_id=user_id, transaction_type=self.transaction_type)
+                self._build_ui()
             else:
-                self.transaction_type= None
+                self.transaction_type = None
         await self.call_on_change(update, context)
 
     async def _handle_category_change(self, cbg: CheckBoxGroup, update, context):

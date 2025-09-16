@@ -11,6 +11,7 @@ class CheckBox(UiComponent):
         if group:
             self.group = group
             group.add(self)
+        self.initiated = True
 
     async def check(self, update, context, notification=False):
         self._selected = True
@@ -53,16 +54,15 @@ class CheckBox(UiComponent):
             return True
         return False
 
-    async def init(self, update, context, *args, **kwargs):
-        """Initialize checkbox"""
+    def update_data(self, text=None, selected=None):
+        """Update checkbox data"""
+        if text is not None:
+            self.text = text
+        if selected is not None:
+            self._selected = selected
         self.initiated = True
 
-    async def clear_state(self, update, context):
-        """Clear checkbox state"""
-        self._selected = False
-        self.initiated = False
-
-    async def get_message(self, update, context):
+    def get_message(self):
         """Get checkbox message"""
         return f"Checkbox: {self.display_text}"
 
@@ -72,6 +72,7 @@ class CheckBoxGroup(UiComponent):
         self.name = name
         self.checkboxes = []
         self._selected_check_box = None
+        self.initiated = True
 
     def add(self, checkbox: CheckBox):
         self.checkboxes.append(checkbox)
@@ -97,20 +98,13 @@ class CheckBoxGroup(UiComponent):
                 return True
         return False
 
-    async def init(self, update, context, *args, **kwargs):
-        """Initialize checkbox group and all checkboxes"""
-        for cb in self.checkboxes:
-            await cb.init(update, context, *args, **kwargs)
+    def update_data(self, name=None):
+        """Update checkbox group data"""
+        if name is not None:
+            self.name = name
         self.initiated = True
 
-    async def clear_state(self, update, context):
-        """Clear checkbox group state"""
-        for cb in self.checkboxes:
-            await cb.clear_state(update, context)
-        self._selected_check_box = None
-        self.initiated = False
-
-    async def get_message(self, update, context):
+    def get_message(self):
         """Get checkbox group message"""
         if self._selected_check_box:
             return f"Selected: {self._selected_check_box.text}"

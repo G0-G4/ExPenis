@@ -11,57 +11,86 @@ from core.service.transaction_service import create_transaction, get_transaction
 
 
 class TransactionEdit(MessageHandlerComponent):
-    def __init__(self, component_id: str = None, on_change: callable = None):
+    def __init__(self, accounts=None, balance_map=None, income_categories=None, expense_categories=None, transaction_data=None, component_id: str = None, on_change: callable = None):
         super().__init__(component_id, on_change)
-        self.account_selector = AccountSelector(on_change=self.on_selection_change)
-        self.category_selector = CategorySelector(on_change=self.on_selection_change)
+        
+        # Initialize with provided data or defaults
+        selected_account_id = transaction_data.get('account_id') if transaction_data else None
+        selected_category = transaction_data.get('category') if transaction_data else None
+        transaction_type = transaction_data.get('type', 'expense') if transaction_data else 'expense'
+        
+        self.account_selector = AccountSelector(
+            accounts=accounts,
+            balance_map=balance_map,
+            selected_account_id=selected_account_id,
+            on_change=self.on_selection_change
+        )
+        self.category_selector = CategorySelector(
+            income_categories=income_categories,
+            expense_categories=expense_categories,
+            selected_category=selected_category,
+            transaction_type=transaction_type,
+            on_change=self.on_selection_change
+        )
         self.amount_input = Input(on_change=self.on_amount_input)
-        self.message = "Please select both account and category first"
-        self.ready_for_input = False
-        self.transaction_id = None  # For editing existing transactions
-
-    async def init(self, update, context, user_id: int = None, transaction_id: int = None):
-        """Initialize component with consistent signature"""
-        if user_id is None:
-            user_id = context.user_data.get('user_id') or context._user_id
-            
-        self.transaction_id = transaction_id
-
-        if transaction_id:
-            # Load existing transaction data and populate selectors
-            transaction = await get_transaction_by_id(transaction_id)
-            if transaction:
-                # Set values BEFORE initializing selectors so checkboxes show correctly
-                self.account_selector.account_id = transaction.account_id
-                self.category_selector.category = transaction.category
-                self.category_selector.transaction_type = transaction.type
-                
-                # Initialize selectors with the pre-set values
-                await self.account_selector.init(update, context, user_id=user_id)
-                await self.category_selector.init(update, context, user_id=user_id, transaction_type=transaction.type)
-                
-                # Set ready for input and activate amount input since both selectors have values
-                self.ready_for_input = True
-                self.message = f"Editing transaction: {transaction.amount} - Enter new amount or keep current"
-                self.amount_input.activate()
+        
+        self.transaction_id = transaction_data.get('id') if transaction_data else None
+        self.ready_for_input = bool(selected_account_id and selected_category)
+        
+        if self.ready_for_input:
+            if self.transaction_id:
+                self.message = f"Editing transaction: {transaction_data.get('amount', 0)} - Enter new amount or keep current"
+            else:
+                self.message = TRANSACTION_INPUT_PROMPT
+            self.amount_input.activate()
         else:
-            # Initialize selectors for new transaction
-            if not self.account_selector.initiated:
-                await self.account_selector.init(update, context, user_id=user_id)
-            if not self.category_selector.initiated:
-                await self.category_selector.init(update, context, user_id=user_id)
-            
+            self.message = "Please select both account and category first"
+        
         self.initiated = True
 
-    async def clear_state(self, update, context):
-        """Reset component state with consistent signature"""
-        self.account_selector = AccountSelector(on_change=self.on_selection_change)
-        self.category_selector = CategorySelector(on_change=self.on_selection_change)
-        self.amount_input = Input(on_change=self.on_amount_input)
-        self.message = "Please select both account and category first"
-        self.ready_for_input = False
-        self.initiated = False
-        self.transaction_id = None
+    def update_data(self, accounts=None, balance_map=None, income_categories=None, expense_categories=None, transaction_data=None):
+        """Update component with new data"""
+        if accounts is not None or balance_map is not None:
+            selected_account_id = transaction_data.get('account_id') if transaction_data else self.account_selector.account_id
+            self.account_selector.update_data(
+                accounts=accounts,
+                balance_map=balance_map,
+                selected_account_id=selected_account_id
+            )
+            
+        if income_categories is not None or expense_categories is not None or transaction_data is not None:
+            selected_category = transaction_data.get('category') if transaction_data else self.category_selector.category
+            transaction_type = transaction_data.get('type', 'expense') if transaction_data else self.category_selector.transaction_type
+            self.category_selector.update_data(
+                income_categories=income_categories,
+                expense_categories=expense_categories,
+                selected_category=selected_category,
+                transaction_type=transaction_type
+            )
+        
+        if transaction_data:
+            self.transaction_id = transaction_data.get('id')
+            self.ready_for_input = bool(self.account_selector.account_id and self.category_selector.category)
+            
+            if self.ready_for_input:
+                if self.transaction_id:
+                    self.message = f"Editing transaction: {transaction_data.get('amount', 0)} - Enter new amount or keep current"
+                else:
+                    self.message = TRANSACTION_INPUT_PROMPT
+                self.amount_input.activate()
+            else:
+                self.message = "Please select both account and category first"
+        else:
+            # For new transactions, always start with fresh state
+            self.transaction_id = None
+            self.ready_for_input = bool(self.account_selector.account_id and self.category_selector.category)
+            if self.ready_for_input:
+                self.message = TRANSACTION_INPUT_PROMPT
+                self.amount_input.activate()
+            else:
+                self.message = "Please select both account and category first"
+        
+        self.initiated = True
 
     async def on_selection_change(self, component, update, context):
         """Handle account/category selection changes"""
@@ -79,48 +108,42 @@ class TransactionEdit(MessageHandlerComponent):
     async def on_amount_input(self, inp: Input, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle amount input and create/update transaction"""
         user_id = update.message.from_user.id
+        amount_decimal = Decimal(inp.value)
+        if amount_decimal <= 0:
+            self.message = "❌ Amount must be positive"
+            return
 
-        try:
-            amount_decimal = Decimal(inp.value)
-            if amount_decimal <= 0:
-                self.message = "❌ Amount must be positive"
-                return
+        if self.transaction_id:
+            # Update existing transaction
+            await update_transaction(
+                transaction_id=self.transaction_id,
+                user_id=user_id,
+                amount=float(amount_decimal),
+                category=self.category_selector.category,
+                transaction_type=self.category_selector.transaction_type,
+                account_id=self.account_selector.account_id
+            )
+            self.message = f"✅ Transaction updated: {amount_decimal} ({self.category_selector.category})"
+        else:
+            # Create new transaction
+            await create_transaction(
+                user_id=user_id,
+                amount=float(amount_decimal),
+                category=self.category_selector.category,
+                transaction_type=self.category_selector.transaction_type,
+                account_id=self.account_selector.account_id
+            )
+            self.message = f"✅ Transaction created: {amount_decimal} ({self.category_selector.category})"
 
-            if self.transaction_id:
-                # Update existing transaction
-                await update_transaction(
-                    transaction_id=self.transaction_id,
-                    user_id=user_id,
-                    amount=float(amount_decimal),
-                    category=self.category_selector.category,
-                    transaction_type=self.category_selector.transaction_type,
-                    account_id=self.account_selector.account_id
-                )
-                self.message = f"✅ Transaction updated: {amount_decimal} ({self.category_selector.category})"
-            else:
-                # Create new transaction
-                await create_transaction(
-                    user_id=user_id,
-                    amount=float(amount_decimal),
-                    category=self.category_selector.category,
-                    transaction_type=self.category_selector.transaction_type,
-                    account_id=self.account_selector.account_id
-                )
-                self.message = f"✅ Transaction created: {amount_decimal} ({self.category_selector.category})"
-
-            # Notify parent component about completion
-            await self.call_on_change(update, context)
-        except ValueError as e:
-            self.message = f"❌ Invalid amount: {inp.value}"
-        except Exception as e:
-            self.message = f"❌ Error creating transaction: {str(e)}"
+        # Notify parent component about completion
+        await self.call_on_change(update, context)
 
     def render(self, update, context):
         """Render the transaction edit UI"""
         return self.account_selector.render(update, context) + self.category_selector.render(update, context)
 
-    async def get_message(self, update, context):
-        """Get current message to display with consistent signature"""
+    def get_message(self):
+        """Get current message to display"""
         return self.message
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE, message):

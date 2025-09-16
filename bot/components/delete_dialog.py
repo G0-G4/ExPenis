@@ -11,6 +11,11 @@ class DeleteDialog(UiComponent):
         self.on_cancel = on_cancel
         self.visible = False
         
+        self._build_ui()
+        self.initiated = True
+        
+    def _build_ui(self):
+        """Build UI components from current data"""
         self.cancel_button = Button(
             text="❌ Cancel", 
             callback_data=f"delete_cancel_{self.component_id}",
@@ -22,6 +27,18 @@ class DeleteDialog(UiComponent):
             callback_data=f"delete_confirm_{self.component_id}",
             on_click=self._on_confirm_click
         )
+        
+    def update_data(self, message=None, on_confirm=None, on_cancel=None):
+        """Update component data and rebuild UI"""
+        if message is not None:
+            self.message = message
+        if on_confirm is not None:
+            self.on_confirm = on_confirm
+        if on_cancel is not None:
+            self.on_cancel = on_cancel
+            
+        self._build_ui()
+        self.initiated = True
     
     async def show(self, update, context):
         self.visible = True
@@ -57,20 +74,7 @@ class DeleteDialog(UiComponent):
         
         return handled
 
-    async def init(self, update, context, *args, **kwargs):
-        """Initialize delete dialog and buttons"""
-        await self.cancel_button.init(update, context, *args, **kwargs)
-        await self.delete_button.init(update, context, *args, **kwargs)
-        self.initiated = True
-
-    async def clear_state(self, update, context):
-        """Clear delete dialog state"""
-        await self.cancel_button.clear_state(update, context)
-        await self.delete_button.clear_state(update, context)
-        self.visible = False
-        self.initiated = False
-
-    async def get_message(self, update, context):
+    def get_message(self):
         """Get delete dialog message"""
         if self.visible:
             return self.message

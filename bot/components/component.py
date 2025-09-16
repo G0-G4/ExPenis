@@ -25,15 +25,9 @@ class StatefulComponent(Component):
         super().__init__(component_id, on_change)
         self.initiated = False
 
-    @abstractmethod
-    async def init(self, update, context, *args, **kwargs):
-        """Initialize component with consistent signature"""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def clear_state(self, update, context):
-        """Clear component state"""
-        raise NotImplementedError
+    def update_data(self, **kwargs):
+        """Update component data - override in subclasses"""
+        self.initiated = True
 
 
 class UiComponent(StatefulComponent):
@@ -53,7 +47,7 @@ class UiComponent(StatefulComponent):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_message(self, update, context):
+    def get_message(self):
         """Get message text for this component"""
         raise NotImplementedError
 
