@@ -1,6 +1,5 @@
 from bot.components.component import UiComponent
 from bot.components.button import Button
-from telegram import InlineKeyboardButton
 
 
 class DeleteDialog(UiComponent):

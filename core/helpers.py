@@ -85,7 +85,7 @@ async def _calculate_period_boundaries(base_date: date, period_type: str) -> tup
 
 def format_amount(amount):
     """Format amount with thousands separator and 2 decimal places"""
-    return f"{amount:,.2f}"
+    return f"{amount:_.2f}".replace("_", " ")
 
 def format_percentage(value):
     """Format percentage with 1 decimal place"""

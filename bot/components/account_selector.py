@@ -1,25 +1,13 @@
-import asyncio
-
-from telegram import Update
-from telegram.ext import Application
-from telegram.error import BadRequest
-from typing import Optional
-
 from bot.components.check_box import CheckBox, CheckBoxGroup
-from bot.components.component import UiComponent
+from bot.components.component import MessageHandlerComponent, UiComponent
 from bot.components.panel import Panel
-from bot.messages import *
-from bot.bot_config import *
 from core.service.account_service import get_user_accounts, calculate_account_balance
-from core.service.category_service import ensure_user_has_categories
 from core.helpers import format_amount
 class AccountSelector(UiComponent):
 
-    def __init__(self, on_change: callable = None):
-        super().__init__(on_change=on_change)
+    def __init__(self, component_id: str = None, on_change: callable = None):
+        super().__init__(component_id, on_change)
         self.accounts = None
-        self.clear()
-    def clear(self):
         self.account_id = None
         self.accounts = []
         self.balance_map = {}
@@ -54,11 +42,16 @@ class AccountSelector(UiComponent):
         self.initiated = True
 
     async def clear_state(self, update, context):
-        """Clear component state with consistent signature"""
-        self.clear()
+        """Reset component state with consistent signature"""
+        self.account_id = None
+        self.accounts = []
+        self.balance_map = {}
+        self.panel  = Panel()
+        self.initiated = False
+        self.selected_account = None
 
     async def get_message(self, update, context):
-        """Get message for account selector"""
+        """Get current message to display with consistent signature"""
         if self.selected_account:
             return f"Selected account: {self.selected_account.name}"
         return "Select an account:"
@@ -78,4 +71,5 @@ class AccountSelector(UiComponent):
         return await self.panel.handle_callback(update, context, callback_data)
 
     def render(self, update, context):
+        """Render the account selector UI"""
         return self.panel.render(update, context)

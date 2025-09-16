@@ -1,5 +1,5 @@
 from bot.components.component import UiComponent
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram import InlineKeyboardButton
 
 class CheckBox(UiComponent):
     def __init__(self, text: str = "", selected: bool = False,

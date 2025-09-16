@@ -1,29 +1,15 @@
-import asyncio
-
 from telegram import Update
-from telegram.ext import Application
-from telegram.error import BadRequest
-from typing import Any, Dict, Optional
-
 from bot.components.check_box import CheckBox, CheckBoxGroup
-from bot.components.component import UiComponent
+from bot.components.component import MessageHandlerComponent, UiComponent
 from bot.components.panel import Panel
-from bot.messages import *
-from bot.bot_config import *
-from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
-from core.helpers import format_amount
 class CategorySelector(UiComponent):
 
-    def __init__(self, transaction_type='expense', on_change:callable=None):
-        super().__init__(on_change=on_change)
-        self.clear(transaction_type)
-
-
-    def clear(self, transaction_type="expense"):
+    def __init__(self, component_id: str = None, on_change: callable = None):
+        super().__init__(component_id, on_change)
         self.income_cats = []
         self.expense_cats = []
-        self.transaction_type = transaction_type
+        self.transaction_type = "expense"
         self.category = None
         self.panel = None
         self.category_map = {}
@@ -79,11 +65,17 @@ class CategorySelector(UiComponent):
         self.initiated = True
 
     async def clear_state(self, update, context):
-        """Clear component state with consistent signature"""
-        self.clear()
+        """Reset component state with consistent signature"""
+        self.income_cats = []
+        self.expense_cats = []
+        self.transaction_type = "expense"
+        self.category = None
+        self.panel = None
+        self.category_map = {}
+        self.initiated = False
 
     async def get_message(self, update, context):
-        """Get message for category selector"""
+        """Get current message to display with consistent signature"""
         if self.category:
             type_text = "income" if self.transaction_type == 'income' else "expense"
             return f"Selected {type_text} category: {self.category}"
@@ -113,4 +105,9 @@ class CategorySelector(UiComponent):
         await self.call_on_change(update, context)
 
     def render(self, update, context):
+        """Render the category selector UI"""
         return self.panel.render(update, context)
+
+    async def handle_message(self, update, context, message):
+        """Handle text input messages"""
+        return False
