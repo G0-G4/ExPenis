@@ -32,14 +32,16 @@ class TransactionEdit(MessageHandlerComponent):
             on_change=self.on_selection_change
         )
         self.amount_input = Input(on_change=self.on_amount_input)
+        self.transaction_id = transaction_data.get('id') if transaction_data else None
+        
         self.delete_dialog = DeleteDialog(
             message="Are you sure you want to delete this transaction?",
+            trigger_text="🗑 Delete Transaction",
+            trigger_callback_data=f"delete_transaction_{self.transaction_id}" if self.transaction_id else "delete_transaction_new",
             on_confirm=self.on_delete_confirm,
             on_cancel=self.on_delete_cancel,
             component_id=f"transaction_edit_{id(self)}"
         )
-        
-        self.transaction_id = transaction_data.get('id') if transaction_data else None
         self._update_ready_state_and_message(transaction_data)
         self.initiated = True
 
@@ -92,6 +94,10 @@ class TransactionEdit(MessageHandlerComponent):
         
         if transaction_data:
             self.transaction_id = transaction_data.get('id')
+            # Update delete dialog trigger callback data
+            self.delete_dialog.update_data(
+                trigger_callback_data=f"delete_transaction_{self.transaction_id}"
+            )
         else:
             self.transaction_id = None
             
@@ -156,13 +162,9 @@ class TransactionEdit(MessageHandlerComponent):
         """Render the transaction edit UI"""
         keyboard = self.account_selector.render(update, context) + self.category_selector.render(update, context)
         
-        # Add delete button only when editing existing transaction
-        if self.transaction_id and not self.delete_dialog.visible:
-            from telegram import InlineKeyboardButton
-            keyboard.append([InlineKeyboardButton("🗑 Delete Transaction", callback_data=f"delete_transaction_{self.transaction_id}")])
-        
-        # Add delete dialog if visible
-        keyboard += self.delete_dialog.render(update, context)
+        # Add delete dialog (renders trigger button when not visible, confirmation when visible)
+        if self.transaction_id:
+            keyboard += self.delete_dialog.render(update, context)
         
         return keyboard
 
@@ -180,12 +182,7 @@ class TransactionEdit(MessageHandlerComponent):
 
     async def handle_callback(self, update, context, callback_data: str) -> bool:
         """Handle button callbacks"""
-        # Handle delete transaction button
-        if callback_data.startswith('delete_transaction_'):
-            await self.delete_dialog.show(update, context)
-            return True
-            
-        # Handle delete dialog callbacks
+        # Handle delete dialog callbacks (including trigger)
         delete_handled = await self.delete_dialog.handle_callback(update, context, callback_data)
         if delete_handled:
             return True
