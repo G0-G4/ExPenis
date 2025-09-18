@@ -2,7 +2,7 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:////Users/g.grishenkov/projects/expenis/expenis.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./expenis.db")
 
 # Create async engine
 engine = create_async_engine(DATABASE_URL, echo=False)
