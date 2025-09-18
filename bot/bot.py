@@ -41,6 +41,7 @@ logging.getLogger('httpx').setLevel(logging.ERROR)
 logging.getLogger('httpcore').setLevel(logging.ERROR)
 logging.getLogger('telegram').setLevel(logging.WARNING)  # Reduce telegram verbosity
 logging.getLogger('asyncio').setLevel(logging.WARNING)
+logging.getLogger('aiosqlite').setLevel(logging.WARNING)
 
 
 
