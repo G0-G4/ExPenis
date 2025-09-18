@@ -3,9 +3,8 @@ from datetime import date, datetime
 from dateutil.relativedelta import MO, SU, relativedelta
 
 
-async def calculate_period_dates(base_date: date, period_type: str, offset: int = 0) -> tuple[datetime, datetime, str]:
+def calculate_period_dates(base_date: date, period_type: str, offset: int = 0) -> tuple[datetime, datetime, str]:
     """Helper method to calculate date ranges for relative periods"""
-    base_date = date.today()
 
     # Apply offset to get the target base date
     target_base_date = None
@@ -25,7 +24,7 @@ async def calculate_period_dates(base_date: date, period_type: str, offset: int 
         raise ValueError("Invalid period type")
 
     # Use the common helper to calculate boundaries
-    return await _calculate_period_boundaries(target_base_date, period_type)
+    return _calculate_period_boundaries(target_base_date, period_type)
 
 async def get_target_date(period_type: str, date_input: str) -> date:
     """Helper method to parse custom period dates"""
@@ -48,7 +47,7 @@ async def get_target_date(period_type: str, date_input: str) -> date:
     return target_base_date
 
 
-async def _calculate_period_boundaries(base_date: date, period_type: str) -> tuple[datetime, datetime, str]:
+def _calculate_period_boundaries(base_date: date, period_type: str) -> tuple[datetime, datetime, str]:
     """Helper method to calculate start/end dates and label for a given base date and period type."""
     start_date = None
     end_date = None
@@ -86,6 +85,14 @@ async def _calculate_period_boundaries(base_date: date, period_type: str) -> tup
 def format_amount(amount):
     """Format amount with thousands separator and 2 decimal places"""
     return f"{amount:_.2f}".replace("_", " ")
+
+def format_date(dt: date) -> str:
+    """Format date as 'Mon 15 Jan'"""
+    return dt.strftime("%a %d %b %y")
+
+def format_long_date(dt: date) -> str:
+    """Format date as 'Monday, 15 January'""" 
+    return dt.strftime("%A, %d %B")
 
 def format_percentage(value):
     """Format percentage with 1 decimal place"""

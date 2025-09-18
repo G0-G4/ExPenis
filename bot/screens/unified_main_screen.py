@@ -1,10 +1,12 @@
+from datetime import date
+
 from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, Application
 
 from bot.components.main_menu import MainMenu
 from bot.components.transaction_edit import TransactionEdit
 from bot.screens.screen import Screen
-from core.service.transaction_service import get_todays_totals, get_todays_transactions, get_transaction_by_id
+from core.service.transaction_service import get_totals_for_period, get_transaction_by_id, get_transactions_for_period
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 
@@ -20,7 +22,7 @@ class UnifiedMainScreen(Screen):
         application.add_handler(CommandHandler('start', self.start_handler))
         self.press_handler = CallbackQueryHandler(
             self.handle_user_presses,
-            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_confirm_|^delete_cancel_'
+            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_confirm_|^delete_cancel_|^nav'
         )
         self.input_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_user_messages)
         application.add_handler(self.press_handler)
@@ -95,6 +97,7 @@ class UnifiedMainScreen(Screen):
         user_state = self.get_user_state(update, context)
         
         # Handle navigation callbacks
+        # TODO think if this could be avoided and delegated to main munu component similar to nav buttons
         if query_data == 'enter_transaction':
             # Switch to transaction edit for new transaction
             # Clear any existing transaction_edit component to start fresh
@@ -114,7 +117,7 @@ class UnifiedMainScreen(Screen):
             user_state['current_component'] = 'main_menu'
             await self._ensure_main_menu_data(update, context)
             return True
-        
+
         # Delegate to current component
         current_component_name = user_state['current_component']
         current_component = user_state['components'].get(current_component_name)
@@ -146,21 +149,21 @@ class UnifiedMainScreen(Screen):
         """Ensure main menu component has fresh data"""
         user_state = self.get_user_state(update, context)
         user_id = context.user_data['user_id']
-        
-        # Fetch fresh data
-        todays_transactions = await get_todays_transactions(user_id)
-        totals = await get_todays_totals(user_id)
-        
-        # Create or update main menu component
+
         if user_state['components']['main_menu'] is None:
+            transactions = await get_transactions_for_period(user_id, date.today(), date.today())
+            totals = await get_totals_for_period(user_id, date.today(), date.today())
             user_state['components']['main_menu'] = MainMenu(
-                todays_transactions=todays_transactions,
+                transactions=transactions,
                 totals=totals,
                 on_change=self.on_main_menu_change
             )
         else:
+            main_menu = user_state['components']['main_menu']
+            transactions = await get_transactions_for_period(user_id, *main_menu.get_selected_period())
+            totals = await get_totals_for_period(user_id, *main_menu.get_selected_period())
             user_state['components']['main_menu'].update_data(
-                todays_transactions=todays_transactions,
+                transactions=transactions,
                 totals=totals
             )
     

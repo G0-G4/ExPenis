@@ -11,30 +11,28 @@ from core.models.transaction import Transaction
 from core.service.account_service import AccountService, get_account_by_id
 
 
-async def get_todays_transactions(user_id: int) -> List[Transaction]:
-    """Get today's transactions for a specific user"""
-    today = date.today()
-    start_of_day = datetime.combine(today, datetime.min.time())
-    end_of_day = datetime.combine(today, datetime.max.time())
+async def get_transactions_for_period(user_id: int, start_date: date, end_date: date) -> List[Transaction]:
+    """Get transactions for a specific period"""
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(end_date, datetime.max.time())
 
     async with session_maker() as session:
         result = await session.execute(
             select(Transaction)
             .where(
                 Transaction.user_id == user_id,
-                Transaction.created_at >= start_of_day,
-                Transaction.created_at <= end_of_day
+                Transaction.created_at >= start_datetime,
+                Transaction.created_at <= end_datetime
             )
             .order_by(Transaction.created_at.desc())
         )
         return list(result.scalars().all())
 
 
-async def get_todays_totals(user_id: int) -> dict:
-    """Get today's total income and expenses for a specific user"""
-    today = date.today()
-    start_of_day = datetime.combine(today, datetime.min.time())
-    end_of_day = datetime.combine(today, datetime.max.time())
+async def get_totals_for_period(user_id: int, start_date: date, end_date: date) -> dict:
+    """Get totals for a specific period"""
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(end_date, datetime.max.time())
 
     async with session_maker() as session:
         # Get total income
@@ -43,8 +41,8 @@ async def get_todays_totals(user_id: int) -> dict:
             .where(
                 Transaction.user_id == user_id,
                 Transaction.type == "income",
-                Transaction.created_at >= start_of_day,
-                Transaction.created_at <= end_of_day
+                Transaction.created_at >= start_datetime,
+                Transaction.created_at <= end_datetime
             )
         )
         total_income = income_result.scalar() or 0.0
@@ -55,8 +53,8 @@ async def get_todays_totals(user_id: int) -> dict:
             .where(
                 Transaction.user_id == user_id,
                 Transaction.type == "expense",
-                Transaction.created_at >= start_of_day,
-                Transaction.created_at <= end_of_day
+                Transaction.created_at >= start_datetime,
+                Transaction.created_at <= end_datetime
             )
         )
         total_expense = expense_result.scalar() or 0.0
@@ -186,7 +184,7 @@ async def get_custom_period_statistics(user_id: int, period_type: str, date_inpu
 
 
 async def create_transaction(
-        user_id: int,
+    user_id: int,
     amount: float,
     category: str,
     transaction_type: str,

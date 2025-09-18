@@ -53,7 +53,6 @@ def get_main_menu_keyboard():
     """Create the main menu keyboard"""
     return [
         [InlineKeyboardButton("➕ Enter Transaction", callback_data='enter_transaction')],
-        [InlineKeyboardButton("📊 View by Period", callback_data='select_period')]
     ]
 
 def get_transaction_type_keyboard():
