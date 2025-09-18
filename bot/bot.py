@@ -13,10 +13,12 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-# Reduce noise from these libraries
-logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
-logging.getLogger('httpx').setLevel(logging.WARNING)
-logging.getLogger('httpcore').setLevel(logging.WARNING)
+# Silence noisy libraries
+logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)  # Only show SQL errors
+logging.getLogger('sqlalchemy.pool').setLevel(logging.ERROR)
+logging.getLogger('httpx').setLevel(logging.ERROR)
+logging.getLogger('httpcore').setLevel(logging.ERROR)
+logging.getLogger('telegram').setLevel(logging.WARNING)  # Reduce telegram verbosity
 
 
 
