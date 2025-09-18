@@ -35,8 +35,24 @@ async def get_user_income_categories(user_id: int) -> List[Category]:
 
 async def create_default_categories(user_id: int):
     """Create default categories for a new user"""
-    default_income_categories = ['Salary', 'Investment', 'Gift', 'Other Income']
-    default_expense_categories = ['Cafe', 'Food', 'Family', 'Presents', 'Entertainment', 'Learning', 'Transport', 'Rent', 'Health', 'Monthly fee']
+    default_income_categories = [
+        '💰 Salary', 
+        '📈 Investment', 
+        '🎁 Gift', 
+        '💸 Other Income'
+    ]
+    default_expense_categories = [
+        '☕ Cafe', 
+        '🍔 Food', 
+        '👪 Family', 
+        '🎁 Presents', 
+        '🎭 Entertainment', 
+        '📚 Learning', 
+        '🚕 Transport', 
+        '🏠 Rent', 
+        '🏥 Health', 
+        '💳 Monthly fee'
+    ]
 
     async with session_maker() as session:
         # Check if user already has categories
