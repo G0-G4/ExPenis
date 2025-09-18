@@ -1,11 +1,12 @@
 # place to /etc/logrotate.d/expenis
 /var/log/expenis.log
 /var/log/expenis-error.log {
-       daily               # Rotate daily
-       rotate 7            # Keep 7 days of logs
-       compress            # Compress old logs (saves ~80% space)
-       delaycompress       # Compress only the previous rotation
-       missingok           # Don't error if log is missing
-       notifempty          # Skip rotation if log is empty
-       create 0644 gog4 gog4  # Recreate log with correct permissions
-   }
+       daily
+       rotate 7
+       compress
+       delaycompress
+       missingok
+       notifempty
+       create 0644 gog4 gog4
+       su gog4 gog4
+}

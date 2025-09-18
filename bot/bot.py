@@ -1,3 +1,4 @@
+import sys
 
 from telegram.ext import ApplicationBuilder
 from telegram import BotCommand, Update
@@ -7,11 +8,31 @@ from core.config import TOKEN
 from core.service.account_service import AccountService
 from telegram.ext import ContextTypes
 import logging
+import logging.handlers
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
-    level=logging.INFO
+log_filename = f"logs/expenis.log"
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s - %(lineno)d - %(message)s')
+
+# File handler
+file_handler = logging.handlers.RotatingFileHandler(
+    log_filename,
+    backupCount=3,
+    maxBytes=5_000_000
 )
+file_handler.setFormatter(formatter)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(formatter)
+
+root_logger.handlers = []
+root_logger.addHandler(file_handler)
+root_logger.addHandler(console_handler)
+
 logger = logging.getLogger(__name__)
 # Silence noisy libraries
 logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)  # Only show SQL errors
@@ -19,6 +40,7 @@ logging.getLogger('sqlalchemy.pool').setLevel(logging.ERROR)
 logging.getLogger('httpx').setLevel(logging.ERROR)
 logging.getLogger('httpcore').setLevel(logging.ERROR)
 logging.getLogger('telegram').setLevel(logging.WARNING)  # Reduce telegram verbosity
+logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 
 
