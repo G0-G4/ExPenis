@@ -9,10 +9,14 @@ from telegram.ext import ContextTypes
 import logging
 
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
+# Reduce noise from these libraries
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
 
 
 
