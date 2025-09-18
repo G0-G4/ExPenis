@@ -1,0 +1,14 @@
+[Unit]
+Description=bot for managing expenses
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=uv run main.py
+WorkingDirectory=/home/gog4/ExPenis
+StandardOutput=append:/var/log/expenis.log
+StandardError=expenis-error.log
+
+[Install]
+WantedBy=multi-user.target
