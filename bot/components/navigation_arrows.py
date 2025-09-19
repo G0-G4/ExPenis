@@ -83,10 +83,9 @@ class NavigationArrows(UiComponent):
             await self.call_on_change(update, context)
             return True
         elif callback_data == "nav_period":
-            prev = self.offset
+            self.base_date = date.today()
             self.offset = 0
-            if prev != self.offset:
-                await self.call_on_change(update, context)
+            await self.call_on_change(update, context)
             # TODO implement period selection
             # Cycle through period types
             # period_types: list[PeriodType] = ['day', 'week', 'month']
