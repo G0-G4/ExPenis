@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -82,6 +82,25 @@ async def update_account_balance(account_id: int, user_id: int, new_balance: flo
             await session.refresh(account)
             return account
         return None
+
+
+async def delete_account(account_id: int, user_id: int) -> bool:
+    """Delete an account and all its transactions"""
+    async with session_maker() as session:
+        account = await get_account_by_id(account_id, user_id, session)
+        if not account:
+            return False
+            
+        # Delete all transactions for this account
+        await session.execute(
+            delete(Transaction)
+            .where(Transaction.account_id == account_id)
+        )
+        
+        # Delete the account
+        await session.delete(account)
+        await session.commit()
+        return True
 
 
 class AccountService:

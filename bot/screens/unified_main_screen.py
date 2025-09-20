@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Callb
 
 from bot.components.main_menu import MainMenu
 from bot.components.transaction_edit import TransactionEdit
+from bot.components.account_edit import AccountEdit
 from bot.screens.screen import Screen
 from core.service.transaction_service import get_totals_for_period, get_transaction_by_id, get_transactions_for_period
 from core.service.account_service import get_user_accounts, calculate_account_balance
@@ -19,10 +20,13 @@ class UnifiedMainScreen(Screen):
         self.application = application
         
         # Register handlers
+        # todo commands should clear state
         application.add_handler(CommandHandler('start', self.start_handler))
+        application.add_handler(CommandHandler('accounts', self.edit_account_handler))
+        # TODO automate call back registration if not custom
         self.press_handler = CallbackQueryHandler(
             self.handle_user_presses,
-            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_confirm_|^delete_cancel_|^nav'
+            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_trigger|^delete_confirm_|^delete_cancel_|^nav|^account_delete|^create_account'
         )
         self.input_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_user_messages)
         application.add_handler(self.press_handler)
@@ -30,16 +34,29 @@ class UnifiedMainScreen(Screen):
 
     async def start_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command - show main menu"""
+        # TODO clear state
         user_id = update.message.from_user.id
+        context.user_data['update'] = None
         user_state = self.get_user_state(update, context)
         user_state['current_component'] = 'main_menu'
         
         await self.init(update, context)
         await self.display_on(update, await self.get_message(update, context), self.render(update, context))
 
+    async def edit_account_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /accounts command - show accont menu"""
+        user_id = update.message.from_user.id
+        # clear update state to use new one received
+        context.user_data['update'] = None
+        user_state = self.get_user_state(update, context)
+        user_state['current_component'] = 'account_edit'
+
+        await self.init(update, context)
+        await self.display_on(update, await self.get_message(update, context), self.render(update, context))
+
     def get_user_state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Get or create user-specific state"""
-        if 'update' not in context.user_data and update.callback_query is not None:
+        if ('update' not in context.user_data or context.user_data['update'] is None) and update.callback_query is not None:
             context.user_data['update'] = update
         context.user_data['user_id'] = context._user_id
         
@@ -49,6 +66,7 @@ class UnifiedMainScreen(Screen):
                 'components': {
                     'main_menu': None,
                     'transaction_edit': None,
+                    'account_edit': None
                 },
                 'current_component': 'main_menu',
                 'message': 'Welcome!'
@@ -69,16 +87,24 @@ class UnifiedMainScreen(Screen):
         # Refresh main menu data and recreate component
         await self._ensure_main_menu_data(update, context)
 
+    async def on_account_edit_change(self, component, update, context):
+        """Handle account edit changes - refresh data"""
+        user_state = self.get_user_state(update, context)
+        await self._ensure_accounts_data(update, context)
+
     async def init(self, update, context, *args, **kwargs):
         """Initialize current component with data orchestration"""
         user_state = self.get_user_state(update, context)
         current_component_name = user_state['current_component']
-        
+
+        # TODO make unified
         if current_component_name == 'main_menu':
             await self._ensure_main_menu_data(update, context)
         elif current_component_name == 'transaction_edit':
             await self._ensure_transaction_edit_data(update, context)
-        
+        elif current_component_name == 'account_edit':
+            await self._ensure_accounts_data(update, context)
+
         # Mark the UnifiedMainScreen itself as initiated
         self.initiated = True
 
@@ -114,6 +140,7 @@ class UnifiedMainScreen(Screen):
             await self._ensure_transaction_edit_data(update, context, transaction_id=transaction_id)
             return True
         elif query_data == 'back':
+            # TODO clear state
             user_state['current_component'] = 'main_menu'
             await self._ensure_main_menu_data(update, context)
             return True
@@ -138,8 +165,8 @@ class UnifiedMainScreen(Screen):
             
         keyboard = current_component.render(update, context)
         
-        # Add back button for transaction edit
-        if current_component_name == 'transaction_edit':
+        # Add back button for non-main-menu screens
+        if current_component_name != 'main_menu':
             from telegram import InlineKeyboardButton
             keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back")])
             
@@ -165,6 +192,28 @@ class UnifiedMainScreen(Screen):
             user_state['components']['main_menu'].update_data(
                 transactions=transactions,
                 totals=totals
+            )
+
+    async def _ensure_accounts_data(self, update, context):
+        """Ensure account edit component has fresh data"""
+        user_state = self.get_user_state(update, context)
+        user_id = context.user_data['user_id']
+
+        accounts = await get_user_accounts(user_id)
+        balance_map = {}
+        for account in accounts:
+            balance_map[account.id] = await calculate_account_balance(account.id, user_id)
+
+        if user_state['components'].get('account_edit') is None:
+            user_state['components']['account_edit'] = AccountEdit(
+                accounts=accounts,
+                balance_map=balance_map,
+                on_change=self.on_account_edit_change
+            )
+        else:
+            user_state['components']['account_edit'].update_data(
+                accounts=accounts,
+                balance_map=balance_map
             )
     
     async def _ensure_transaction_edit_data(self, update, context, transaction_id=None):
