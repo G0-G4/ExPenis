@@ -8,7 +8,7 @@ Type=simple
 ExecStart=uv run main.py
 WorkingDirectory=/home/gog4/ExPenis
 StandardOutput=append:/var/log/expenis.log
-StandardError=expenis-error.log
+StandardError==append:/var/log/expenis-error.log
 
 [Install]
 WantedBy=multi-user.target

@@ -1,10 +1,14 @@
-# ExPenis
+# ExPenis - Expense & Income Tracking Bot 💰
 
-![](images/ExPenis.jpg)
+try it out in telegram @ExPenisBot
 
-bot for managing expenses
+![ExPenis Logo](images/ExPenis.jpg)
+
+## demo
+
+![demo](images/expenis.gif)
 
 ## run
 ```bash
-uv run python -m bot.bot
+uv run python main.py
 ```
