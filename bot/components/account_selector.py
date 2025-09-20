@@ -1,4 +1,4 @@
-from bot.components.check_box import CheckBox, CheckBoxGroup
+from bot.components.check_box import CheckBox, ExclusiveCheckBoxGroup
 from bot.components.component import MessageHandlerComponent, UiComponent
 from bot.components.panel import Panel
 from core.helpers import format_amount
@@ -29,8 +29,8 @@ class AccountSelector(UiComponent):
                     break
 
         # Account selection
-        account_group = CheckBoxGroup("accounts",
-                                      on_change=self.account_selection_call_back)
+        account_group = ExclusiveCheckBoxGroup("accounts",
+                                               on_change=self.account_selection_call_back)
         for account in self.accounts:
             balance = self.balance_map.get(account.id, 0)
             cb = CheckBox(
@@ -58,7 +58,7 @@ class AccountSelector(UiComponent):
         if self.selected_account:
             return f"Selected account: {self.selected_account.name}"
         return "Select an account:"
-    async def account_selection_call_back(self, cbg: CheckBoxGroup, update, context):
+    async def account_selection_call_back(self, cbg: ExclusiveCheckBoxGroup, update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.account_id = int(cbg.selected_check_box.component_id.split("_")[1])
