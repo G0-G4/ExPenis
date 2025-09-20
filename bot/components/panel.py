@@ -19,14 +19,13 @@ class Panel(UiComponent):
         keyboard = []
         row = []
         for component in self.components:
+            if isinstance(component, Panel):
+                keyboard.extend(component.render(update, context))
+            else:
+                row.append(component.render(update, context))
             if len(row) == self._per_row:
                 keyboard.append(row)
                 row = []
-            else:
-                if isinstance(component, Panel):
-                    keyboard.extend(component.render(update, context))
-                else:
-                    row.append(component.render(update, context))
         if len(row):
             keyboard.append(row)
         return keyboard
