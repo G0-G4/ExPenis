@@ -49,8 +49,8 @@ class TransactionEdit(MessageHandlerComponent):
         """Extract account_id, category, and type from transaction data"""
         if transaction_data:
             return (
-                transaction_data.get('account_id'),
-                transaction_data.get('category'),
+                transaction_data.get('account_id', None),
+                transaction_data.get('category', None),
                 transaction_data.get('type', 'expense')
             )
         return None, None, 'expense'
@@ -157,6 +157,9 @@ class TransactionEdit(MessageHandlerComponent):
     async def on_delete_cancel(self, dialog, update, context):
         """Handle delete cancellation"""
         self.message = "Delete cancelled"
+
+    def get_selected_account(self):
+        return self.account_selector.account_id
 
     def render(self, update, context):
         """Render the transaction edit UI"""

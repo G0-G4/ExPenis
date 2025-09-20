@@ -82,6 +82,9 @@ class UnifiedMainScreen(Screen):
     async def on_transaction_edit_change(self, component, update, context):
         """Handle transaction edit completion - return to main menu"""
         user_state = self.get_user_state(update, context)
+        transaction_edit = user_state['components']['transaction_edit']
+        last_selected_account = transaction_edit.get_selected_account()
+        user_state['last_selected_account'] = last_selected_account
         user_state['current_component'] = 'main_menu'
         
         # Refresh main menu data and recreate component
@@ -240,6 +243,10 @@ class UnifiedMainScreen(Screen):
                     'type': transaction.type,
                     'amount': transaction.amount
                 }
+        else:
+            transaction_data = {
+                'account_id': user_state.get('last_selected_account', None)
+            }
         
         # Create or update transaction edit component
         if user_state['components']['transaction_edit'] is None:
