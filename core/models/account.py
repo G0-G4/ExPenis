@@ -11,8 +11,8 @@ class Account(Base):
     user_id = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
     amount = Column(Float, nullable=False, default=0.0)
-    created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     
     def __repr__(self):
         return f"<Account(user_id={self.user_id}, name='{self.name}', amount={self.amount})>"

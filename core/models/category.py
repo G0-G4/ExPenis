@@ -11,8 +11,8 @@ class Category(Base):
     user_id = Column(Integer, nullable=False)
     type = Column(String, nullable=False)  # 'income' or 'expense'
     name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     
     def __repr__(self):
         return f"<Category(user_id={self.user_id}, type='{self.type}', name='{self.name}')>"
