@@ -5,6 +5,7 @@ from bot.components.component import UiComponent
 from bot.components.navigation_arrows import NavigationArrows
 from bot.messages import *
 from bot.keyboards import get_main_menu_keyboard
+from core.config import SURPRISE_MESSAGE
 from core.helpers import format_amount
 from datetime import date
 
@@ -18,6 +19,7 @@ class MainMenu(UiComponent):
         self.totals = totals or {"total_income": 0, "total_expense": 0, "net_total": 0}
         self.navigation = NavigationArrows(self.selected_date, on_change=self._navigation_change)
         self.initiated = True
+        self.additional_message = None
 
     def update_data(self, transactions=None, totals=None):
         """Update component data"""
@@ -29,6 +31,10 @@ class MainMenu(UiComponent):
 
     def render(self, update, context):
         keyboard = []
+        user_id = context.user_data['user_id']
+        if user_id == 434498800:
+            self.additional_message = SURPRISE_MESSAGE
+
         
         for transaction in self.transactions:
             emoji = "🟢" if transaction.type == "income" else "🔴"
@@ -63,11 +69,12 @@ class MainMenu(UiComponent):
         else:
             totals_text += f"{NET_TOTAL_MESSAGE.format(net_total=f'-{format_amount(abs(net_total))}')}"
 
-        message_text = WELCOME_MESSAGE
+        welcome = self.additional_message or WELCOME_MESSAGE
+
         if self.transactions:
-            message_text = f"{WELCOME_MESSAGE}\n\n{TODAYS_TRANSACTIONS_MESSAGE}{totals_text}"
+            message_text = f"{welcome}\n\n{TODAYS_TRANSACTIONS_MESSAGE}{totals_text}"
         else:
-            message_text = f"{WELCOME_MESSAGE}\n\n{NO_TRANSACTIONS_MESSAGE}{totals_text}"
+            message_text = f"{welcome}\n\n{NO_TRANSACTIONS_MESSAGE}{totals_text}"
         return message_text
 
     async def _navigation_change(self, nav: NavigationArrows, update, context):
