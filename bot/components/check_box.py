@@ -3,11 +3,12 @@ from telegram import InlineKeyboardButton
 
 class CheckBox(UiComponent):
     def __init__(self, text: str = "", selected: bool = False,
-                 callback_prefix: str = "cb_", on_change: callable = None, component_id = None, group: "CheckBoxGroup" = None):
+                 callback_prefix: str = "cb_", on_change: callable = None, component_id = None, group: "ExclusiveCheckBoxGroup" = None):
         super().__init__(component_id, on_change)
         self._selected = selected
         self.text = text
         self.callback_prefix = callback_prefix
+        self.group = None
         if group:
             self.group = group
             group.add(self)
@@ -66,7 +67,7 @@ class CheckBox(UiComponent):
         """Get checkbox message"""
         return f"Checkbox: {self.display_text}"
 
-class CheckBoxGroup(UiComponent):
+class ExclusiveCheckBoxGroup(UiComponent):
     def __init__(self, name: str, on_change: callable = None):
         super().__init__(on_change=on_change)
         self.name = name
