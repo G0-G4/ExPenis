@@ -66,6 +66,7 @@ class ExpenseBot:
         commands = [
             BotCommand("start", "Open the main menu"),
             BotCommand("accounts", "Create or edit accounts"),
+            BotCommand("stats", "View stats"),
         ]
         await self.application.bot.set_my_commands(commands)
 
