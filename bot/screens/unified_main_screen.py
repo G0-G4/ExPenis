@@ -4,10 +4,16 @@ from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, Application
 
 from bot.components.main_menu import MainMenu
-from bot.components.transaction_edit import TransactionEdit
+from bot.components.transaction_edit import TransactionEdit 
 from bot.components.account_edit import AccountEdit
+from bot.components.statistics_view import StatisticsView
 from bot.screens.screen import Screen
-from core.service.transaction_service import get_totals_for_period, get_transaction_by_id, get_transactions_for_period
+from core.service.transaction_service import (
+    get_totals_for_period,
+    get_transaction_by_id,
+    get_transactions_for_category, get_transactions_for_period,
+    get_period_statistics
+)
 from core.service.account_service import get_user_accounts, calculate_account_balance
 from core.service.category_service import ensure_user_has_categories
 
@@ -23,10 +29,11 @@ class UnifiedMainScreen(Screen):
         # todo commands should clear state
         application.add_handler(CommandHandler('start', self.start_handler))
         application.add_handler(CommandHandler('accounts', self.edit_account_handler))
+        application.add_handler(CommandHandler('stats', self.stats_handler))
         # TODO automate call back registration if not custom
         self.press_handler = CallbackQueryHandler(
             self.handle_user_presses,
-            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_trigger|^delete_confirm_|^delete_cancel_|^nav|^account_delete|^create_account'
+            pattern='^cb_|^back$|^enter_transaction$|^view_transaction_|^separator$|^delete_transaction_|^delete_trigger|^delete_confirm_|^delete_cancel_|^nav|^account_delete|^create_account|^stats_'
         )
         self.input_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_user_messages)
         application.add_handler(self.press_handler)
@@ -39,6 +46,7 @@ class UnifiedMainScreen(Screen):
         context.user_data['update'] = None
         user_state = self.get_user_state(update, context)
         user_state['current_component'] = 'main_menu'
+        user_state['start_component'] = 'main_menu'
         
         await self.init(update, context)
         await self.display_on(update, await self.get_message(update, context), self.render(update, context))
@@ -59,14 +67,15 @@ class UnifiedMainScreen(Screen):
         if ('update' not in context.user_data or context.user_data['update'] is None) and update.callback_query is not None:
             context.user_data['update'] = update
         context.user_data['user_id'] = context._user_id
-        
+        context.user_data['start_component'] = None # TODO store components in stack to allow go back
         if 'unified_main_screen' not in context.user_data:
             # Initialize with empty components - will be populated with data later
             context.user_data['unified_main_screen'] = {
                 'components': {
                     'main_menu': None,
-                    'transaction_edit': None,
-                    'account_edit': None
+                    'transaction_edit': None, 
+                    'account_edit': None,
+                    'stats_view': None
                 },
                 'current_component': 'main_menu',
                 'message': 'Welcome!'
@@ -85,10 +94,13 @@ class UnifiedMainScreen(Screen):
         transaction_edit = user_state['components']['transaction_edit']
         last_selected_account = transaction_edit.get_selected_account()
         user_state['last_selected_account'] = last_selected_account
-        user_state['current_component'] = 'main_menu'
+        user_state['current_component'] = user_state['start_component']
         
         # Refresh main menu data and recreate component
-        await self._ensure_main_menu_data(update, context)
+        if user_state['current_component'] == 'main_menu':
+            await self._ensure_main_menu_data(update, context)
+        if user_state['current_component'] == 'stats_view':
+            await self._ensure_stats_data(update, context)
 
     async def on_account_edit_change(self, component, update, context):
         """Handle account edit changes - refresh data"""
@@ -100,13 +112,14 @@ class UnifiedMainScreen(Screen):
         user_state = self.get_user_state(update, context)
         current_component_name = user_state['current_component']
 
-        # TODO make unified
         if current_component_name == 'main_menu':
             await self._ensure_main_menu_data(update, context)
         elif current_component_name == 'transaction_edit':
             await self._ensure_transaction_edit_data(update, context)
         elif current_component_name == 'account_edit':
             await self._ensure_accounts_data(update, context)
+        elif current_component_name == 'stats_view':
+            await self._ensure_stats_data(update, context)
 
         # Mark the UnifiedMainScreen itself as initiated
         self.initiated = True
@@ -126,7 +139,12 @@ class UnifiedMainScreen(Screen):
         user_state = self.get_user_state(update, context)
         
         # Handle navigation callbacks
-        # TODO think if this could be avoided and delegated to main munu component similar to nav buttons
+        if query_data == 'stats_back_to_view':
+            stats_view = user_state['components']['stats_view']
+            stats_view.showing_transactions = False
+            await self._ensure_stats_data(update, context)
+            return True
+            
         if query_data == 'enter_transaction':
             # Switch to transaction edit for new transaction
             # Clear any existing transaction_edit component to start fresh
@@ -145,6 +163,7 @@ class UnifiedMainScreen(Screen):
         elif query_data == 'back':
             # TODO clear state
             user_state['current_component'] = 'main_menu'
+            user_state['start_component'] = 'main_menu'
             await self._ensure_main_menu_data(update, context)
             return True
 
@@ -266,6 +285,72 @@ class UnifiedMainScreen(Screen):
                 expense_categories=expense_cats,
                 transaction_data=transaction_data
             )
+
+    async def stats_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /stats command - show statistics view"""
+        user_id = update.message.from_user.id
+        context.user_data['update'] = None
+        user_state = self.get_user_state(update, context)
+        user_state['current_component'] = 'stats_view'
+        user_state['start_component'] = 'stats_view'
+        
+        await self.init(update, context)
+        await self.display_on(update, await self.get_message(update, context), self.render(update, context))
+
+    async def _ensure_stats_data(self, update, context):
+        """Ensure statistics component has fresh data"""
+        user_state = self.get_user_state(update, context)
+        user_id = context.user_data['user_id']
+        
+        if user_state['components'].get('stats_view'):
+            period_type = user_state['components']['stats_view'].navigation.period_type
+            offset = user_state['components']['stats_view'].navigation.offset
+            stats = await get_period_statistics(user_id, period_type, offset)
+        else:
+            stats = await get_period_statistics(user_id, 'month')  # Default to monthly stats
+        
+        # Format data for StatisticsView component
+        income_data = {
+            cat['category']: {
+                'amount': cat['total'],
+                'percentage': (cat['total'] / stats['total_income']) * 100 if stats['total_income'] else 0
+            }
+            for cat in stats['income_categories']
+        }
+        
+        expense_data = {
+            cat['category']: {
+                'amount': cat['total'], 
+                'percentage': (cat['total'] / stats['total_expense']) * 100 if stats['total_expense'] else 0
+            }
+            for cat in stats['expense_categories']
+        }
+
+        if user_state['components'].get('stats_view') is None:
+            user_state['components']['stats_view'] = StatisticsView(
+                income_data=income_data,
+                expense_data=expense_data,
+                on_change=self.on_stats_change
+            )
+        else:
+            stats_view = user_state['components']['stats_view']
+            start, end = stats_view.navigation.get_current_period()
+            transactions = await get_transactions_for_category(
+                user_id,
+                stats_view.current_category,
+                stats_view.current_type,
+                start,
+                end
+            )
+            stats_view.update_data(
+                income_data=income_data,
+                expense_data=expense_data,
+                transactions = transactions
+            )
+
+    async def on_stats_change(self, component, update, context):
+        """Handle stats view changes (like period navigation)"""
+        await self._ensure_stats_data(update, context)
 
     async def get_message(self, update, context):
         """Get message for current component"""

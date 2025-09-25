@@ -1,5 +1,5 @@
 from telegram import Update
-from bot.components.check_box import CheckBox, CheckBoxGroup
+from bot.components.check_box import CheckBox, ExclusiveCheckBoxGroup
 from bot.components.component import MessageHandlerComponent, UiComponent
 from bot.components.panel import Panel
 class CategorySelector(UiComponent):
@@ -28,8 +28,8 @@ class CategorySelector(UiComponent):
             self.category_map[category.id] = category
             
         # Transaction type selection
-        type_group = CheckBoxGroup("type_group",
-                                   on_change=self._handle_type_change)
+        type_group = ExclusiveCheckBoxGroup("type_group",
+                                            on_change=self._handle_type_change)
         income_cb = CheckBox(
             "🟢 Income (+)",
             self.transaction_type == 'income',
@@ -48,8 +48,8 @@ class CategorySelector(UiComponent):
 
         # Category selection
         category_panel = Panel()
-        category_group = CheckBoxGroup("categories",
-                                       on_change=self._handle_category_change)
+        category_group = ExclusiveCheckBoxGroup("categories",
+                                                on_change=self._handle_category_change)
         cats = self.expense_cats if self.transaction_type == 'expense' else self.income_cats
         for category in cats:
             cb = CheckBox(
@@ -88,7 +88,7 @@ class CategorySelector(UiComponent):
     async def handle_callback(self, update, context, callback_data: str) -> bool:
         return await self.panel.handle_callback(update, context, callback_data)
 
-    async def _handle_type_change(self, cbg: CheckBoxGroup, update: Update, context):
+    async def _handle_type_change(self, cbg: ExclusiveCheckBoxGroup, update: Update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 self.transaction_type = cbg.selected_check_box.component_id
@@ -98,7 +98,7 @@ class CategorySelector(UiComponent):
                 self.transaction_type = None
         await self.call_on_change(update, context)
 
-    async def _handle_category_change(self, cbg: CheckBoxGroup, update, context):
+    async def _handle_category_change(self, cbg: ExclusiveCheckBoxGroup, update, context):
         if cbg.selected_check_box is not None:
             if cbg.selected_check_box.selected:
                 category_id = int(cbg.selected_check_box.component_id.split("_")[1])

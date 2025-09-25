@@ -1,6 +1,6 @@
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, date, timedelta
 import calendar
 from dateutil.relativedelta import relativedelta, MO, SU
@@ -21,6 +21,32 @@ async def get_transactions_for_period(user_id: int, start_date: date, end_date: 
             select(Transaction)
             .where(
                 Transaction.user_id == user_id,
+                Transaction.created_at >= start_datetime,
+                Transaction.created_at <= end_datetime
+            )
+            .order_by(Transaction.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+
+async def get_transactions_for_category(
+    user_id: int, 
+    category: str,
+    transaction_type: str,
+    start_date: date,
+    end_date: date
+) -> List[Transaction]:
+    """Get transactions for specific category and period"""
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(end_date, datetime.max.time())
+
+    async with session_maker() as session:
+        result = await session.execute(
+            select(Transaction)
+            .where(
+                Transaction.user_id == user_id,
+                Transaction.category == category,
+                Transaction.type == transaction_type,
                 Transaction.created_at >= start_datetime,
                 Transaction.created_at <= end_datetime
             )
@@ -172,14 +198,14 @@ async def _get_period_statistics_data(user_id: int, start_date: datetime, end_da
 
 async def get_period_statistics(user_id: int, period_type: str, offset: int = 0) -> dict:
     """Get statistics for a specific period (day, week, month, year) with offset"""
-    start_date, end_date, period_label = await calculate_period_dates(date.today(), period_type, offset)
+    start_date, end_date, period_label = calculate_period_dates(date.today(), period_type, offset)
     return await _get_period_statistics_data(user_id, start_date, end_date, period_label)
 
 
 async def get_custom_period_statistics(user_id: int, period_type: str, date_input: str, offset: int) -> dict:
     """Get statistics for a custom period based on user input"""
     base_date = await get_target_date(period_type, date_input)
-    start_date, end_date, period_label = await calculate_period_dates(base_date, period_type, offset)
+    start_date, end_date, period_label = calculate_period_dates(base_date, period_type, offset)
     return await _get_period_statistics_data(user_id, start_date, end_date, period_label)
 
 
