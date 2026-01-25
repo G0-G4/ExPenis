@@ -1,19 +1,19 @@
-import os
 from typing import Sequence
 
-from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from tuican import Application, USER_ID
+from tuican import USER_ID
 from tuican.components import Button, CheckBox, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
 from tuican.validation import positive_float
 
 from core.helpers import format_amount
 from core.models.account import Account
 from core.models.category import Category
+from core.models.transaction import Transaction
 from core.service.account_service import calculate_account_balance, get_user_accounts
 from core.service.category_service import get_user_expense_categories, get_user_income_categories
-from core.service.transaction_service import create_transaction
+from core.service.transaction_service import create_transaction, delete_transaction, get_transaction_by_id, \
+    update_transaction
 
 
 def get_account_label(account: Account, amount: float):
@@ -99,11 +99,11 @@ class TransactionCreate(Screen):
 
     def check_form_filled(self) -> bool:
         return ((self.income.selected and self.income_group.get_selected() is not None or
-                    self.expense.selected and self.expense_group.get_selected() is not None) and
+                 self.expense.selected and self.expense_group.get_selected() is not None) and
                 self.type_group.get_selected() is not None and
                 self.account_group.get_selected() is not None and
                 self.amount.value is not None
-        )
+                )
 
     async def init_if_necessary(self):
         if self.income_categories is None or self.expense_categories is None or self.accounts is None:
@@ -121,13 +121,82 @@ class TransactionCreate(Screen):
                 self.add_component(cb)
             for account in self.accounts:
                 amount = await calculate_account_balance(account.id, user_id)
-                cb = CheckBox(text=get_account_label(account, amount), group=self.account_group, component_id=str(account.id))
+                cb = CheckBox(text=get_account_label(account, amount), group=self.account_group,
+                              component_id=str(account.id))
                 self.account_checkboxes.append(cb)
                 self.add_component(cb)
 
-#
-# load_dotenv()
-# token = os.getenv("token")
-#
-# app = Application(token, TransactionCreate)
-# app.run()
+
+class TransactionEdit(TransactionCreate):
+    def __init__(self, transaction_id: int, group: ScreenGroup):
+        self.transaction_id = transaction_id
+        self.transaction: Transaction | None = None
+        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
+        super().__init__(group)
+        self.add_components([self.delete])
+
+    async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
+        Sequence[InlineKeyboardButton]]:
+        await self.init_if_necessary()
+        await self.initial_setup(update, context)
+        layout = await super().get_layout(update, context)
+        layout += [[self.delete.render(update, context)]]
+        return layout
+    async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        category = None
+        if self.income.selected:
+            category = self.income_group.get_selected().text
+        if self.expense.selected:
+            category = self.expense_group.get_selected().text
+        await update_transaction(
+            transaction_id=self.transaction_id,
+            user_id=USER_ID.get(),
+            category=category,
+            transaction_type=self.type_group.get_selected().component_id,
+            account_id=int(self.account_group.get_selected().component_id),
+            amount=self.amount.value
+        )
+        await self.group.go_back(update, context)
+
+    async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        screen = DeleteScreen(self.transaction_id, self.group)
+        await self.group.go_to_screen(update, context, screen)
+
+    async def initial_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if self.transaction is None:
+            self.transaction = await get_transaction_by_id(self.transaction_id)
+            for account in self.account_checkboxes:
+                if account.component_id == str(self.transaction.account_id):
+                    await account.check(update, context, update.callback_query.data)
+            if self.transaction.type == 'income':
+                await self.income.check(update, context, update.callback_query.data)
+                for category in self.income_checkboxes:
+                    if category.text == self.transaction.category:
+                        await category.check(update, context, update.callback_query.data)
+            else:
+                await self.expense.check(update, context, update.callback_query.data)
+                for category in self.expense_checkboxes:
+                    if category.text == self.transaction.category:
+                        await category.check(update, context, update.callback_query.data)
+            self.amount.value = self.transaction.amount
+
+class DeleteScreen(Screen):
+
+    def __init__(self, transaction_id: int, group: ScreenGroup):
+        self.group = group
+        self.transaction_id = transaction_id
+        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
+        self.cancel = Button(text="❌ Cancel", on_change=self.cancel_handler)
+        super().__init__([self.delete, self.cancel], message="Удалить?")
+
+    async def get_layout(self, update, context) -> Sequence[Sequence[InlineKeyboardButton]]:
+        return [
+            [self.delete.render(update, context), self.cancel.render(update, context)]
+        ]
+
+    async def cancel_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        await self.group.go_back(update, context)
+
+    async def delete_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        await delete_transaction(self.transaction_id, USER_ID.get())
+        await self.group.go_home(update, context)

@@ -1,6 +1,6 @@
 import os
 from datetime import date, timedelta
-from typing import Sequence
+from typing import ClassVar, Sequence
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, Update
@@ -9,7 +9,7 @@ from tuican import Application, USER_ID
 from tuican.components import Button, Hline, Screen, ScreenGroup
 
 from bot.components.component import Component
-from bot.components.transaction_screen import TransactionCreate
+from bot.components.transaction_screen import TransactionCreate, TransactionEdit
 from core.helpers import format_amount
 from core.models.transaction import Transaction
 from core.service.transaction_service import get_transactions_for_period
@@ -66,6 +66,12 @@ class DailyScreen(Screen):
         self.remove_transactions()
         await self.group.go_to_screen(update, context, screen)
 
+    async def edit_transaction_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
+                                      callback_data: str | None, cmp: Component):
+        screen = TransactionEdit(int(cmp.component_id), self.group)
+        self.remove_transactions()
+        await self.group.go_to_screen(update, context, screen)
+
 
     def get_message(self) -> str:
         return f"Transaction: {self.selected_date}"
@@ -75,7 +81,7 @@ class DailyScreen(Screen):
             self.transactions = await get_transactions_for_period(USER_ID.get(), self.selected_date, self.selected_date)
             for transaction in self.transactions:
                 label = get_transaction_label(transaction)
-                b = Button(text=label)
+                b = Button(text=label, on_change=self.edit_transaction_handler, component_id=str(transaction.id))
                 self.add_component(b)
                 self.transactions_buttons.append(b)
 
@@ -86,6 +92,7 @@ class DailyScreen(Screen):
         self.transactions = None
 
 class MainScreen(ScreenGroup):
+    description: ClassVar[str] = "траты по дням"
     def __init__(self):
         self.main = DailyScreen(self)
         super().__init__(self.main)
@@ -93,5 +100,5 @@ class MainScreen(ScreenGroup):
 load_dotenv()
 token = os.getenv("token")
 
-app = Application(token, MainScreen)
+app = Application(token, {'start': MainScreen})
 app.run()
