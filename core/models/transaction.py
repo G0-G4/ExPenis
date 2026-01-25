@@ -1,33 +1,22 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
+from peewee import AutoField, DateTimeField, FloatField, ForeignKeyField, IntegerField, Model, TextField
 
 from core.models.account import Account
+from core.models.category import Category
+from core.models.database import db
 
-Base = declarative_base()
 
-class Transaction(Base):
-    __tablename__ = "transactions"
-    
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False)
-    account_id = Column(Integer, ForeignKey(Account.id), nullable=False)
-    amount = Column(Float, nullable=False)
-    category = Column(String, nullable=False)
-    type = Column(String, nullable=False)  # 'income' or 'expense'
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
-    
-    def __repr__(self):
-        return f"<Transaction(user_id={self.user_id}, account_id={self.account_id}, amount={self.amount}, category='{self.category}', type='{self.type}')>"
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'account_id': self.account_id,
-            'amount': self.amount,
-            'category': self.category,
-            'type': self.type,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
+class Transaction(Model):
+    id = AutoField(primary_key=True)
+    user_id = IntegerField(null=False)
+    account = ForeignKeyField(Account, backref="transactions")
+    category = ForeignKeyField(Category, backref="transactions")
+    amount = FloatField(null=False, default=0.0)
+    description = TextField(null=True)
+    created_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+
+    class Meta:
+        database = db
+        table_name = "transactions"

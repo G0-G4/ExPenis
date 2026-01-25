@@ -1,101 +1,86 @@
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
-from core.database import session_maker
+from datetime import UTC, datetime
+from typing import Literal
+
 from core.models.category import Category
+from core.models.database import db
+
+CategoryType = Literal['income', 'expense']
+
+DEFAULT_INCOME = [
+    '💰 Salary',
+    '📈 Investment',
+    '🎁 Gift',
+    '💸 Other Income'
+]
+DEFAULT_EXPENSE = [
+    '☕ Cafe',
+    '🍔 Food',
+    '👪 Family',
+    '🎁 Presents',
+    '🎭 Entertainment',
+    '📚 Learning',
+    '🚕 Transport',
+    '🏠 Rent',
+    '🏥 Health',
+    '💳 Monthly fee'
+]
 
 
-async def get_user_expense_categories(user_id: int) -> List[Category]:
-    """Get expense categories for a specific user"""
-    async with session_maker() as session:
-        result = await session.execute(
-            select(Category)
-            .where(
-                Category.user_id == user_id,
-                Category.type == "expense"
-            )
-            .order_by(Category.id)
-        )
-        return list(result.scalars().all())
+async def get_user_categories(user_id: int) -> tuple[list[Category], list[Category]]:
+    categories = await db.list(Category.select()
+                               .where(Category.user_id == user_id))
+    return [c for c in categories if c.type == 'income'], [c for c in categories if c.type == 'expense']
 
 
-async def get_user_income_categories(user_id: int) -> List[Category]:
-    """Get income categories for a specific user"""
-    async with session_maker() as session:
-        result = await session.execute(
-            select(Category)
-            .where(
-                Category.user_id == user_id,
-                Category.type == "income"
-            )
-            .order_by(Category.id)
-        )
-        return list(result.scalars().all())
+async def get_category_by_id(user_id: int, id: int) -> Category | None:
+    category = await db.run(lambda:
+                            Category.get_or_none(Category.id == id))
+    return category
+
+
+async def create_category(user_id: int, name: str, type: CategoryType):
+    now = datetime.now(UTC)
+    category = Category(user_id=user_id, name=name, type=type, created_at=now, updated_at=now)
+    await db.run(category.save)
+
+
+async def update_category(category: Category):
+    now = datetime.now(UTC)
+    category.updated_at = now
+    await db.run(category.save)
+
+
+async def delete_category(category: Category):
+    await db.run(category.delete_instance)
+
+async def delete_category_by_id(category_id: int):
+    """Delete a category"""
+    await db.run(lambda: Category.delete_by_id(category_id))
 
 
 async def create_default_categories(user_id: int):
-    """Create default categories for a new user"""
-    default_income_categories = [
-        '💰 Salary', 
-        '📈 Investment', 
-        '🎁 Gift', 
-        '💸 Other Income'
-    ]
-    default_expense_categories = [
-        '☕ Cafe', 
-        '🍔 Food', 
-        '👪 Family', 
-        '🎁 Presents', 
-        '🎭 Entertainment', 
-        '📚 Learning', 
-        '🚕 Transport', 
-        '🏠 Rent', 
-        '🏥 Health', 
-        '💳 Monthly fee'
-    ]
-
-    async with session_maker() as session:
-        # Check if user already has categories
-        income_cats = await get_user_income_categories(user_id)
-        expense_cats = await get_user_expense_categories(user_id)
-
-        # Only create defaults if user has no categories of that type
-        if not income_cats:
-            for cat_name in default_income_categories:
-                category = Category(user_id=user_id, name=cat_name, type="income")
-                session.add(category)
-
-        if not expense_cats:
-            for cat_name in default_expense_categories:
-                category = Category(user_id=user_id, name=cat_name, type="expense")
-                session.add(category)
-
-        await session.commit()
-
-
-async def ensure_user_has_categories(user_id: int):
-    """Ensure user has categories, creating defaults if needed"""
-    income_cats = await get_user_income_categories(user_id)
-    expense_cats = await get_user_expense_categories(user_id)
-
-    if not income_cats and not expense_cats:
-        await create_default_categories(user_id)
-        # Refresh the lists after creation
-        income_cats = await get_user_income_categories(user_id)
-        expense_cats = await get_user_expense_categories(user_id)
-
-    return income_cats, expense_cats
-
-
-async def get_user_categories_by_type(user_id: int, category_type: str) -> List[Category]:
-    """Get categories of a specific type for a user"""
-    async with session_maker() as session:
-        result = await session.execute(
-            select(Category)
-            .where(
-                Category.user_id == user_id,
-                Category.type == category_type
-            )
-            .order_by(Category.id)
-        )
-        return list(result.scalars().all())
+    now = datetime.now(UTC)
+    async with db.atomic():
+        income, expense = await get_user_categories(user_id)
+        if not income and not expense:
+            incomes = [
+                Category(
+                    user_id=user_id,
+                    name=category,
+                    type='income',
+                    created_at=now,
+                    updated_at=now
+                )
+                for category in DEFAULT_INCOME
+            ]
+            expenses = [
+                Category(
+                    user_id=user_id,
+                    name=category,
+                    type='expense',
+                    created_at=now,
+                    updated_at=now
+                )
+                for category in DEFAULT_EXPENSE
+            ]
+            await db.run(lambda: Category.bulk_create(incomes + expenses))
