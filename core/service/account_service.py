@@ -138,5 +138,115 @@ async def get_accounts_with_calculated_balance(user_id: int) -> list[Account]:
         return accounts_with_balance
 
 
+from typing import List, Optional
+from sqlalchemy import select, func, case, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import session_maker
+from core.models.account import Account
+from core.models.transaction import Transaction
+
+
 class AccountService:
-    pass
+    @staticmethod
+    async def get_user_accounts(user_id: int) -> List[Account]:
+        """Get all accounts for a specific user"""
+        async with session_maker() as session:
+            result = await session.execute(
+                select(Account)
+                .where(Account.user_id == user_id)
+                .order_by(Account.name)
+            )
+            return list(result.scalars().all())
+
+    @staticmethod
+    async def get_account_by_id(account_id: int, user_id: int) -> Optional[Account]:
+        """Get a specific account by ID for a user"""
+        async with session_maker() as session:
+            result = await session.execute(
+                select(Account)
+                .where(Account.id == account_id, Account.user_id == user_id)
+            )
+            return result.scalar_one_or_none()
+
+    @staticmethod
+    async def calculate_account_balance(account_id: int, user_id: int) -> Optional[float]:
+        """Calculate the current balance of an account"""
+        account = await AccountService.get_account_by_id(account_id, user_id)
+        if not account:
+            return None
+
+        async with session_maker() as session:
+            result = await session.execute(
+                select(
+                    func.sum(
+                        case(
+                            (Transaction.type == "income", Transaction.amount),
+                            (Transaction.type == "expense", -Transaction.amount),
+                            else_=0
+                        )
+                    )
+                )
+                .where(Transaction.account_id == account_id)
+            )
+            transaction_sum = result.scalar() or 0.0
+        
+        return account.amount + transaction_sum
+
+    @staticmethod
+    async def create_account(user_id: int, name: str, initial_amount: float = 0.0) -> Account:
+        """Create a new account for a user"""
+        async with session_maker() as session:
+            account = Account(
+                user_id=user_id,
+                name=name,
+                amount=initial_amount
+            )
+            session.add(account)
+            await session.commit()
+            await session.refresh(account)
+            return account
+
+    @staticmethod
+    async def update_account(account_id: int, user_id: int, **kwargs) -> Optional[Account]:
+        """Update account properties"""
+        async with session_maker() as session:
+            account = await AccountService.get_account_by_id(account_id, user_id, session)
+            if not account:
+                return None
+
+            for key, value in kwargs.items():
+                if hasattr(account, key):
+                    setattr(account, key, value)
+
+            await session.commit()
+            await session.refresh(account)
+            return account
+
+    @staticmethod
+    async def delete_account(account_id: int, user_id: int) -> bool:
+        """Delete an account and all its transactions"""
+        async with session_maker() as session:
+            account = await AccountService.get_account_by_id(account_id, user_id, session)
+            if not account:
+                return False
+
+            await session.delete(account)
+            await session.commit()
+            return True
+
+    @staticmethod
+    async def get_accounts_with_balances(user_id: int) -> List[Account]:
+        """Get all accounts with their calculated balances"""
+        accounts = await AccountService.get_user_accounts(user_id)
+        return [
+            Account(
+                id=account.id,
+                user_id=account.user_id,
+                name=account.name,
+                amount=await AccountService.calculate_account_balance(account.id, user_id),
+                created_at=account.created_at,
+                updated_at=account.updated_at
+            )
+            for account in accounts
+        ]
