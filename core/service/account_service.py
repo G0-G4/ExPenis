@@ -1,4 +1,4 @@
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -101,6 +101,47 @@ async def delete_account(account_id: int, user_id: int) -> bool:
         await session.delete(account)
         await session.commit()
         return True
+
+async def get_accounts_with_calculated_balance(user_id: int) -> list[Account]:
+    """Get all accounts for a user with their calculated balances (base_amount + income - expense)"""
+    async with session_maker() as session:
+        # Single query that joins accounts with transactions and calculates sums
+        stmt = (
+            select(
+                Account,
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Transaction.type == "income", Transaction.amount),
+                            (Transaction.type == "expense", -Transaction.amount),
+                            else_=0
+                        )
+                    ),
+                    0
+                ).label("transaction_sum")
+            )
+            .outerjoin(Transaction, Account.id == Transaction.account_id)
+            .where(Account.user_id == user_id)
+            .group_by(Account.id)
+            .order_by(Account.name)
+        )
+
+        result = await session.execute(stmt)
+        accounts_with_balance = []
+        
+        for account, transaction_sum in result:
+            # Create new account with calculated balance
+            account_with_balance = Account(
+                id=account.id,
+                user_id=account.user_id,
+                name=account.name,
+                amount=account.amount + transaction_sum,
+                created_at=account.created_at,
+                updated_at=account.updated_at
+            )
+            accounts_with_balance.append(account_with_balance)
+            
+        return accounts_with_balance
 
 
 class AccountService:
