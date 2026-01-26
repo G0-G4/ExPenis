@@ -1,8 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime, UTC
-
-from core.models.account import Account
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -16,7 +15,11 @@ class Transaction(Base):
     category = Column(String, nullable=False)
     type = Column(String, nullable=False)  # 'income' or 'expense'
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    account = relationship("Account", back_populates="transactions")
+    category = relationship("Category", back_populates="transactions")
     
     def __repr__(self):
         return f"<Transaction(user_id={self.user_id}, account_id={self.account_id}, amount={self.amount}, category='{self.category}', type='{self.type}')>"
