@@ -5,9 +5,10 @@ from typing import ClassVar, Sequence
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from tuican import Application, USER_ID
+from tuican import Application, get_user_id
 from tuican.components import Button, Hline, Screen, ScreenGroup
 
+from bot.components.account_screen import AccountMain
 from bot.components.component import Component
 from bot.components.transaction_screen import TransactionCreate, TransactionEdit
 from core.helpers import format_amount
@@ -36,7 +37,7 @@ class DailyScreen(Screen):
 
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[Sequence[InlineKeyboardButton]]:
-        await self.add_transactions()
+        await self.add_transactions(get_user_id(update))
         return ([[b.render(update, context)] for b in self.transactions_buttons] +
                 [
                     [self.hline.render(update, context)],
@@ -76,9 +77,9 @@ class DailyScreen(Screen):
     def get_message(self) -> str:
         return f"Transaction: {self.selected_date}"
 
-    async def add_transactions(self):
+    async def add_transactions(self, user_id: int):
         if self.transactions is None:
-            self.transactions = await get_transactions_for_period(USER_ID.get(), self.selected_date, self.selected_date)
+            self.transactions = await get_transactions_for_period(user_id, self.selected_date, self.selected_date)
             for transaction in self.transactions:
                 label = get_transaction_label(transaction)
                 b = Button(text=label, on_change=self.edit_transaction_handler, component_id=str(transaction.id))
@@ -100,5 +101,5 @@ class MainScreen(ScreenGroup):
 load_dotenv()
 token = os.getenv("token")
 
-app = Application(token, {'start': MainScreen})
+app = Application(token, {'start': MainScreen, 'accounts': AccountMain})
 app.run()

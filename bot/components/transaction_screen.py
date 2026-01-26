@@ -2,8 +2,8 @@ from typing import Sequence
 
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from tuican import USER_ID
-from tuican.components import Button, CheckBox, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
+from tuican import get_user_id
+from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
 from tuican.validation import positive_float
 
 from core.helpers import format_amount
@@ -20,13 +20,13 @@ def get_account_label(account: Account, amount: float):
     return f'{account.name} ({format_amount(amount)})'
 
 
-def render_check_boxes(update: Update, context: ContextTypes.DEFAULT_TYPE, check_boxes: list[CheckBox]) -> Sequence[
+def render_by_n(update: Update, context: ContextTypes.DEFAULT_TYPE, cmp: list[Component], n: int=3) -> Sequence[
     Sequence[InlineKeyboardButton]]:
     keyboard = []
     row = []
-    for component in check_boxes:
+    for component in cmp:
         row.append(component.render(update, context))
-        if len(row) == 3:
+        if len(row) == n:
             keyboard.append(row)
             row = []
     if len(row):
@@ -63,15 +63,15 @@ class TransactionCreate(Screen):
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
-        await self.init_if_necessary()
+        await self.init_if_necessary(get_user_id(update))
         if self.type_group.get_selected() is None:
             await self.expense.check(update, context, update.callback_query.data)
         income_cb = self.type_group.get_selected() is not None and self.type_group.get_selected().component_id == "income"
         checkboxes = self.income_checkboxes if income_cb else self.expense_checkboxes
         layout = [
-            *render_check_boxes(update, context, self.account_checkboxes),
+            *render_by_n(update, context, self.account_checkboxes),
             [self.income.render(update, context), self.expense.render(update, context)],
-            *render_check_boxes(update, context, checkboxes),
+            *render_by_n(update, context, checkboxes),
             [self.amount.render(update, context)],
         ]
         if self.check_form_filled():
@@ -86,7 +86,7 @@ class TransactionCreate(Screen):
         if self.expense.selected:
             category = self.expense_group.get_selected().text
         await create_transaction(
-            user_id=USER_ID.get(),
+            user_id=get_user_id(update),
             category=category,
             transaction_type=self.type_group.get_selected().component_id,
             account_id=int(self.account_group.get_selected().component_id),
@@ -105,9 +105,8 @@ class TransactionCreate(Screen):
                 self.amount.value is not None
                 )
 
-    async def init_if_necessary(self):
+    async def init_if_necessary(self, user_id: int):
         if self.income_categories is None or self.expense_categories is None or self.accounts is None:
-            user_id = USER_ID.get()
             self.income_categories = await get_user_income_categories(user_id)
             self.expense_categories = await get_user_expense_categories(user_id)
             self.accounts = await get_user_accounts(user_id)
@@ -137,7 +136,6 @@ class TransactionEdit(TransactionCreate):
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
-        await self.init_if_necessary()
         await self.initial_setup(update, context)
         layout = await super().get_layout(update, context)
         layout += [[self.delete.render(update, context)]]
@@ -150,7 +148,7 @@ class TransactionEdit(TransactionCreate):
             category = self.expense_group.get_selected().text
         await update_transaction(
             transaction_id=self.transaction_id,
-            user_id=USER_ID.get(),
+            user_id=get_user_id(update),
             category=category,
             transaction_type=self.type_group.get_selected().component_id,
             account_id=int(self.account_group.get_selected().component_id),
@@ -163,6 +161,7 @@ class TransactionEdit(TransactionCreate):
         await self.group.go_to_screen(update, context, screen)
 
     async def initial_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await super().init_if_necessary(get_user_id(update))
         if self.transaction is None:
             self.transaction = await get_transaction_by_id(self.transaction_id)
             for account in self.account_checkboxes:
@@ -198,5 +197,5 @@ class DeleteScreen(Screen):
         await self.group.go_back(update, context)
 
     async def delete_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await delete_transaction(self.transaction_id, USER_ID.get())
+        await delete_transaction(self.transaction_id, get_user_id(update))
         await self.group.go_home(update, context)

@@ -90,12 +90,14 @@ async def delete_account(account_id: int, user_id: int) -> bool:
         account = await get_account_by_id(account_id, user_id, session)
         if not account:
             return False
-            
+
+        #TODO maybe better cascade to null
+
         # Delete all transactions for this account
-        await session.execute(
-            delete(Transaction)
-            .where(Transaction.account_id == account_id)
-        )
+        # await session.execute(
+        #     delete(Transaction)
+        #     .where(Transaction.account_id == account_id)
+        # )
         
         # Delete the account
         await session.delete(account)
