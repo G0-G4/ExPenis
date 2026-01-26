@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from datetime import datetime, UTC
 
 Base = declarative_base()
@@ -16,7 +16,7 @@ class Account(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     
     # Relationships
-    transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")
+    transactions = relationship("UserTransaction", back_populates="account", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Account(user_id={self.user_id}, name='{self.name}', amount={self.amount})>"

@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from core.database import session_maker
 from core.models.account import Account
-from core.models.transaction import Transaction
+from core.models.transaction import UserTransaction as Transaction
 
 
 async def get_user_accounts(user_id: int) -> List[Account]:

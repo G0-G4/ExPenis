@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta, MO, SU
 
 from core.database import  get_session_async, session_maker
 from core.helpers import calculate_period_dates, get_target_date
-from core.models.transaction import Transaction
+from core.models.transaction import UserTransaction as Transaction
 from core.service.account_service import AccountService, get_account_by_id
 
 
