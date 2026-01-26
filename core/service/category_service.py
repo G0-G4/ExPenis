@@ -1,15 +1,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
-from core.database import session_maker
-from core.models.category import Category
-
+from core.models.database import session_maker
 
 from typing import List, Optional, Tuple
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import session_maker
+from core.models.database import session_maker
 from core.models.category import Category
 
 
@@ -28,7 +25,7 @@ class CategoryService:
                 .where(Category.user_id == user_id, Category.type == "expense")
                 .order_by(Category.name)
             )
-            return (list(income.scalars().all()), list(expense.scalars().all()))
+            return list(income.scalars().all()), list(expense.scalars().all())
 
     @staticmethod
     async def get_category_by_id(category_id: int, user_id: int) -> Optional[Category]:

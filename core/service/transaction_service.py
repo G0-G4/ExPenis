@@ -1,14 +1,12 @@
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional, Dict
-from datetime import datetime, date, timedelta
-import calendar
-from dateutil.relativedelta import relativedelta, MO, SU
+from typing import List, Optional
+from datetime import datetime, date
 
-from core.database import  get_session_async, session_maker
+from core.models.database import  get_session_async, session_maker
 from core.helpers import calculate_period_dates, get_target_date
 from core.models.transaction import UserTransaction as Transaction
-from core.service.account_service import AccountService, get_account_by_id
+from core.service.account_service import get_account_by_id
 
 
 async def get_transactions_for_period(user_id: int, start_date: date, end_date: date) -> List[Transaction]:

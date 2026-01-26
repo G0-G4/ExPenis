@@ -1,252 +1,51 @@
-from sqlalchemy import select, func, delete, case
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from datetime import UTC, datetime
 
-from core.database import session_maker
-from core.models.account import Account
-from core.models.transaction import UserTransaction as Transaction
+from peewee import fn
+from playhouse.pwasyncio import AsyncSqliteDatabase
 
-
-async def get_user_accounts(user_id: int) -> List[Account]:
-    """Get all accounts for a specific user"""
-    async with session_maker() as session:
-        result = await session.execute(
-            select(Account)
-            .where(Account.user_id == user_id)
-            .order_by(Account.name)
-        )
-        return list(result.scalars().all())
+from core.models import Account, Transaction, db
 
 
-async def get_account_by_id(account_id: int, user_id: int, session=None) -> Optional[Account]:
-    """Get a specific account by ID for a user"""
-    if session is None:
-        session = session_maker()
-    result = await session.execute(
-        select(Account)
-        .where(Account.id == account_id, Account.user_id == user_id)
-    )
-    return result.scalar_one_or_none()
+class AccountService():
+    def __init__(self, db):
+        self.db = AsyncSqliteDatabase
+async def get_user_accounts(user_id: int) -> list[Account]:
+    accounts = await db.list((Account.select()
+                              .where(Account.user_id == user_id)
+                              .order_by(Account.name)))
+    return accounts
 
 
-async def calculate_account_balance(account_id: int, user_id: int) -> Optional[float]:
-    """Calculate the current balance of an account based on all transactions"""
-    async with session_maker() as session:
-        # Get the base amount
-        account = await get_account_by_id(account_id, user_id, session)
-        if not account:
-            return None
-
-        base_amount = account.amount
-
-        # Calculate sum of incomes for this account
-        income_result = await session.execute(
-            select(func.sum(Transaction.amount))
-            .where(Transaction.account_id == account_id, Transaction.type == "income")
-        )
-        total_income = income_result.scalar() or 0.0
-
-        # Calculate sum of expenses for this account
-        expense_result = await session.execute(
-            select(func.sum(Transaction.amount))
-            .where(Transaction.account_id == account_id, Transaction.type == "expense")
-        )
-        total_expense = expense_result.scalar() or 0.0
-
-        # Current balance = base_amount + total_income - total_expense
-        current_balance = base_amount + total_income - total_expense
-        return current_balance
+async def get_account_by_id(user_id: int, id: int) -> Account | None:
+    account = await db.run(lambda: Account.get_or_none(Account.user_id == user_id & Account.id == id))
+    return account
 
 
-async def create_account(user_id: int, name: str, initial_amount: float = 0.0) -> Account:
-    """Create a new account for a user"""
-    async with session_maker() as session:
-        account = Account(
-            user_id=user_id,
-            name=name,
-            amount=initial_amount
-        )
-        session.add(account)
-        await session.commit()
-        await session.refresh(account)
-        return account
+def _accounts_with_balance_query(filterr):
+    return Account.select(
+        Account,
+        (fn.SUM(Transaction.amount) + Account.adjustment_amount).alias('balance')
+    ).join(Transaction).where(filterr).group_by(Account.name).order_by(Account.name)
 
 
-async def update_account_balance(account_id: int, user_id: int, new_balance: float) -> Optional[Account]:
-    """Update an account's balance"""
-    async with session_maker() as session:
-        account = await get_account_by_id(account_id, user_id, session)
-        if account:
-            account.amount = new_balance
-            await session.commit()
-            await session.refresh(account)
-            return account
-        return None
+async def get_user_accounts_with_balance(user_id: int) -> list[tuple[Account, float]]:
+    accounts = await db.list(_accounts_with_balance_query(Account.user_id == user_id))
+    return [(a, a.balance) for a in accounts]
 
 
-async def delete_account(account_id: int, user_id: int) -> bool:
-    """Delete an account and all its transactions"""
-    async with session_maker() as session:
-        account = await get_account_by_id(account_id, user_id, session)
-        if not account:
-            return False
-
-        # Delete the account
-        await session.delete(account)
-        await session.commit()
-        return True
-
-async def get_accounts_with_calculated_balance(user_id: int) -> list[Account]:
-    """Get all accounts for a user with their calculated balances (base_amount + income - expense)"""
-    async with session_maker() as session:
-        # Single query that joins accounts with transactions and calculates sums
-        stmt = (
-            select(
-                Account,
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (Transaction.type == "income", Transaction.amount),
-                            (Transaction.type == "expense", -Transaction.amount),
-                            else_=0
-                        )
-                    ),
-                    0
-                ).label("transaction_sum")
-            )
-            .outerjoin(Transaction, Account.id == Transaction.account_id)
-            .where(Account.user_id == user_id)
-            .group_by(Account.id)
-            .order_by(Account.name)
-        )
-
-        result = await session.execute(stmt)
-        accounts_with_balance = []
-        
-        for account, transaction_sum in result:
-            # Create new account with calculated balance
-            account_with_balance = Account(
-                id=account.id,
-                user_id=account.user_id,
-                name=account.name,
-                amount=account.amount + transaction_sum,
-                created_at=account.created_at,
-                updated_at=account.updated_at
-            )
-            accounts_with_balance.append(account_with_balance)
-            
-        return accounts_with_balance
+async def get_user_account_with_balance(user_id: int, account_id) -> list[tuple[Account, float]] | None:
+    accounts = await db.list(_accounts_with_balance_query((Account.id == account_id) & (Account.user_id == user_id)))
+    return (accounts[0], accounts[0].balance) if len(accounts) > 0 else None
 
 
-from typing import List, Optional
-from sqlalchemy import select, func, case, delete
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from core.database import session_maker
-from core.models.account import Account
-from core.models.transaction import Transaction
+async def create_account(user_id: int, name: str, adjustment_amount: float):
+    now = datetime.now(UTC)
+    account = Account(user_id=user_id, name=name, adjustment_amount=adjustment_amount, created_at=now, updated_at=now)
+    await db.run(account.save)
 
 
-class AccountService:
-    @staticmethod
-    async def get_user_accounts(user_id: int) -> List[Account]:
-        """Get all accounts for a specific user"""
-        async with session_maker() as session:
-            result = await session.execute(
-                select(Account)
-                .where(Account.user_id == user_id)
-                .order_by(Account.name)
-            )
-            return list(result.scalars().all())
-
-    @staticmethod
-    async def get_account_by_id(account_id: int, user_id: int) -> Optional[Account]:
-        """Get a specific account by ID for a user"""
-        async with session_maker() as session:
-            result = await session.execute(
-                select(Account)
-                .where(Account.id == account_id, Account.user_id == user_id)
-            )
-            return result.scalar_one_or_none()
-
-    @staticmethod
-    async def calculate_account_balance(account_id: int, user_id: int) -> Optional[float]:
-        """Calculate the current balance of an account"""
-        account = await AccountService.get_account_by_id(account_id, user_id)
-        if not account:
-            return None
-
-        async with session_maker() as session:
-            result = await session.execute(
-                select(
-                    func.sum(
-                        case(
-                            (Transaction.type == "income", Transaction.amount),
-                            (Transaction.type == "expense", -Transaction.amount),
-                            else_=0
-                        )
-                    )
-                )
-                .where(Transaction.account_id == account_id)
-            )
-            transaction_sum = result.scalar() or 0.0
-        
-        return account.amount + transaction_sum
-
-    @staticmethod
-    async def create_account(user_id: int, name: str, initial_amount: float = 0.0) -> Account:
-        """Create a new account for a user"""
-        async with session_maker() as session:
-            account = Account(
-                user_id=user_id,
-                name=name,
-                amount=initial_amount
-            )
-            session.add(account)
-            await session.commit()
-            await session.refresh(account)
-            return account
-
-    @staticmethod
-    async def update_account(account_id: int, user_id: int, **kwargs) -> Optional[Account]:
-        """Update account properties"""
-        async with session_maker() as session:
-            account = await AccountService.get_account_by_id(account_id, user_id, session)
-            if not account:
-                return None
-
-            for key, value in kwargs.items():
-                if hasattr(account, key):
-                    setattr(account, key, value)
-
-            await session.commit()
-            await session.refresh(account)
-            return account
-
-    @staticmethod
-    async def delete_account(account_id: int, user_id: int) -> bool:
-        """Delete an account and all its transactions"""
-        async with session_maker() as session:
-            account = await AccountService.get_account_by_id(account_id, user_id, session)
-            if not account:
-                return False
-
-            await session.delete(account)
-            await session.commit()
-            return True
-
-    @staticmethod
-    async def get_accounts_with_balances(user_id: int) -> List[Account]:
-        """Get all accounts with their calculated balances"""
-        accounts = await AccountService.get_user_accounts(user_id)
-        return [
-            Account(
-                id=account.id,
-                user_id=account.user_id,
-                name=account.name,
-                amount=await AccountService.calculate_account_balance(account.id, user_id),
-                created_at=account.created_at,
-                updated_at=account.updated_at
-            )
-            for account in accounts
-        ]
+async def set_balance(user_id: int, id: int, new_balance: float):
+    async with db.atomic():
+        account, balance = await get_user_account_with_balance(user_id, id)
+        account.adjustment_amount = new_balance - balance + account.adjustment_amount
+        await db.run(account.save)

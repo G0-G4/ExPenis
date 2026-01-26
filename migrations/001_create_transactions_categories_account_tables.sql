@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS transactions
     description TEXT,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES accounts (id),
     FOREIGN KEY (category_id) REFERENCES categories (id)
 );
 

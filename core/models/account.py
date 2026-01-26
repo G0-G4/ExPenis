@@ -1,32 +1,17 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
-from sqlalchemy.orm import relationship
-from sqlalchemy.orm import declarative_base
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
-Base = declarative_base()
+from peewee import AutoField, DateTimeField, FloatField, IntegerField, Model, TextField
 
-class Account(Base):
-    __tablename__ = "accounts"
-    
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False)
-    name = Column(String, nullable=False)
-    amount = Column(Float, nullable=False, default=0.0)  # Matches adjustment_amount in migrations
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
-    
-    # Relationships
-    transactions = relationship("UserTransaction", back_populates="account", cascade="all, delete-orphan")
-    
-    def __repr__(self):
-        return f"<Account(user_id={self.user_id}, name='{self.name}', amount={self.amount})>"
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'name': self.name,
-            'amount': self.amount,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+from core.models.database import db
+
+
+class Account(Model):
+    id = AutoField(primary_key=True)
+    user_id = IntegerField(null=False)
+    name = TextField(null=False)
+    adjustment_amount = FloatField(null=False, default=0.0)
+    created_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+    updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+    class Meta:
+        database = db
+        table_name = "accounts"
