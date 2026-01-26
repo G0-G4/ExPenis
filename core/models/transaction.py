@@ -1,7 +1,11 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
+
+from core.models import Account
 
 Base = declarative_base()
 
