@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime, UTC
-from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -12,7 +11,7 @@ class Account(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
-    amount = Column(Float, nullable=False, default=0.0)
+    amount = Column(Float, nullable=False, default=0.0)  # Matches adjustment_amount in migrations
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     

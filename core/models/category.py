@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
