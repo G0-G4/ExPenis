@@ -67,7 +67,7 @@ async def create_default_categories(user_id: int):
                     created_at=now,
                     updated_at=now
                 )
-                for category in DEFAULT_INCOME
+                for category in DEFAULT_EXPENSE
             ]
             expenses = [
                 Category(
