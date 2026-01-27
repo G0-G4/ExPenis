@@ -1,14 +1,10 @@
 from datetime import UTC, datetime
 
 from peewee import fn
-from playhouse.pwasyncio import AsyncSqliteDatabase
 
 from core.models import Account, Transaction, db
 
 
-class AccountService():
-    def __init__(self, db):
-        self.db = AsyncSqliteDatabase
 async def get_user_accounts(user_id: int) -> list[Account]:
     accounts = await db.list((Account.select()
                               .where(Account.user_id == user_id)
