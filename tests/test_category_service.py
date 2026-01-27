@@ -1,35 +1,24 @@
 import pytest
 
 from core.models import Category, db
-from core.service.category_service import (
-    create_category,
-    get_category_by_id,
-    get_user_categories,
-    create_default_categories,
-    update_category,
-    delete_category
-)
+from core.service.category_service import (CategoryType, DEFAULT_EXPENSE, DEFAULT_INCOME, create_category,
+                                           create_default_categories, delete_category, get_category_by_id,
+                                           get_user_categories, update_category)
 
 
 @pytest.fixture(autouse=True)
 async def run_before_each_test():
     async with db:
         await db.run(Category.delete().execute)
-    # Code that will run BEFORE each test
-    print("\nThis runs before each test!")
-
     yield
-
-    # Code that will run AFTER each test (teardown)
-    print("This runs after each test!")
 
 
 @pytest.mark.asyncio
 async def test_basic_crud():
     user_id = 1
     name = "Test Category"
-    category_type = "income"
-    
+    category_type: CategoryType = "income"
+
     async with db:
         # Test create and read
         await create_category(
@@ -41,7 +30,7 @@ async def test_basic_crud():
         income_cats, expense_cats = await get_user_categories(user_id)
         assert len(income_cats) > 0
         cat = income_cats[0]
-        
+
         retrieved_category = await get_category_by_id(user_id, cat.id)
         assert retrieved_category == cat
         assert cat.user_id == user_id
@@ -52,7 +41,7 @@ async def test_basic_crud():
         new_name = "Updated Category"
         cat.name = new_name
         await update_category(cat)
-        
+
         updated_category = await get_category_by_id(user_id, cat.id)
         assert updated_category.name == new_name
 
@@ -65,14 +54,14 @@ async def test_basic_crud():
 @pytest.mark.asyncio
 async def test_default_categories():
     user_id = 1
-    
+
     async with db:
         await create_default_categories(user_id)
-        
+
         income_cats, expense_cats = await get_user_categories(user_id)
         assert len(income_cats) == len(DEFAULT_INCOME)
         assert len(expense_cats) == len(DEFAULT_EXPENSE)
-        
+
         # Verify types are correct
         for cat in income_cats:
             assert cat.type == 'income'

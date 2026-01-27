@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from peewee import fn
+from peewee import JOIN, fn
 
 from core.models import Account, Transaction, db
 
@@ -13,15 +13,15 @@ async def get_user_accounts(user_id: int) -> list[Account]:
 
 
 async def get_account_by_id(user_id: int, id: int) -> Account | None:
-    account = await db.run(lambda: Account.get_or_none(Account.user_id == user_id & Account.id == id))
+    account = await db.run(lambda: Account.get_or_none((Account.user_id == user_id) & (Account.id == id)))
     return account
 
 
 def _accounts_with_balance_query(filterr):
     return Account.select(
         Account,
-        (fn.SUM(Transaction.amount) + Account.adjustment_amount).alias('balance')
-    ).join(Transaction).where(filterr).group_by(Account.name).order_by(Account.name)
+        (fn.COALESCE(fn.SUM(Transaction.amount), 0.0) + Account.adjustment_amount).alias('balance')
+    ).join(Transaction, join_type=JOIN.LEFT_OUTER).where(filterr).group_by(Account.name).order_by(Account.name)
 
 
 async def get_user_accounts_with_balance(user_id: int) -> list[tuple[Account, float]]:
@@ -29,9 +29,9 @@ async def get_user_accounts_with_balance(user_id: int) -> list[tuple[Account, fl
     return [(a, a.balance) for a in accounts]
 
 
-async def get_user_account_with_balance(user_id: int, account_id) -> list[tuple[Account, float]] | None:
+async def get_user_account_with_balance(user_id: int, account_id) -> tuple[Account, float] | tuple[None, None]:
     accounts = await db.list(_accounts_with_balance_query((Account.id == account_id) & (Account.user_id == user_id)))
-    return (accounts[0], accounts[0].balance) if len(accounts) > 0 else None
+    return (accounts[0], accounts[0].balance) if len(accounts) > 0 else (None, None)
 
 
 async def create_account(user_id: int, name: str, adjustment_amount: float):

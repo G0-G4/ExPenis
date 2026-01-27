@@ -57,7 +57,7 @@ async def delete_category(category: Category):
 async def create_default_categories(user_id: int):
     now = datetime.now(UTC)
     async with db.atomic():
-        income, expense = get_user_categories(user_id)
+        income, expense = await get_user_categories(user_id)
         if not income and not expense:
             incomes = [
                 Category(
@@ -67,16 +67,16 @@ async def create_default_categories(user_id: int):
                     created_at=now,
                     updated_at=now
                 )
-                for category in DEFAULT_EXPENSE
+                for category in DEFAULT_INCOME
             ]
             expenses = [
                 Category(
                     user_id=user_id,
                     name=category,
-                    type='income',
+                    type='expense',
                     created_at=now,
                     updated_at=now
                 )
-                for category in DEFAULT_INCOME
+                for category in DEFAULT_EXPENSE
             ]
-            await db.run(Category.bulk_create(incomes + expenses))
+            await db.run(lambda: Category.bulk_create(incomes + expenses))
