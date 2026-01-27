@@ -57,6 +57,10 @@ async def test_basic_crud(test_account, test_category):
         new_description = "Updated transaction"
         transaction.amount = new_amount
         transaction.description = new_description
+        # Test category update only with id
+        new_category = Category(user_id=1, name="new category", type="income")
+        await db.run(new_category.save)
+        transaction.category = Category(id=new_category.id)
         await save_transaction(transaction)
 
         updated = await get_transaction_by_id(transaction.id)
