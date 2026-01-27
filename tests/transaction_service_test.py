@@ -9,23 +9,23 @@ from core.service.transaction_service import (create_transaction, delete_transac
 @pytest.fixture(autouse=True)
 async def run_before_each_test():
     async with db:
-        await db.run(Transaction.delete().execute())
-        await db.run(Account.delete().execute())
-        await db.run(Category.delete().execute())
+        await db.run(Transaction.truncate_table)
+        await db.run(Account.truncate_table)
+        await db.run(Category.truncate_table)
     yield
 
 @pytest.fixture
 async def test_account():
     async with db:
         account = Account(user_id=1, name="Test Account")
-        await db.run(account.save())
+        await db.run(account.save)
         return account
 
 @pytest.fixture
 async def test_category():
     async with db:
         category = Category(user_id=1, name="Test Category", type="income")
-        await db.run(category.save())
+        await db.run(category.save)
         return category
 
 @pytest.mark.asyncio

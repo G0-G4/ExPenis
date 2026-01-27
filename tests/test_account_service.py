@@ -1,6 +1,7 @@
 import pytest
+from playhouse.pwasyncio import AsyncSqliteDatabase
 
-from core.models import Account, db
+from core.models import Account, Category, Transaction, db
 from core.service import create_account, get_account_by_id, get_user_account_with_balance, get_user_accounts, \
     get_user_accounts_with_balance
 
@@ -8,7 +9,9 @@ from core.service import create_account, get_account_by_id, get_user_account_wit
 @pytest.fixture(autouse=True)
 async def run_before_each_test():
     async with db:
-        await db.run(Account.delete().execute)
+        await db.run(Transaction.truncate_table)
+        await db.run(Account.truncate_table)
+        await db.run(Category.truncate_table)
     yield
 
 
