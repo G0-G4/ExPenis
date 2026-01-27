@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime
-from typing import List
 
 from core.models import Account, Category, Transaction, db
 
@@ -32,18 +31,21 @@ async def get_transaction_by_id(transaction_id: int) -> Transaction | None:
 async def save_transaction(transaction: Transaction):
     """Update an existing transaction"""
     now = datetime.now(UTC)
-    transaction.updated_at = now
+    transaction.created_at = now if transaction.created_at is None else transaction.created_at
+    transaction.updated_at = now if transaction.updated_at is None else transaction.updated_at
     await db.run(transaction.save)
 
+async def update_transaction(transaction: Transaction):
+    """Update an existing transaction"""
+    now = datetime.now(UTC)
+    transaction.updated_at = now if transaction.updated_at is None else transaction.updated_at
+    await db.run(transaction.save)
 
 async def delete_transaction(transaction: Transaction):
     """Delete a transaction"""
     await db.run(transaction.delete_instance)
 
+async def delete_transaction_by_id(transaction_id: int):
+    """Delete a transaction"""
+    await db.run(lambda: Transaction.delete_by_id(transaction_id))
 
-async def create_transaction(transaction: Transaction):
-    """Create a new transaction"""
-    # now = datetime.now(UTC)
-    # transaction.created_at = now
-    # transaction.updated_at = now
-    await db.run(transaction.save)

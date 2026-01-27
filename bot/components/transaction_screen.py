@@ -4,15 +4,15 @@ from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 from tuican import get_user_id
 from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
-from tuican.validation import positive_float
+from tuican.validation import identity, positive_float
 
 from core.helpers import format_amount
 from core.models.account import Account
 from core.models.category import Category
 from core.models.transaction import Transaction
-from core.service.account_service import calculate_account_balance, get_user_accounts
-from core.service.category_service import get_user_expense_categories, get_user_income_categories
-from core.service.transaction_service import create_transaction, delete_transaction, get_transaction_by_id, \
+from core.service import get_user_accounts_with_balance
+from core.service.category_service import create_default_categories, get_user_categories
+from core.service.transaction_service import delete_transaction_by_id, get_transaction_by_id, save_transaction, \
     update_transaction
 
 
@@ -48,6 +48,7 @@ class TransactionCreate(Screen):
         self.back = Button(text="⬅️ back", on_change=self.back_handler)
 
         self.amount = Input[float](positive_float, text="📊Сумма :")
+        self.description = Input[str](identity, text="✍️Описание :")
 
         self.income_categories: list[Category] | None = None
         self.expense_categories: list[Category] | None = None
@@ -59,7 +60,7 @@ class TransactionCreate(Screen):
 
         self.group = group
 
-        super().__init__([self.income, self.expense, self.amount, self.save, self.back], message="transaction")
+        super().__init__([self.income, self.expense, self.amount, self.description, self.save, self.back], message="transaction")
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
@@ -73,6 +74,7 @@ class TransactionCreate(Screen):
             [self.income.render(update, context), self.expense.render(update, context)],
             *render_by_n(update, context, checkboxes),
             [self.amount.render(update, context)],
+            [self.description.render(update, context)],
         ]
         if self.check_form_filled():
             layout += [[self.save.render(update, context)]]
@@ -80,18 +82,20 @@ class TransactionCreate(Screen):
         return layout
 
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        category = None
+        category_id = None
         if self.income.selected:
-            category = self.income_group.get_selected().text
+            category_id = self.income_group.get_selected().component_id
         if self.expense.selected:
-            category = self.expense_group.get_selected().text
-        await create_transaction(
+            category_id = self.expense_group.get_selected().component_id
+        transaction = Transaction(
             user_id=get_user_id(update),
-            category=category,
+            category=Category(id=int(category_id)),
             transaction_type=self.type_group.get_selected().component_id,
-            account_id=int(self.account_group.get_selected().component_id),
-            amount=self.amount.value
+            account=Account(id=int(self.account_group.get_selected().component_id)),
+            amount=self.amount.value,
+            description=self.description.value
         )
+        await save_transaction(transaction)
         await self.group.go_back(update, context)
 
     async def back_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
@@ -107,23 +111,29 @@ class TransactionCreate(Screen):
 
     async def init_if_necessary(self, user_id: int):
         if self.income_categories is None or self.expense_categories is None or self.accounts is None:
-            self.income_categories = await get_user_income_categories(user_id)
-            self.expense_categories = await get_user_expense_categories(user_id)
-            self.accounts = await get_user_accounts(user_id)
+            income_categories, expense_categories = await get_user_categories(user_id)
+            if not income_categories and not expense_categories:
+                await create_default_categories(user_id)
+                income_categories, expense_categories = await get_user_categories(user_id)
+            self.income_categories = income_categories
+            self.expense_categories = expense_categories
             for category in self.income_categories:
-                cb = CheckBox(text=category.name, group=self.income_group)
+                cb = CheckBox(text=category.name, group=self.income_group, component_id=str(category.id))
                 self.income_checkboxes.append(cb)
                 self.add_component(cb)
             for category in self.expense_categories:
-                cb = CheckBox(text=category.name, group=self.expense_group)
+                cb = CheckBox(text=category.name, group=self.expense_group, component_id=str(category.id))
                 self.expense_checkboxes.append(cb)
                 self.add_component(cb)
-            for account in self.accounts:
-                amount = await calculate_account_balance(account.id, user_id)
-                cb = CheckBox(text=get_account_label(account, amount), group=self.account_group,
+            accounts_with_balances = await get_user_accounts_with_balance(user_id)
+            if len(accounts_with_balances) > 0:
+                self.accounts = []
+            for account, balance in accounts_with_balances:
+                cb = CheckBox(text=get_account_label(account, balance), group=self.account_group,
                               component_id=str(account.id))
                 self.account_checkboxes.append(cb)
                 self.add_component(cb)
+                self.accounts.append(account)
 
 
 class TransactionEdit(TransactionCreate):
@@ -141,19 +151,21 @@ class TransactionEdit(TransactionCreate):
         layout += [[self.delete.render(update, context)]]
         return layout
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        category = None
+        category_id = None
         if self.income.selected:
-            category = self.income_group.get_selected().text
+            category_id = self.income_group.get_selected().component_id
         if self.expense.selected:
-            category = self.expense_group.get_selected().text
-        await update_transaction(
-            transaction_id=self.transaction_id,
+            category_id = self.expense_group.get_selected().component_id
+        transaction = Transaction(
+            id=self.transaction_id,
             user_id=get_user_id(update),
-            category=category,
+            category=Category(id=int(category_id)),
             transaction_type=self.type_group.get_selected().component_id,
-            account_id=int(self.account_group.get_selected().component_id),
-            amount=self.amount.value
+            account=Account(id=int(self.account_group.get_selected().component_id)),
+            amount=self.amount.value,
+            description=self.description.value
         )
+        await update_transaction(transaction)
         await self.group.go_back(update, context)
 
     async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
@@ -167,17 +179,18 @@ class TransactionEdit(TransactionCreate):
             for account in self.account_checkboxes:
                 if account.component_id == str(self.transaction.account_id):
                     await account.check(update, context, update.callback_query.data)
-            if self.transaction.type == 'income':
+            if self.transaction.category.type == 'income':
                 await self.income.check(update, context, update.callback_query.data)
                 for category in self.income_checkboxes:
-                    if category.text == self.transaction.category:
+                    if category.component_id == str(self.transaction.category.id):
                         await category.check(update, context, update.callback_query.data)
             else:
                 await self.expense.check(update, context, update.callback_query.data)
                 for category in self.expense_checkboxes:
-                    if category.text == self.transaction.category:
+                    if category.component_id == str(self.transaction.category.id):
                         await category.check(update, context, update.callback_query.data)
             self.amount.value = self.transaction.amount
+            self.description.value = self.transaction.description
 
 class DeleteScreen(Screen):
 
@@ -197,5 +210,5 @@ class DeleteScreen(Screen):
         await self.group.go_back(update, context)
 
     async def delete_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await delete_transaction(self.transaction_id, get_user_id(update))
+        await delete_transaction_by_id(self.transaction_id)
         await self.group.go_home(update, context)

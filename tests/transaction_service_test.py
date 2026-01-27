@@ -3,8 +3,9 @@ from datetime import UTC, date, datetime
 import pytest
 
 from core.models import Account, Category, Transaction, db
-from core.service.transaction_service import (create_transaction, delete_transaction,
-                                              get_transaction_by_id, get_transactions_for_period,
+from core.service.transaction_service import (save_transaction, delete_transaction,
+                                              delete_transaction_by_id, get_transaction_by_id,
+                                              get_transactions_for_period,
                                               save_transaction)
 
 
@@ -39,7 +40,7 @@ async def test_basic_crud(test_account, test_category):
             amount=amount,
             description=description
         )
-        await create_transaction(transaction)
+        await save_transaction(transaction)
 
         # Test read
         retrieved = await get_transaction_by_id(transaction.id)
@@ -72,6 +73,18 @@ async def test_basic_crud(test_account, test_category):
         await delete_transaction(transaction)
         deleted = await get_transaction_by_id(transaction.id)
         assert deleted is None
+        # Test delete by id
+        transaction = Transaction(
+            user_id=user_id,
+            account=test_account,
+            category=test_category,
+            amount=amount,
+            description=description
+        )
+        await save_transaction(transaction)
+        await delete_transaction_by_id(transaction.id)
+        deleted = await get_transaction_by_id(transaction.id)
+        assert deleted is None
 
 
 @pytest.mark.asyncio
@@ -97,8 +110,8 @@ async def test_get_transactions_for_period(test_account, test_category):
             amount=200.0,
             created_at=datetime(today.year, today.month, today.day, tzinfo=UTC)
         )
-        await create_transaction(t1)
-        await create_transaction(t2)
+        await save_transaction(t1)
+        await save_transaction(t2)
 
         # Test period query
         transactions = await get_transactions_for_period(user_id, yesterday, today)

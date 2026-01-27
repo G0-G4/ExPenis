@@ -1,15 +1,12 @@
 import os
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import ClassVar, Sequence
 
-from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from tuican import Application, get_user_id
-from tuican.components import Button, Hline, Screen, ScreenGroup
+from tuican import get_user_id
+from tuican.components import Button, Component, Hline, Screen, ScreenGroup
 
-from bot.components.account_screen import AccountMain
-from bot.components.component import Component
 from bot.components.transaction_screen import TransactionCreate, TransactionEdit
 from core.helpers import format_amount
 from core.models.transaction import Transaction
@@ -17,9 +14,9 @@ from core.service.transaction_service import get_transactions_for_period
 
 
 def get_transaction_label(transaction: Transaction)-> str:
-    emoji = "🟢" if transaction.type == "income" else "🔴"
+    emoji = "🟢" if transaction.category.type == "income" else "🔴"
     formatted_amount = format_amount(transaction.amount)
-    return f"{emoji} {formatted_amount:>10} ({transaction.category})"
+    return f"{emoji} {formatted_amount:>10} ({transaction.category.name})"
 
 
 class DailyScreen(Screen):
@@ -31,7 +28,7 @@ class DailyScreen(Screen):
         self.new_transaction = Button(text="➕ new", on_change=self.new_transaction_handler)
         self.transactions = None
         self.transactions_buttons = []
-        self.selected_date = date.today()
+        self.selected_date = datetime.now(UTC).date()
         self.group = group
         super().__init__([self.left, self.today, self.right, self.new_transaction], message=self.get_message())
 
@@ -57,7 +54,7 @@ class DailyScreen(Screen):
         self.message = self.get_message()
 
     def today_handler(self, *args, **kwargs):
-        self.selected_date = date.today()
+        self.selected_date = datetime.now(UTC).date()
         self.remove_transactions()
         self.message = self.get_message()
 
@@ -98,8 +95,3 @@ class MainScreen(ScreenGroup):
         self.main = DailyScreen(self)
         super().__init__(self.main)
 
-load_dotenv()
-token = os.getenv("token")
-
-app = Application(token, {'start': MainScreen, 'accounts': AccountMain})
-app.run()

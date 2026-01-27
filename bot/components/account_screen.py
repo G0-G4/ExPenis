@@ -1,4 +1,3 @@
-from cmath import acos
 from typing import ClassVar, Sequence
 
 from telegram import InlineKeyboardButton, Update
@@ -10,8 +9,8 @@ from tuican.validation import any_float, identity
 from bot.components.transaction_screen import render_by_n
 from core.helpers import format_amount
 from core.models.account import Account
-from core.service.account_service import calculate_account_balance, create_account, delete_account, get_account_by_id, \
-    get_accounts_with_calculated_balance
+from core.service import get_user_accounts_with_balance
+from core.service.account_service import create_account, get_user_account_with_balance
 
 
 class AccountsScreen(Screen):
@@ -36,7 +35,7 @@ class AccountsScreen(Screen):
         await self.group.go_to_screen(update, context, screen)
 
     async def edit_account_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
-                                       callback_data: str | None, cmp: Component):
+                                   callback_data: str | None, cmp: Component):
         self.remove_accounts()
         screen = AccountEditScreen(int(cmp.component_id), self.group)
         await self.group.go_to_screen(update, context, screen)
@@ -44,11 +43,15 @@ class AccountsScreen(Screen):
     async def init_if_necessary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if self.accounts is None:
             user_id = get_user_id(update)
-            self.accounts = await get_accounts_with_calculated_balance(user_id)
-            for account in self.accounts:
-                btn = Button(text=f"{account.name} {format_amount(account.amount)}", component_id=str(account.id), on_change=self.edit_account_handler)
+            accounts_with_balance = await get_user_accounts_with_balance(user_id)
+            if len(accounts_with_balance) > 0:
+                self.accounts = []
+            for account, balance in accounts_with_balance:
+                btn = Button(text=f"{account.name} {format_amount(balance)}", component_id=str(account.id),
+                             on_change=self.edit_account_handler)
                 self.account_buttons.append(btn)
                 self.add_component(btn)
+                self.accounts.append(account)
 
     def remove_accounts(self):
         for btn in self.account_buttons:
@@ -88,62 +91,36 @@ class AccountCreateScreen(Screen):
     def check_form_filled(self) -> bool:
         return self.name.value is not None and self.amount.value is not None
 
+
 class AccountEditScreen(AccountCreateScreen):
     def __init__(self, account_id: int, group: ScreenGroup):
         self.account_id = account_id
         self.group = group
         self.account: Account | None = None
-        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
         super().__init__(self.group)
-        self.add_components([self.delete])
+        self.add_components([])
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
         await self.init_if_necessary(update, context)
         layout = await super().get_layout(update, context)
-        layout += [[self.delete.render(update, context)]]
+        layout += [[]]
         return layout
 
     async def init_if_necessary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if self.account is None:
             user_id = get_user_id(update)
-            # TODO one query
-            self.account = await get_account_by_id(self.account_id, user_id)
-            amount = await calculate_account_balance(self.account_id, user_id)
+            self.account, balance = await get_user_account_with_balance(user_id, self.account_id)
             self.name.value = self.account.name
-            self.amount.value = amount
+            self.amount.value = balance
 
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         await self.group.go_back(update, context)
 
-    async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        screen = DeleteScreen(self.account_id, self.group)
-        await self.group.go_to_screen(update, context, screen)
-
-class DeleteScreen(Screen):
-
-    def __init__(self, transaction_id: int, group: ScreenGroup):
-        self.group = group
-        self.account_id = transaction_id
-        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
-        self.cancel = Button(text="❌ Cancel", on_change=self.cancel_handler)
-        super().__init__([self.delete, self.cancel], message="Удалить?")
-
-    async def get_layout(self, update, context) -> Sequence[Sequence[InlineKeyboardButton]]:
-        return [
-            [self.delete.render(update, context), self.cancel.render(update, context)]
-        ]
-
-    async def cancel_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await self.group.go_back(update, context)
-
-    async def delete_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await delete_account(self.account_id, get_user_id(update))
-        await self.group.go_home(update, context)
-
 
 class AccountMain(ScreenGroup):
     description: ClassVar[str] = "счета"
+
     def __init__(self):
         self.main = AccountsScreen(self)
         super().__init__(self.main)

@@ -18,6 +18,7 @@ async def get_account_by_id(user_id: int, id: int) -> Account | None:
 
 
 def _accounts_with_balance_query(filterr):
+    # TODO negate for expenses
     return Account.select(
         Account,
         (fn.COALESCE(fn.SUM(Transaction.amount), 0.0) + Account.adjustment_amount).alias('balance')
