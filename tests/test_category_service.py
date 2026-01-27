@@ -1,18 +1,9 @@
 import pytest
 
-from core.models import Account, Category, Transaction, db
+from core.models import db
 from core.service.category_service import (CategoryType, DEFAULT_EXPENSE, DEFAULT_INCOME, create_category,
                                            create_default_categories, delete_category, get_category_by_id,
                                            get_user_categories, update_category)
-
-
-@pytest.fixture(autouse=True)
-async def run_before_each_test():
-    async with db:
-        await db.run(Transaction.truncate_table)
-        await db.run(Account.truncate_table)
-        await db.run(Category.truncate_table)
-    yield
 
 
 @pytest.mark.asyncio

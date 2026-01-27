@@ -1,18 +1,12 @@
+from datetime import UTC, date, datetime
+
 import pytest
-from datetime import date, datetime, UTC
 
-from core.models import Transaction, Account, Category, db
+from core.models import Account, Category, Transaction, db
 from core.service.transaction_service import (create_transaction, delete_transaction,
-                                             get_transaction_by_id, get_transactions_for_period,
-                                             save_transaction)
+                                              get_transaction_by_id, get_transactions_for_period,
+                                              save_transaction)
 
-@pytest.fixture(autouse=True)
-async def run_before_each_test():
-    async with db:
-        await db.run(Transaction.truncate_table)
-        await db.run(Account.truncate_table)
-        await db.run(Category.truncate_table)
-    yield
 
 @pytest.fixture
 async def test_account():
@@ -21,12 +15,14 @@ async def test_account():
         await db.run(account.save)
         return account
 
+
 @pytest.fixture
 async def test_category():
     async with db:
         category = Category(user_id=1, name="Test Category", type="income")
         await db.run(category.save)
         return category
+
 
 @pytest.mark.asyncio
 async def test_basic_crud(test_account, test_category):
@@ -72,6 +68,7 @@ async def test_basic_crud(test_account, test_category):
         await delete_transaction(transaction)
         deleted = await get_transaction_by_id(transaction.id)
         assert deleted is None
+
 
 @pytest.mark.asyncio
 async def test_get_transactions_for_period(test_account, test_category):
