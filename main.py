@@ -6,6 +6,7 @@ from mypy.fixup import missing_alias
 from tuican import Application
 
 from bot.components.account_screen import AccountMain
+from bot.components.category_screen import CategoriesMain
 from bot.components.daily_screen import MainScreen
 from core.models import db
 
@@ -23,7 +24,11 @@ async def post_shutdown(application):
 
 
 def main():
-    app = Application(token, {'start': MainScreen, 'accounts': AccountMain}).post_init(post_init).post_shutdown(post_shutdown)
+    app = Application(token, {
+        'start': MainScreen,
+        'accounts': AccountMain,
+        'categories': CategoriesMain
+    }).post_init(post_init).post_shutdown(post_shutdown)
     app.run()
 
 

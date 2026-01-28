@@ -42,8 +42,8 @@ class TransactionCreate(Screen):
         self.type_group = ExclusiveCheckBoxGroup(sticky=True)
         self.account_group = ExclusiveCheckBoxGroup(sticky=True)
 
-        self.income = CheckBox(text="🟢 Income (+)", component_id="income", selected=True, group=self.type_group)
-        self.expense = CheckBox(text="🔴 Expense (-)", component_id="expense", group=self.type_group)
+        self.income = CheckBox(text="🟢 Income (+)", component_id="income", group=self.type_group)
+        self.expense = CheckBox(text="🔴 Expense (-)", component_id="expense", selected=True, group=self.type_group)
         self.save = Button(text="✅ Save", on_change=self.save_handler)
         self.back = Button(text="⬅️ back", on_change=self.back_handler)
 
@@ -65,8 +65,6 @@ class TransactionCreate(Screen):
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
         await self.init_if_necessary(get_user_id(update))
-        if self.type_group.get_selected() is None:
-            await self.expense.check(update, context, update.callback_query.data)
         income_cb = self.type_group.get_selected() is not None and self.type_group.get_selected().component_id == "income"
         checkboxes = self.income_checkboxes if income_cb else self.expense_checkboxes
         layout = [

@@ -53,6 +53,10 @@ async def update_category(category: Category):
 async def delete_category(category: Category):
     await db.run(category.delete_instance)
 
+async def delete_category_by_id(category_id: int):
+    """Delete a category"""
+    await db.run(lambda: Category.delete_by_id(category_id))
+
 
 async def create_default_categories(user_id: int):
     now = datetime.now(UTC)
