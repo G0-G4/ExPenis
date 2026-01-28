@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import ClassVar, Sequence
 
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
@@ -10,6 +10,7 @@ from core.models.category import Category
 from core.service.category_service import (
     create_category,
     delete_category,
+    get_category_by_id,
     get_user_categories,
     update_category,
 )
