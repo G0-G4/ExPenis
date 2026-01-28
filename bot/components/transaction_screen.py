@@ -110,7 +110,7 @@ class TransactionCreate(Screen):
                 )
 
     async def init_if_necessary(self, user_id: int):
-        if self.income_categories is None or self.expense_categories is None or self.accounts is None:
+        if self.income_categories is None or self.expense_categories is None:
             income_categories, expense_categories = await get_user_categories(user_id)
             if not income_categories and not expense_categories:
                 await create_default_categories(user_id)
@@ -125,6 +125,7 @@ class TransactionCreate(Screen):
                 cb = CheckBox(text=category.name, group=self.expense_group, component_id=str(category.id))
                 self.expense_checkboxes.append(cb)
                 self.add_component(cb)
+        if self.accounts is None :
             accounts_with_balances = await get_user_accounts_with_balance(user_id)
             if len(accounts_with_balances) > 0:
                 self.accounts = []

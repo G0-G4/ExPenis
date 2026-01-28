@@ -10,7 +10,7 @@ from bot.components.transaction_screen import render_by_n
 from core.helpers import format_amount
 from core.models.account import Account
 from core.service import get_user_accounts_with_balance
-from core.service.account_service import create_account, get_user_account_with_balance
+from core.service.account_service import create_account, get_user_account_with_balance, update_account
 
 
 class AccountsScreen(Screen):
@@ -115,6 +115,8 @@ class AccountEditScreen(AccountCreateScreen):
             self.amount.value = balance
 
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        self.account.name = self.name.value
+        await update_account(get_user_id(update), self.account, self.amount.value)
         await self.group.go_back(update, context)
 
 

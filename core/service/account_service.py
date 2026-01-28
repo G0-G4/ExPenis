@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
-from peewee import JOIN, fn
+from peewee import JOIN, fn, Case
 
-from core.models import Account, Transaction, db
+from core.models import Account, Category, Transaction, db
 
 
 async def get_user_accounts(user_id: int) -> list[Account]:
@@ -18,11 +18,17 @@ async def get_account_by_id(user_id: int, id: int) -> Account | None:
 
 
 def _accounts_with_balance_query(filterr):
-    # TODO negate for expenses
     return Account.select(
         Account,
-        (fn.COALESCE(fn.SUM(Transaction.amount), 0.0) + Account.adjustment_amount).alias('balance')
-    ).join(Transaction, join_type=JOIN.LEFT_OUTER).where(filterr).group_by(Account.name).order_by(Account.name)
+        (fn.COALESCE(fn.SUM(
+            Transaction.amount *
+            fn.IIF(Category.type == 'income', 1, -1)
+        ), 0.0) + Account.adjustment_amount).alias('balance')
+    ).join(
+        Transaction, join_type=JOIN.LEFT_OUTER
+    ).join(
+        Category, join_type=JOIN.LEFT_OUTER
+    ).where(filterr).group_by(Account.name).order_by(Account.name)
 
 
 async def get_user_accounts_with_balance(user_id: int) -> list[tuple[Account, float]]:
@@ -45,4 +51,13 @@ async def set_balance(user_id: int, id: int, new_balance: float):
     async with db.atomic():
         account, balance = await get_user_account_with_balance(user_id, id)
         account.adjustment_amount = new_balance - balance + account.adjustment_amount
+        await db.run(account.save)
+
+async def update_account(user_id: int, account: Account, new_balance: float | None = None):
+    now = datetime.now(UTC)
+    async with db.atomic():
+        if new_balance is not None:
+            _, balance = await get_user_account_with_balance(user_id, account.id)
+            account.adjustment_amount = new_balance - balance + account.adjustment_amount
+        account.updated_at = now
         await db.run(account.save)
