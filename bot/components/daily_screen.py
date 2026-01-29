@@ -16,7 +16,40 @@ from core.service.transaction_service import get_transactions_for_period
 def get_transaction_label(transaction: Transaction)-> str:
     emoji = "🟢" if transaction.category.type == "income" else "🔴"
     formatted_amount = format_amount(transaction.amount)
-    return f"{emoji} {formatted_amount:>10} ({transaction.category.name})"
+    return f"{emoji} {formatted_amount} ({transaction.category.name})"
+
+def get_paddings(transactions: list[Transaction]) -> tuple[int, int]:
+    if len(transactions) == 0:
+        return 0, 0
+    amount_padding = max([len(format_amount(transaction.amount)) for transaction in transactions]) + 2
+    category_padding = max([len(transaction.category.name) for transaction in transactions]) + 2
+    return amount_padding, category_padding
+
+def get_message(transactions: list[Transaction], dt: date) -> str:
+    income, expense, total = calculate_stats(transactions)
+    max_length = max(len(format_amount(income)), len(format_amount(expense)), len(format_amount(total)))
+    padding_width = max_length + 2
+    separator = (10 + padding_width) * "─"
+    return f"""<pre>
+{dt}
+🟢 Доходы  {format_amount(income):>{padding_width}}
+🔴 Расходы {format_amount(expense):>{padding_width}}
+{separator}
+📊 Итого   {format_amount(total):>{padding_width}}
+</pre>
+"""
+
+def calculate_stats(transactions: list[Transaction]) -> tuple[float, float, float]:
+    income = 0.0
+    expense = 0.0
+    total = 0.0
+    for transaction in transactions:
+        if transaction.category.type == 'income':
+            income += transaction.amount
+        if transaction.category.type == 'expense':
+            expense += transaction.amount
+    total = income - expense
+    return income, expense, total
 
 
 class DailyScreen(Screen):
@@ -30,7 +63,7 @@ class DailyScreen(Screen):
         self.transactions_buttons = []
         self.selected_date = datetime.now(UTC).date()
         self.group = group
-        super().__init__([self.left, self.today, self.right, self.new_transaction], message=self.get_message())
+        super().__init__([self.left, self.today, self.right, self.new_transaction])
 
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[Sequence[InlineKeyboardButton]]:
@@ -46,17 +79,14 @@ class DailyScreen(Screen):
     def left_handler(self, *args, **kwargs):
         self.selected_date -= timedelta(days=1)
         self.remove_transactions()
-        self.message = self.get_message()
 
     def right_handler(self, *args, **kwargs):
         self.selected_date += timedelta(days=1)
         self.remove_transactions()
-        self.message = self.get_message()
 
     def today_handler(self, *args, **kwargs):
         self.selected_date = datetime.now(UTC).date()
         self.remove_transactions()
-        self.message = self.get_message()
 
     async def new_transaction_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                 callback_data: str | None, cmp: Component):
@@ -70,13 +100,10 @@ class DailyScreen(Screen):
         self.remove_transactions()
         await self.group.go_to_screen(update, context, screen)
 
-
-    def get_message(self) -> str:
-        return f"Transaction: {self.selected_date}"
-
     async def add_transactions(self, user_id: int):
         if self.transactions is None:
             self.transactions = await get_transactions_for_period(user_id, self.selected_date, self.selected_date)
+            self.message = get_message(self.transactions, self.selected_date)
             for transaction in self.transactions:
                 label = get_transaction_label(transaction)
                 b = Button(text=label, on_change=self.edit_transaction_handler, component_id=str(transaction.id))
