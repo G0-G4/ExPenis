@@ -111,38 +111,34 @@ document.addEventListener('alpine:init', () => {
             const ctx = document.getElementById(chartId);
             if (!ctx) return;
 
-            const chart = this[chartId];
-            const title = `${titlePrefix}: $${chartData.sum.toFixed(2)}`;
+            // Destroy existing chart if it exists
+            if (this[chartId]) {
+                this[chartId].destroy();
+            }
 
-            if (chart) {
-                chart.data.labels = chartData.labels;
-                chart.data.datasets[0].data = chartData.data;
-                chart.options.plugins.title.text = title;
-                chart.update();
-            } else {
-                this[chartId] = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: chartData.labels,
-                        datasets: [{
-                            data: chartData.data,
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: title,
-                                font: {
-                                    size: 16
-                                }
+            // Create new chart instance
+            this[chartId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        data: chartData.data,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${titlePrefix}: $${chartData.sum.toFixed(2)}`,
+                            font: {
+                                size: 16
                             }
                         }
                     }
-                });
-            }
+                }
+            });
         }
     }));
 });
