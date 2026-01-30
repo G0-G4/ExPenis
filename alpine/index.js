@@ -2,18 +2,11 @@ function createChart(elementId, title, labels, data) {
     const ctx = document.getElementById(elementId);
     if (ctx) {
         new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
                     data: data,
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(54, 162, 235, 0.7)',
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(255, 206, 86, 0.7)',
-                        'rgba(153, 102, 255, 0.7)'
-                    ],
                     borderWidth: 1
                 }]
             },
@@ -34,8 +27,7 @@ function createChart(elementId, title, labels, data) {
 }
 
 document.addEventListener('alpine:init', () => {
-    // Initialize stores first
-    Alpine.store('notifications', {
+    Alpine.store('store', {
         transactions: [
             {
                 account: 'main',
@@ -57,15 +49,15 @@ document.addEventListener('alpine:init', () => {
             },
             {
                 account: 'main',
-                category: 'family',
+                category: 'food',
                 type: 'expense',
                 amount: 50000.00
             },
             {
-                account: 'food',
-                category: 'family',
+                account: 'main',
+                category: 'transport',
                 type: 'expense',
-                amount: 500.00
+                amount: 1000.00
             }
         ],
         incomeCategories: ['salary', 'present'],
@@ -83,7 +75,7 @@ document.addEventListener('alpine:init', () => {
             this.updateCharts();
         },
         get incomeData() {
-            const income = Alpine.store('notifications').transactions.filter(t => t.type === 'income');
+            const income = Alpine.store('store').transactions.filter(t => t.type === 'income');
             const sum = income.reduce((acc, t) => acc + t.amount, 0);
             const byCategory = {};
             
@@ -98,7 +90,7 @@ document.addEventListener('alpine:init', () => {
             };
         },
         get expenseData() {
-            const expense = Alpine.store('notifications').transactions.filter(t => t.type === 'expense');
+            const expense = Alpine.store('store').transactions.filter(t => t.type === 'expense');
             const sum = expense.reduce((acc, t) => acc + t.amount, 0);
             const byCategory = {};
             
