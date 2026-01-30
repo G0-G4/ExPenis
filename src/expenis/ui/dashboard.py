@@ -1,53 +1,115 @@
+import logging
+import sqlite3
+from datetime import UTC, date, datetime
+
 import pandas as pd
 import panel as pn
-from panel.widgets import DatePicker
 import plotly.express as px
+from panel.widgets import DatePicker
 
 pn.config.template = 'material'
+pn.extension("tabulator", "plotly")
 
-x = pn.widgets.IntSlider(name='x', start=0, end=100)
-background = pn.widgets.ColorPicker(name='Background', value='lightgray')
+DB_PATH = '/Users/g.grishenkov/projects/expenis/expenis.db'
 
-start_date = DatePicker()
-end_date = DatePicker()
+def get_transactions(datetime_from: datetime, datetime_to: datetime):
+    """Fetch transactions from database between specified dates"""
+    try:
+        cnx = sqlite3.connect(DB_PATH)
+        # Convert to string format for SQLite
+        from_str = datetime_from.strftime('%Y-%m-%d %H:%M:%S')
+        to_str = datetime_to.strftime('%Y-%m-%d %H:%M:%S')
 
-df = pd.DataFrame({
-    'int': [1, 2, 3],
-    'float': [3.14, 6.28, 9.42],
-    'str': ['A', 'B', 'C'],
-    'bool': [True, False, True],
-}, index=[1, 2, 3])
+        query = """
+                SELECT transactions.created_at as created_at,
+                       transactions.user_id    as user_id,
+                       accounts.name           as account,
+                       categories.name         as category,
+                       amount,
+                       description
+                FROM transactions
+                JOIN accounts on transactions.account_id = accounts.id
+                JOIN categories on transactions.category_id = categories.id
+                WHERE transactions.created_at BETWEEN ? AND ?
+                ORDER BY transactions.created_at DESC \
+                """
+        df = pd.read_sql_query(query, cnx, params=[from_str, to_str])
 
-categories = pn.widgets.MultiChoice(name='MultiSelect', value=['Apple', 'Pear'],
-                                      options=['Apple', 'Banana', 'Pear', 'Strawberry'])
+        df['created_at'] = pd.to_datetime(df['created_at'])
 
-df_widget = pn.widgets.DataFrame(df, name='DataFrame')
+        return df
+    except Exception as e:
+        logging.exception("Error fetching data: %s", str(e))
+        return pd.DataFrame()
+    finally:
+        cnx.close()
 
-pn.extension("plotly")
-
-data = pd.DataFrame([
-    ('Monday', 7), ('Tuesday', 4), ('Wednesday', 9), ('Thursday', 4),
-    ('Friday', 4), ('Saturday', 4), ('Sunday', 4)], columns=['Day', 'Orders']
+# Create date pickers with initial values
+start_date = DatePicker(
+    name='Start Date',
+    value=date.today().replace(day=1),  # First day of current month
+    width=200
 )
 
-fig_responsive = px.line(data, x="Day", y="Orders")
-fig_responsive.update_traces(mode="lines+markers", marker=dict(size=10), line=dict(width=4))
-fig_responsive.layout.autosize = True
+end_date = DatePicker(
+    name='End Date',
+    value=date.today(),  # Today
+    width=200
+)
 
-responsive = pn.pane.Plotly(fig_responsive, height=300)
+def load_transactions(start, end):
+    if isinstance(start, date):
+        start = datetime.combine(start, datetime.min.time()).replace(tzinfo=UTC)
+    if isinstance(end, date):
+        end = datetime.combine(end, datetime.max.time()).replace(tzinfo=UTC)
 
+    return get_transactions(start, end)
 
+transactions_rx = pn.rx(load_transactions)(
+    start_date,
+    end_date
+)
 
-def square(x):
-    return f'{x} squared is {x ** 2}'
+tabulator = pn.widgets.Tabulator(
+    transactions_rx,
+    pagination='local',
+    page_size=20,
+    sizing_mode='stretch_width',
+    height=400,
+    show_index=False
+)
 
+def create_chart(df):
+    if df.empty or 'amount' not in df.columns or 'created_at' not in df.columns:
+        return None
 
-def styles(background):
-    return {'background-color': background, 'padding': '0 10px'}
+    # Aggregate by date
+    df_copy = df.copy()
+    df_copy['date'] = df_copy['created_at'].dt.date
+    daily_totals = df_copy.groupby('date')['amount'].sum().reset_index()
+
+    fig = px.bar(
+        daily_totals,
+        x='date',
+        y='amount',
+        title='Daily Transaction Amounts',
+        labels={'amount': 'Amount', 'date': 'Date'}
+    )
+    fig.update_layout(height=300, margin=dict(t=30, b=20))
+    return fig
+
+chart_rx = pn.rx(create_chart)(transactions_rx)
+chart_pane = pn.pane.Plotly(chart_rx, height=300)
 
 
 col = pn.Column(
-    pn.Row(start_date, end_date, categories),
-    df_widget,
-    responsive
-).servable()
+    pn.Row(start_date, end_date),
+    # pn.pane.Markdown(summary_rx, sizing_mode='stretch_width'),
+    tabulator,
+    chart_pane,
+    sizing_mode='stretch_width'
+)
+
+
+
+col.servable(title="Transaction Dashboard")
