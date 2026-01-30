@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 import pandas as pd
 import panel as pn
 import plotly.express as px
+import param
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from panel.widgets import DatePicker
@@ -47,16 +48,15 @@ def get_transactions(datetime_from: datetime, datetime_to: datetime):
     finally:
         cnx.close()
 
-# Create date pickers with initial values
 start_date = DatePicker(
     name='Start Date',
-    value=date.today().replace(day=1),  # First day of current month
+    value=date.today().replace(day=1),
     width=200
 )
 
 end_date = DatePicker(
     name='End Date',
-    value=date.today(),  # Today
+    value=date.today(),
     width=200
 )
 
@@ -69,8 +69,8 @@ def load_transactions(start, end):
     return get_transactions(start, end)
 
 transactions_rx = pn.rx(load_transactions)(
-    start_date.rx.value,
-    end_date.rx.value
+    start_date,
+    end_date
 )
 
 tabulator = pn.widgets.Tabulator(
@@ -79,7 +79,8 @@ tabulator = pn.widgets.Tabulator(
     page_size=20,
     sizing_mode='stretch_width',
     height=400,
-    show_index=False
+    show_index=False,
+    header_filters=True,
 )
 
 def create_chart(df):
@@ -140,27 +141,20 @@ def create_chart(df):
         texttemplate='%{label}<br>%{percent:.1%}<br>%{value:,.2f}'
     )
     
-    # Create a row layout with totals and charts
-    return pn.Column(
-        pn.Row(
-            income_card,
-            expense_card,
-            sizing_mode='stretch_width'
-        ),
-        pn.Row(
+    return pn.Row(
             pn.pane.Plotly(income_fig, height=400),
             pn.pane.Plotly(expense_fig, height=400),
             sizing_mode='stretch_width'
-        ),
-        sizing_mode='stretch_width'
-    )
+        )
 
-chart_pane = pn.Column(pn.rx(create_chart)(transactions_rx), height=400)
+# this duplicated date time pickers https://panel.holoviz.org/tutorials/basic/pn_rx.html
+# I didn't understand how to avoid it, so used bind
+# chart_pane = pn.Column(pn.rx(create_chart)(transactions_rx), height=400)
+chart_pane = pn.bind(create_chart, df=transactions_rx)
 
 
 col = pn.Column(
     pn.Row(start_date, end_date),
-    # pn.pane.Markdown(summary_rx, sizing_mode='stretch_width'),
     tabulator,
     chart_pane,
     sizing_mode='stretch_width'
