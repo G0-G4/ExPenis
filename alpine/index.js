@@ -52,12 +52,21 @@ document.addEventListener('alpine:init', () => {
         },
 
         addTransaction() {
-            this.transactions.push({ 
-                account: 'main', 
-                category: 'transport', 
-                type: 'expense', 
-                amount: 1000.00, 
-                id: this.transactions.length + 1 
+            // Create a more varied sample transaction
+            const types = ['income', 'expense'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const categories = type === 'income' ? this.incomeCategories : this.expenseCategories;
+            const category = categories[Math.floor(Math.random() * categories.length)];
+            const amount = type === 'income' 
+                ? Math.floor(Math.random() * 5000) + 1000 
+                : -(Math.floor(Math.random() * 500) + 50);
+            
+            this.transactions.push({
+                id: Date.now(), // Use timestamp for unique ID
+                account: 'main',
+                category: category,
+                type: type,
+                amount: amount
             });
             this.updateCharts();
         },

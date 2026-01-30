@@ -23,6 +23,12 @@
          x-model="endDate"
          min="2025-01-01" max="2027-12-31">
 
+  <div style="margin: 20px 0;">
+    <button x-on:click="addTransaction()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+      Add Sample Transaction
+    </button>
+  </div>
+
   <div style="display: flex; gap: 20px;">
     <div style="width: 45%;">
       <canvas id="incomeChart"></canvas>
