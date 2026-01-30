@@ -30,13 +30,12 @@ def get_message(transactions: list[Transaction], dt: date) -> str:
     max_length = max(len(format_amount(income)), len(format_amount(expense)), len(format_amount(total)))
     padding_width = max_length + 2
     separator = (10 + padding_width) * "─"
-    return f"""<pre>
-{dt}
-🟢 Доходы  {format_amount(income):>{padding_width}}
-🔴 Расходы {format_amount(expense):>{padding_width}}
-{separator}
-📊 Итого   {format_amount(total):>{padding_width}}
-</pre>
+    return f"""
+<code>{dt}</code>
+<code>🟢 Доходы  {format_amount(income):>{padding_width}}</code>
+<code>🔴 Расходы {format_amount(expense):>{padding_width}}</code>
+<code>{separator}</code>
+<code>📊 Итого   {format_amount(total):>{padding_width}}</code>
 """
 
 def calculate_stats(transactions: list[Transaction]) -> tuple[float, float, float]:
