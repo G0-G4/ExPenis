@@ -58,19 +58,23 @@ class TransactionDashboard:
         return transactions, accounts
 
     def process_data(self, transactions, accounts):
-        # Convert to DataFrame for easier manipulation
-        df = pd.DataFrame([{
-            'date': t.created_at,
-            'amount': t.amount,
-            'type': t.category.type,
-            'category': t.category.name,
-            'account': t.account.name
-        } for t in transactions])
+        # Initialize empty DataFrame with expected columns
+        df = pd.DataFrame(columns=['date', 'amount', 'type', 'category', 'account'])
+        
+        if transactions:
+            # Convert to DataFrame for easier manipulation
+            df = pd.DataFrame([{
+                'date': t.created_at,
+                'amount': t.amount,
+                'type': t.category.type,
+                'category': t.category.name,
+                'account': t.account.name
+            } for t in transactions])
 
         # Calculate stats
-        total_income = df[df['type'] == 'income']['amount'].sum()
-        total_expense = df[df['type'] == 'expense']['amount'].sum()
-        net_balance = sum(acc[1] for acc in accounts)
+        total_income = df[df['type'] == 'income']['amount'].sum() if not df.empty else 0
+        total_expense = df[df['type'] == 'expense']['amount'].sum() if not df.empty else 0
+        net_balance = sum(acc[1] for acc in accounts) if accounts else 0
 
         return df, {
             'total_income': total_income,
