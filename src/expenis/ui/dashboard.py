@@ -69,8 +69,8 @@ def load_transactions(start, end):
     return get_transactions(start, end)
 
 transactions_rx = pn.rx(load_transactions)(
-    start_date,
-    end_date
+    start_date.rx.value,
+    end_date.rx.value
 )
 
 tabulator = pn.widgets.Tabulator(
@@ -87,8 +87,8 @@ def create_chart(df):
         return None
 
     # Separate income and expense
-    income_df = df[df['amount'] > 0].copy()
-    expense_df = df[df['amount'] < 0].copy()
+    income_df = df[df['type'] == 'income'].copy()
+    expense_df = df[df['type'] == 'expense'].copy()
     
     # Group by category and sum amounts
     income_by_category = income_df.groupby('category')['amount'].sum().reset_index()
