@@ -46,8 +46,7 @@ document.addEventListener('alpine:init', () => {
         expenseChart: null,
 
         init() {
-            this.$watch('startDate', () => this.updateCharts());
-            this.$watch('endDate', () => this.updateCharts());
+            this.$watch('transactions', () => this.updateCharts());
             this.updateCharts();
         },
 
