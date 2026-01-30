@@ -25,6 +25,7 @@ def get_transactions(datetime_from: datetime, datetime_to: datetime):
                        transactions.user_id    as user_id,
                        accounts.name           as account,
                        categories.name         as category,
+                       categories.type         as type,
                        amount,
                        description
                 FROM transactions
