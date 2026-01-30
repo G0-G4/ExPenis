@@ -94,14 +94,14 @@ def create_chart(df):
     income_card = pn.indicators.Number(
         name='Total Income',
         value=total_income,
-        format='${value:,.2f}',
+        format='{value:,.2f}',
         colors=[(0, '#4CAF50')]  # Green color for income
     )
     
     expense_card = pn.indicators.Number(
         name='Total Expenses',
         value=total_expense,
-        format='${value:,.2f}',
+        format='{value:,.2f}',
         colors=[(0, '#F44336')]  # Red color for expenses
     )
     
@@ -113,12 +113,12 @@ def create_chart(df):
     income_by_category = income_df.groupby('category')['amount'].sum().reset_index()
     expense_by_category = expense_df.groupby('category')['amount'].sum().abs().reset_index()
     
-    # Create pie charts
+    # Create pie charts with totals in title
     income_fig = px.pie(
         income_by_category,
         values='amount',
         names='category',
-        title='Income by Category',
+        title=f'Income by Category (Total: {total_income:,.2f})',
         hole=0.3
     )
     
@@ -126,7 +126,7 @@ def create_chart(df):
         expense_by_category,
         values='amount',
         names='category',
-        title='Expenses by Category',
+        title=f'Expenses by Category (Total: {total_expense:,.2f})',
         hole=0.3
     )
     
