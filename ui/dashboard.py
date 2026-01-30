@@ -37,8 +37,16 @@ class TransactionDashboard:
         self.date_range.param.watch(self.update_data, "value")
         self.refresh.on_click(self.update_data)
 
-        # Set up async update
-        pn.state.onload(self.update_data)
+        # Set up callbacks with async support
+        self.date_range.param.watch(self._wrap_async(self.update_data), "value")
+        self.refresh.on_click(self._wrap_async(self.update_data))
+        pn.state.onload(self._wrap_async(self.update_data))
+
+    def _wrap_async(self, coro_func):
+        """Helper to wrap async callbacks for Panel"""
+        async def wrapper(*args, **kwargs):
+            await coro_func(*args, **kwargs)
+        return wrapper
 
     async def load_data(self):
         transactions = await transaction_service.get_transactions_for_period(
@@ -70,21 +78,18 @@ class TransactionDashboard:
             'net_balance': net_balance
         }
 
-    def update_data(self, event=None):
-        async def _update():
-            transactions, accounts = await self.load_data()
-            df, stats = self.process_data(transactions, accounts)
+    async def update_data(self, event=None):
+        transactions, accounts = await self.load_data()
+        df, stats = self.process_data(transactions, accounts)
 
-            # Update stats
-            self.stats_view.value = stats['net_balance']
-            self.stats_view.name = f"Net Balance (Income: {format_amount(stats['total_income'])}, Expense: {format_amount(stats['total_expense'])})"
+        # Update stats
+        self.stats_view.value = stats['net_balance']
+        self.stats_view.name = f"Net Balance (Income: {format_amount(stats['total_income'])}, Expense: {format_amount(stats['total_expense'])})"
 
-            # Update visualizations
-            self.income_chart.object = self.create_chart(df[df['type'] == 'income'], "Income by Category")
-            self.expense_chart.object = self.create_chart(df[df['type'] == 'expense'], "Expense by Category")
-            self.time_series.object = self.create_time_series(df)
-        
-        pn.io.with_executor(None, _update)
+        # Update visualizations
+        self.income_chart.object = self.create_chart(df[df['type'] == 'income'], "Income by Category")
+        self.expense_chart.object = self.create_chart(df[df['type'] == 'expense'], "Expense by Category")
+        self.time_series.object = self.create_time_series(df)
 
     def create_chart(self, df, title):
         if df.empty:
