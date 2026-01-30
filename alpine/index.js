@@ -1,7 +1,14 @@
+const chartInstances = {};
+
 function createChart(elementId, title, labels, data) {
     const ctx = document.getElementById(elementId);
     if (ctx) {
-        new Chart(ctx, {
+        // Destroy existing chart if it exists
+        if (chartInstances[elementId]) {
+            chartInstances[elementId].destroy();
+        }
+        
+        chartInstances[elementId] = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: labels,
@@ -105,19 +112,36 @@ document.addEventListener('alpine:init', () => {
             };
         },
         updateCharts() {
-            createChart(
-                'incomeChart', 
-                `Income: $${this.incomeData.sum.toFixed(2)}`, 
-                this.incomeData.labels, 
-                this.incomeData.data
-            );
+            const incomeChart = chartInstances['incomeChart'];
+            const expenseChart = chartInstances['expenseChart'];
             
-            createChart(
-                'expenseChart', 
-                `Expense: $${this.expenseData.sum.toFixed(2)}`, 
-                this.expenseData.labels, 
-                this.expenseData.data
-            );
+            if (incomeChart) {
+                incomeChart.data.labels = this.incomeData.labels;
+                incomeChart.data.datasets[0].data = this.incomeData.data;
+                incomeChart.options.plugins.title.text = `Income: $${this.incomeData.sum.toFixed(2)}`;
+                incomeChart.update();
+            } else {
+                createChart(
+                    'incomeChart',
+                    `Income: $${this.incomeData.sum.toFixed(2)}`,
+                    this.incomeData.labels,
+                    this.incomeData.data
+                );
+            }
+            
+            if (expenseChart) {
+                expenseChart.data.labels = this.expenseData.labels;
+                expenseChart.data.datasets[0].data = this.expenseData.data;
+                expenseChart.options.plugins.title.text = `Expense: $${this.expenseData.sum.toFixed(2)}`;
+                expenseChart.update();
+            } else {
+                createChart(
+                    'expenseChart',
+                    `Expense: $${this.expenseData.sum.toFixed(2)}`,
+                    this.expenseData.labels,
+                    this.expenseData.data
+                );
+            }
         }
     }));
 });
