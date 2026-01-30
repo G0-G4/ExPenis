@@ -3,62 +3,76 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alpine.js Crash Course</title>
-  <link rel="stylesheet" href="styles.css">
-
+  <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="index.js"></script>
 </head>
-<body>
+<body class="bg-gray-50 p-8">
 
-<div x-data="state">
-  <label for="start">Start date:</label>
-  <input type="date" id="start" name="trip-start"
-         x-model="startDate"
-         min="2025-01-01" max="2027-12-31">
+<div x-data="state" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">Transaction Dashboard</h1>
+  
+  <div class="flex flex-col sm:flex-row gap-4 mb-6">
+    <div class="w-full sm:w-1/2">
+      <label for="start" class="block text-sm font-medium text-gray-700 mb-1">Start date:</label>
+      <input type="date" id="start" name="trip-start"
+             x-model="startDate"
+             min="2025-01-01" max="2027-12-31"
+             class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    </div>
+    <div class="w-full sm:w-1/2">
+      <label for="end" class="block text-sm font-medium text-gray-700 mb-1">End date:</label>
+      <input type="date" id="end" name="trip-start"
+             x-model="endDate"
+             min="2025-01-01" max="2027-12-31"
+             class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    </div>
+  </div>
 
-  <label for="end">Start date:</label>
-  <input type="date" id="end" name="trip-start"
-         x-model="endDate"
-         min="2025-01-01" max="2027-12-31">
-
-  <div style="margin: 20px 0;">
-    <button x-on:click="addTransaction">
+  <div class="mb-6">
+    <button x-on:click="addTransaction"
+            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
       Add Sample Transaction
     </button>
   </div>
 
-  <div style="display: flex; gap: 20px;">
-    <div style="width: 300px; height: 300px;">
-      <canvas id="incomeChart" width="300" height="300"></canvas>
+  <div class="flex flex-col md:flex-row gap-6 mb-8">
+    <div class="w-full md:w-1/2 bg-gray-50 p-4 rounded-lg">
+      <h2 class="text-lg font-semibold text-gray-700 mb-3">Income Chart</h2>
+      <canvas id="incomeChart" class="w-full h-64"></canvas>
     </div>
-    <div style="width: 300px; height: 300px;">
-      <canvas id="expenseChart" width="300" height="300"></canvas>
+    <div class="w-full md:w-1/2 bg-gray-50 p-4 rounded-lg">
+      <h2 class="text-lg font-semibold text-gray-700 mb-3">Expense Chart</h2>
+      <canvas id="expenseChart" class="w-full h-64"></canvas>
     </div>
   </div>
 
-  <table>
-    <thead>
-    <tr>
-      <th>Account</th>
-      <th>Type</th>
-      <th>Category</th>
-      <th>Amount</th>
-    </tr>
-    </thead>
-    <tbody>
-    <template x-for="tr in transactions" :key="tr.id">
-      <tr>
-        <td x-text="tr.account"></td>
-        <td x-text="tr.type"></td>
-        <td x-text="tr.category"></td>
-        <td x-text="tr.amount"></td>
-      </tr>
-    </template>
-    </tbody>
-  </table>
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        <template x-for="tr in transactions" :key="tr.id">
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800" x-text="tr.account"></td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800" x-text="tr.type"></td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800" x-text="tr.category"></td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" 
+                x-text="tr.amount" 
+                :class="tr.type === 'income' ? 'text-green-600' : 'text-red-600'"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
 </div>
-
 
 </body>
 </html>
