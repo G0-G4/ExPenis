@@ -13,6 +13,11 @@ class TransactionDashboard:
         self.start_date = date.today() - timedelta(days=30)
         self.end_date = date.today()
 
+        # Initialize charts as empty placeholders
+        self.income_chart = pn.pane.Markdown("Loading income data...")
+        self.expense_chart = pn.pane.Markdown("Loading expense data...")
+        self.time_series = pn.pane.Markdown("Loading transaction history...")
+
         # Create widgets
         self.date_range = pn.widgets.DateRangeSlider(
             name="Date Range",
@@ -32,8 +37,8 @@ class TransactionDashboard:
         self.date_range.param.watch(self.update_data, "value")
         self.refresh.on_click(self.update_data)
 
-        # Load initial data
-        self.update_data()
+        # Set up async update
+        pn.state.onload(self.update_data)
 
     async def load_data(self):
         transactions = await transaction_service.get_transactions_for_period(
@@ -65,18 +70,21 @@ class TransactionDashboard:
             'net_balance': net_balance
         }
 
-    async def update_data(self, event=None):
-        transactions, accounts = await self.load_data()
-        df, stats = self.process_data(transactions, accounts)
+    def update_data(self, event=None):
+        async def _update():
+            transactions, accounts = await self.load_data()
+            df, stats = self.process_data(transactions, accounts)
 
-        # Update stats
-        self.stats_view.value = stats['net_balance']
-        self.stats_view.name = f"Net Balance (Income: {format_amount(stats['total_income'])}, Expense: {format_amount(stats['total_expense'])})"
+            # Update stats
+            self.stats_view.value = stats['net_balance']
+            self.stats_view.name = f"Net Balance (Income: {format_amount(stats['total_income'])}, Expense: {format_amount(stats['total_expense'])})"
 
-        # Create visualizations
-        self.income_chart = self.create_chart(df[df['type'] == 'income'], "Income by Category")
-        self.expense_chart = self.create_chart(df[df['type'] == 'expense'], "Expense by Category")
-        self.time_series = self.create_time_series(df)
+            # Update visualizations
+            self.income_chart.object = self.create_chart(df[df['type'] == 'income'], "Income by Category")
+            self.expense_chart.object = self.create_chart(df[df['type'] == 'expense'], "Expense by Category")
+            self.time_series.object = self.create_time_series(df)
+        
+        pn.io.with_executor(None, _update)
 
     def create_chart(self, df, title):
         if df.empty:
