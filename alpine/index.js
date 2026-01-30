@@ -19,7 +19,7 @@ document.addEventListener('alpine:init', () => {
         async fetchTransactions() {
             this.isLoading = true;
             try {
-                const response = await fetch(`/transactions?date_from=${this.startDate}&date_to=${this.endDate}`);
+                const response = await fetch(`http://localhost:8000/transactions?date_from=${this.startDate}&date_to=${this.endDate}`);
                 const data = await response.json();
                 this.transactions = data.transactions;
                 
