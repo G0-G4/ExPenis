@@ -6,13 +6,13 @@ from tuican import get_user_id
 from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
 from tuican.validation import identity, positive_float
 
-from core.helpers import format_amount
-from core.models.account import Account
-from core.models.category import Category
-from core.models.transaction import Transaction
-from core.service import get_user_accounts_with_balance
-from core.service.category_service import create_default_categories, get_user_categories
-from core.service.transaction_service import delete_transaction_by_id, get_transaction_by_id, save_transaction, \
+from ...core.helpers import format_amount
+from ...core.models.account import Account
+from ...core.models.category import Category
+from ...core.models import Transaction
+from ...core.service import get_user_accounts_with_balance
+from ...core.service.category_service import create_default_categories, get_user_categories
+from ...core.service.transaction_service import delete_transaction_by_id, get_transaction_by_id, save_transaction, \
     update_transaction
 
 

@@ -6,9 +6,9 @@ from tuican import get_user_id
 from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
 from tuican.validation import identity
 
-from bot.components.transaction_screen import render_by_n
-from core.models.category import Category
-from core.service.category_service import (
+from .transaction_screen import render_by_n
+from ...core.models.category import Category
+from ...core.service.category_service import (
     CategoryType, create_category,
     delete_category_by_id, get_user_categories,
     update_category,

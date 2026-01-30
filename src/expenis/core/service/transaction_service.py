@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-from core.models import Account, Category, Transaction, db
+from ..models import Account, Category, Transaction, db
 
 
 async def get_transactions_for_period(user_id: int, start_date: date, end_date: date) -> list[Transaction]:
