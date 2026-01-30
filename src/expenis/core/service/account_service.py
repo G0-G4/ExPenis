@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
-from peewee import JOIN, fn, Case
+from peewee import JOIN, fn
 
-from core.models import Account, Category, Transaction, db
+from ..models import Account, Category, Transaction, db
 
 
 async def get_user_accounts(user_id: int) -> list[Account]:

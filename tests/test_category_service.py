@@ -1,9 +1,9 @@
 import pytest
 
-from core.models import db
-from core.service.category_service import (CategoryType, DEFAULT_EXPENSE, DEFAULT_INCOME, create_category,
-                                           create_default_categories, delete_category, get_category_by_id,
-                                           get_user_categories, update_category)
+from src.expenis.core.models import db
+from src.expenis.core.service.category_service import (CategoryType, DEFAULT_EXPENSE, DEFAULT_INCOME, create_category,
+                                                       create_default_categories, delete_category, get_category_by_id,
+                                                       get_user_categories, update_category)
 
 
 @pytest.mark.asyncio

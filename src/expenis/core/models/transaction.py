@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 from peewee import AutoField, DateTimeField, FloatField, ForeignKeyField, IntegerField, Model, TextField
 
-from core.models.account import Account
-from core.models.category import Category
-from core.models.database import db
+from .account import Account
+from .category import Category
+from .database import db
 
 
 class Transaction(Model):

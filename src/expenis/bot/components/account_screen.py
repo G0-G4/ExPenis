@@ -6,11 +6,11 @@ from tuican import get_user_id
 from tuican.components import Button, Component, Input, Screen, ScreenGroup
 from tuican.validation import any_float, identity
 
-from bot.components.transaction_screen import render_by_n
-from core.helpers import format_amount
-from core.models.account import Account
-from core.service import get_user_accounts_with_balance
-from core.service.account_service import create_account, get_user_account_with_balance, update_account
+from ..components.transaction_screen import render_by_n
+from ...core.helpers import format_amount
+from ...core.models.account import Account
+from ...core.service import get_user_accounts_with_balance
+from ...core.service import create_account, get_user_account_with_balance, update_account
 
 
 class AccountsScreen(Screen):

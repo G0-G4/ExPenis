@@ -1,6 +1,6 @@
 import pytest
 
-from core.models import Account, Category, Transaction, db
+from src.expenis.core.models import Account, Category, Transaction, db
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,3 @@
-import os
 from datetime import UTC, date, datetime, timedelta
 from typing import ClassVar, Sequence
 
@@ -7,10 +6,10 @@ from telegram.ext import ContextTypes
 from tuican import get_user_id
 from tuican.components import Button, Component, Hline, Screen, ScreenGroup
 
-from bot.components.transaction_screen import TransactionCreate, TransactionEdit
-from core.helpers import format_amount
-from core.models.transaction import Transaction
-from core.service.transaction_service import get_transactions_for_period
+from ...bot.components.transaction_screen import TransactionCreate, TransactionEdit
+from ...core.helpers import format_amount
+from ...core.models import Transaction
+from ...core.service.transaction_service import get_transactions_for_period
 
 
 def get_transaction_label(transaction: Transaction)-> str:
@@ -120,4 +119,3 @@ class MainScreen(ScreenGroup):
     def __init__(self):
         self.main = DailyScreen(self)
         super().__init__(self.main)
-

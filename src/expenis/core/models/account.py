@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from peewee import AutoField, DateTimeField, FloatField, IntegerField, Model, TextField
 
-from core.models.database import db
+from .database import db
 
 
 class Account(Model):

@@ -1,8 +1,7 @@
 from datetime import UTC, datetime
 from typing import Literal
 
-from core.models.category import Category
-from core.models.database import db
+from ..models import Category, db
 
 CategoryType = Literal['income', 'expense']
 

@@ -2,11 +2,11 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from core.models import Account, Category, Transaction, db
-from core.service.transaction_service import (save_transaction, delete_transaction,
-                                              delete_transaction_by_id, get_transaction_by_id,
-                                              get_transactions_for_period,
-                                              save_transaction)
+from src.expenis.core.models import Account, Category, Transaction, db
+from src.expenis.core.service.transaction_service import (delete_transaction,
+                                                          delete_transaction_by_id, get_transaction_by_id,
+                                                          get_transactions_for_period,
+                                                          save_transaction)
 
 
 @pytest.fixture
