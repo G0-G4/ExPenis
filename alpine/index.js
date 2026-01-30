@@ -1,3 +1,38 @@
+function createChart(elementId, title, labels, data) {
+    const ctx = document.getElementById(elementId);
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: title,
+                        font: {
+                            size: 16
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.store('state', {
         startDate: new Date().toISOString().split('T')[0],
@@ -69,5 +104,24 @@ document.addEventListener('alpine:init', () => {
         incomeCategories: ['salary', 'present'],
         expenseCategories: ['food', 'family', 'transport'],
         accounts: ['main'],
+    });
+
+    Alpine.effect(() => {
+        const state = Alpine.store('state');
+        if (state) {
+            createChart(
+                'incomeChart', 
+                `Income: $${state.incomeData.sum.toFixed(2)}`, 
+                state.incomeData.labels, 
+                state.incomeData.data
+            );
+            
+            createChart(
+                'expenseChart', 
+                `Expense: $${state.expenseData.sum.toFixed(2)}`, 
+                state.expenseData.labels, 
+                state.expenseData.data
+            );
+        }
     });
 });
