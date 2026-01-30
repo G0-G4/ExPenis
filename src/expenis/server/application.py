@@ -3,6 +3,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import FastAPI, Query
+from starlette.middleware.cors import CORSMiddleware
 
 from src.expenis.server.dto import Transaction, TransactionsResponse
 from ..core.models import Transaction as ModelTransaction, db
@@ -19,6 +20,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/transactions")
 async def get_user_transactions(
@@ -31,6 +39,7 @@ async def get_user_transactions(
 
 def convert_transaction_to_dto(transaction: ModelTransaction) -> Transaction:
     return Transaction(
+        id=transaction.id,
         account=transaction.account.name,
         type=transaction.category.type,
         category=transaction.category.name,

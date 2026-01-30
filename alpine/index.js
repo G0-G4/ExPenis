@@ -111,9 +111,37 @@ document.addEventListener('alpine:init', () => {
                             font: {
                                 size: 16
                             }
+                        },
+                        datalabels: {
+                            formatter: (value, context) => {
+                                const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                const percentage = (value / total) * 100;
+                                // Only show label if segment is > 5% of total
+                                if (percentage < 5) return '';
+                                return `${value.toFixed(2)}\n(${Math.round(percentage)}%)`;
+                            },
+                            color: '#fff',
+                            font: {
+                                weight: 'bold',
+                                size: 12
+                            },
+                            textAlign: 'center',
+                            padding: 6
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: $${value.toFixed(2)} (${percentage}%)`;
+                                }
+                            }
                         }
                     }
-                }
+                },
+                plugins: [ChartDataLabels]
             });
         }
     }));
