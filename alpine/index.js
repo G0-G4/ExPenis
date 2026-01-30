@@ -1,11 +1,7 @@
 document.addEventListener('alpine:init', () => {
-    Alpine.data('state', () => ({
-        startDate: '',
-        endDate: '',
-        init() {
-            this.startDate = new Date().toISOString().split('T')[0];
-            this.endDate = new Date().toISOString().split('T')[0];
-        },
+    Alpine.store('state', {
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
         get incomeData() {
             const income = Alpine.store('notifications').transactions.filter(t => t.type === 'income');
             const sum = income.reduce((acc, t) => acc + t.amount, 0);
@@ -36,7 +32,7 @@ document.addEventListener('alpine:init', () => {
                 sum: sum
             };
         }
-    }));
+    });
     Alpine.store('notifications', {
         transactions: [
             {
