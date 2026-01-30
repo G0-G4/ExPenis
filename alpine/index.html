@@ -1,0 +1,59 @@
+<html lang="en" xmlns:x-on="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpine.js Crash Course</title>
+  <link rel="stylesheet" href="styles.css">
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="index.js"></script>
+</head>
+<body>
+
+<!-- <div x-data="{ count: 0, name: 'Mario' }">
+  <h1>Hi, <span x-text="name"></span></h1>
+  <p>The current value of the count is: <span x-text="count"></span></p>
+  <button x-on:click="count++">Increase count by 1</button>
+</div> -->
+
+<div x-data="state">
+  <label for="start">Start date:</label>
+  <input type="date" id="start" name="trip-start"
+         x-model="startDate"
+         min="2025-01-01" max="2027-12-31">
+
+  <label for="end">Start date:</label>
+  <input type="date" id="end" name="trip-start"
+         x-model="endDate"
+         min="2025-01-01" max="2027-12-31">
+</div>
+
+<div>
+  <canvas id="chart"></canvas>
+</div>
+
+<script>
+    const ctx = document.getElementById('chart');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+            datasets: [{
+                label: '# of Votes',
+                data: [12, 19, 3, 5, 2, 3],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
