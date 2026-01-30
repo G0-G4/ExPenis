@@ -11,7 +11,8 @@ document.addEventListener('alpine:init', () => {
         isLoading: false,
 
         init() {
-            this.$watch(['startDate', 'endDate'], () => this.fetchTransactions());
+            this.$watch('startDate', () => this.fetchTransactions());
+            this.$watch('endDate', () => this.fetchTransactions());
             this.fetchTransactions();
         },
 
