@@ -107,44 +107,7 @@ document.addEventListener('alpine:init', () => {
                 sum: sum
             };
         }
-    });
-    Alpine.store('notifications', {
-        transactions: [
-            {
-                account: 'main',
-                category: 'salary',
-                type: 'income',
-                amount: 100000.00
-            },
-            {
-                account: 'main',
-                category: 'present',
-                type: 'income',
-                amount: 100000.00
-            },
-            {
-                account: 'main',
-                category: 'family',
-                type: 'expense',
-                amount: 50000.00
-            },
-            {
-                account: 'main',
-                category: 'family',
-                type: 'expense',
-                amount: 50000.00
-            },
-            {
-                account: 'food',
-                category: 'family',
-                type: 'expense',
-                amount: 500.00
-            }
-        ],
-        incomeCategories: ['salary', 'present'],
-        expenseCategories: ['food', 'family', 'transport'],
-        accounts: ['main'],
-    });
+    }));
 
     Alpine.effect(() => {
         const state = Alpine.store('state');
