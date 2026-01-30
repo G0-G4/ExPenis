@@ -5,6 +5,8 @@ from datetime import UTC, date, datetime
 import pandas as pd
 import panel as pn
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from panel.widgets import DatePicker
 
 pn.config.template = 'material'
@@ -81,26 +83,52 @@ tabulator = pn.widgets.Tabulator(
 )
 
 def create_chart(df):
-    if df.empty or 'amount' not in df.columns or 'created_at' not in df.columns:
+    if df.empty or 'amount' not in df.columns or 'category' not in df.columns:
         return None
 
-    # Aggregate by date
-    df_copy = df.copy()
-    df_copy['date'] = df_copy['created_at'].dt.date
-    daily_totals = df_copy.groupby('date')['amount'].sum().reset_index()
-
-    fig = px.bar(
-        daily_totals,
-        x='date',
-        y='amount',
-        title='Daily Transaction Amounts',
-        labels={'amount': 'Amount', 'date': 'Date'}
+    # Separate income and expense
+    income_df = df[df['amount'] > 0].copy()
+    expense_df = df[df['amount'] < 0].copy()
+    
+    # Group by category and sum amounts
+    income_by_category = income_df.groupby('category')['amount'].sum().reset_index()
+    expense_by_category = expense_df.groupby('category')['amount'].sum().abs().reset_index()
+    
+    # Create pie charts
+    income_fig = px.pie(
+        income_by_category,
+        values='amount',
+        names='category',
+        title='Income by Category',
+        hole=0.3
     )
-    fig.update_layout(height=300, margin=dict(t=30, b=20))
-    return fig
+    
+    expense_fig = px.pie(
+        expense_by_category,
+        values='amount',
+        names='category',
+        title='Expenses by Category',
+        hole=0.3
+    )
+    
+    # Update layout for better display
+    income_fig.update_traces(
+        textinfo='percent+value',
+        texttemplate='%{label}<br>%{percent:.1%}<br>%{value:,.2f}'
+    )
+    expense_fig.update_traces(
+        textinfo='percent+value',
+        texttemplate='%{label}<br>%{percent:.1%}<br>%{value:,.2f}'
+    )
+    
+    # Create a row layout
+    return pn.Row(
+        pn.pane.Plotly(income_fig, height=400),
+        pn.pane.Plotly(expense_fig, height=400),
+        sizing_mode='stretch_width'
+    )
 
-chart_rx = pn.rx(create_chart)(transactions_rx)
-chart_pane = pn.pane.Plotly(chart_rx, height=300)
+chart_pane = pn.Column(pn.rx(create_chart)(transactions_rx), height=400)
 
 
 col = pn.Column(
