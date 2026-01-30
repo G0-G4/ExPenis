@@ -88,7 +88,7 @@ def create_chart(df):
 
     # Calculate totals
     total_income = df[df['type'] == 'income']['amount'].sum()
-    total_expense = df[df['type'] == 'expense']['amount'].sum().abs()
+    total_expense = df[df['type'] == 'expense']['amount'].sum()
     
     # Create summary cards
     income_card = pn.indicators.Number(
