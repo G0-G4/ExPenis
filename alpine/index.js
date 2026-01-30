@@ -43,9 +43,27 @@ document.addEventListener('alpine:init', () => {
             },
             {
                 account: 'main',
+                category: 'present',
+                type: 'income',
+                amount: 100000.00
+            },
+            {
+                account: 'main',
                 category: 'family',
                 type: 'expense',
                 amount: 50000.00
+            },
+            {
+                account: 'main',
+                category: 'family',
+                type: 'expense',
+                amount: 50000.00
+            },
+            {
+                account: 'food',
+                category: 'family',
+                type: 'expense',
+                amount: 500.00
             }
         ],
         incomeCategories: ['salary', 'present'],
