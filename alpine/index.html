@@ -29,30 +29,68 @@
          min="2025-01-01" max="2027-12-31">
 </div>
 
-<div>
-  <canvas id="chart"></canvas>
+<div style="display: flex; gap: 20px;">
+    <div style="width: 45%;">
+        <canvas id="incomeChart"></canvas>
+    </div>
+    <div style="width: 45%;">
+        <canvas id="expenseChart"></canvas>
+    </div>
 </div>
 
 <script>
-    const ctx = document.getElementById('chart');
-
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
-            datasets: [{
-                label: '# of Votes',
-                data: [12, 19, 3, 5, 2, 3],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
+    function createChart(elementId, title, labels, data) {
+        const ctx = document.getElementById(elementId);
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: title,
+                        font: {
+                            size: 16
+                        }
+                    }
                 }
             }
-        }
+        });
+    }
+
+    document.addEventListener('alpine:initialized', () => {
+        Alpine.effect(() => {
+            const income = Alpine.store('state').incomeData;
+            const expense = Alpine.store('state').expenseData;
+            
+            createChart(
+                'incomeChart', 
+                `Income: $${income.sum.toFixed(2)}`, 
+                income.labels, 
+                income.data
+            );
+            
+            createChart(
+                'expenseChart', 
+                `Expense: $${expense.sum.toFixed(2)}`, 
+                expense.labels, 
+                expense.data
+            );
+        });
     });
 </script>
 </body>
