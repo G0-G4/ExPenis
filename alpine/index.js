@@ -109,22 +109,62 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 
+    // Initialize state as a store
+    Alpine.store('state', {
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        get incomeData() {
+            const income = Alpine.store('notifications').transactions.filter(t => t.type === 'income');
+            const sum = income.reduce((acc, t) => acc + t.amount, 0);
+            const byCategory = {};
+            
+            income.forEach(t => {
+                byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+            });
+            
+            return {
+                labels: Object.keys(byCategory),
+                data: Object.values(byCategory),
+                sum: sum
+            };
+        },
+        get expenseData() {
+            const expense = Alpine.store('notifications').transactions.filter(t => t.type === 'expense');
+            const sum = expense.reduce((acc, t) => acc + t.amount, 0);
+            const byCategory = {};
+            
+            expense.forEach(t => {
+                byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+            });
+            
+            return {
+                labels: Object.keys(byCategory),
+                data: Object.values(byCategory),
+                sum: sum
+            };
+        }
+    });
+
+    // Update the component to reference the store
+    Alpine.data('state', () => ({
+        startDate: Alpine.store('state').startDate,
+        endDate: Alpine.store('state').endDate
+    }));
+
     Alpine.effect(() => {
         const state = Alpine.store('state');
-        if (state) {
-            createChart(
-                'incomeChart', 
-                `Income: $${state.incomeData.sum.toFixed(2)}`, 
-                state.incomeData.labels, 
-                state.incomeData.data
-            );
-            
-            createChart(
-                'expenseChart', 
-                `Expense: $${state.expenseData.sum.toFixed(2)}`, 
-                state.expenseData.labels, 
-                state.expenseData.data
-            );
-        }
-    }));
+        createChart(
+            'incomeChart', 
+            `Income: $${state.incomeData.sum.toFixed(2)}`, 
+            state.incomeData.labels, 
+            state.incomeData.data
+        );
+        
+        createChart(
+            'expenseChart', 
+            `Expense: $${state.expenseData.sum.toFixed(2)}`, 
+            state.expenseData.labels, 
+            state.expenseData.data
+        );
+    });
 });
