@@ -1,40 +1,7 @@
-const chartInstances = {};
-
-function createChart(elementId, title, labels, data) {
-    const ctx = document.getElementById(elementId);
-    if (ctx) {
-        // Destroy existing chart if it exists
-        if (chartInstances[elementId]) {
-            chartInstances[elementId].destroy();
-        }
-        
-        chartInstances[elementId] = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: title,
-                        font: {
-                            size: 16
-                        }
-                    }
-                }
-            }
-        });
-    }
-}
-
 document.addEventListener('alpine:init', () => {
-    Alpine.store('store', {
+    Alpine.data('state', () => ({
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
         transactions: [
             {
                 id: 1,
@@ -75,22 +42,28 @@ document.addEventListener('alpine:init', () => {
         incomeCategories: ['salary', 'present'],
         expenseCategories: ['food', 'family', 'transport'],
         accounts: ['main'],
-        addTransaction() {
-            this.accounts.push({ account: 'main', category: 'transport', type: 'expense', amount: 1000.00, id: this.transactions.length + 1 });
-        }
-    });
+        incomeChart: null,
+        expenseChart: null,
 
-    // Initialize component with data and chart logic
-    Alpine.data('state', () => ({
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0],
         init() {
             this.$watch('startDate', () => this.updateCharts());
             this.$watch('endDate', () => this.updateCharts());
             this.updateCharts();
         },
+
+        addTransaction() {
+            this.transactions.push({ 
+                account: 'main', 
+                category: 'transport', 
+                type: 'expense', 
+                amount: 1000.00, 
+                id: this.transactions.length + 1 
+            });
+            this.updateCharts();
+        },
+
         get incomeData() {
-            const income = Alpine.store('store').transactions.filter(t => t.type === 'income');
+            const income = this.transactions.filter(t => t.type === 'income');
             const sum = income.reduce((acc, t) => acc + t.amount, 0);
             const byCategory = {};
             
@@ -104,8 +77,9 @@ document.addEventListener('alpine:init', () => {
                 sum: sum
             };
         },
+
         get expenseData() {
-            const expense = Alpine.store('store').transactions.filter(t => t.type === 'expense');
+            const expense = this.transactions.filter(t => t.type === 'expense');
             const sum = expense.reduce((acc, t) => acc + t.amount, 0);
             const byCategory = {};
             
@@ -119,36 +93,47 @@ document.addEventListener('alpine:init', () => {
                 sum: sum
             };
         },
+
         updateCharts() {
-            const incomeChart = chartInstances['incomeChart'];
-            const expenseChart = chartInstances['expenseChart'];
-            
-            if (incomeChart) {
-                incomeChart.data.labels = this.incomeData.labels;
-                incomeChart.data.datasets[0].data = this.incomeData.data;
-                incomeChart.options.plugins.title.text = `Income: $${this.incomeData.sum.toFixed(2)}`;
-                incomeChart.update();
+            this.updateChart('incomeChart', this.incomeData, 'Income');
+            this.updateChart('expenseChart', this.expenseData, 'Expense');
+        },
+
+        updateChart(chartId, chartData, titlePrefix) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx) return;
+
+            const chart = this[chartId];
+            const title = `${titlePrefix}: $${chartData.sum.toFixed(2)}`;
+
+            if (chart) {
+                chart.data.labels = chartData.labels;
+                chart.data.datasets[0].data = chartData.data;
+                chart.options.plugins.title.text = title;
+                chart.update();
             } else {
-                createChart(
-                    'incomeChart',
-                    `Income: $${this.incomeData.sum.toFixed(2)}`,
-                    this.incomeData.labels,
-                    this.incomeData.data
-                );
-            }
-            
-            if (expenseChart) {
-                expenseChart.data.labels = this.expenseData.labels;
-                expenseChart.data.datasets[0].data = this.expenseData.data;
-                expenseChart.options.plugins.title.text = `Expense: $${this.expenseData.sum.toFixed(2)}`;
-                expenseChart.update();
-            } else {
-                createChart(
-                    'expenseChart',
-                    `Expense: $${this.expenseData.sum.toFixed(2)}`,
-                    this.expenseData.labels,
-                    this.expenseData.data
-                );
+                this[chartId] = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            data: chartData.data,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: title,
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        }
+                    }
+                });
             }
         }
     }));
