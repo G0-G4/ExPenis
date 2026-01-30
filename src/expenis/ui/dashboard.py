@@ -86,6 +86,25 @@ def create_chart(df):
     if df.empty or 'amount' not in df.columns or 'category' not in df.columns:
         return None
 
+    # Calculate totals
+    total_income = df[df['type'] == 'income']['amount'].sum()
+    total_expense = df[df['type'] == 'expense']['amount'].sum().abs()
+    
+    # Create summary cards
+    income_card = pn.indicators.Number(
+        name='Total Income',
+        value=total_income,
+        format='${value:,.2f}',
+        colors=[(0, '#4CAF50')]  # Green color for income
+    )
+    
+    expense_card = pn.indicators.Number(
+        name='Total Expenses',
+        value=total_expense,
+        format='${value:,.2f}',
+        colors=[(0, '#F44336')]  # Red color for expenses
+    )
+    
     # Separate income and expense
     income_df = df[df['type'] == 'income'].copy()
     expense_df = df[df['type'] == 'expense'].copy()
@@ -121,10 +140,18 @@ def create_chart(df):
         texttemplate='%{label}<br>%{percent:.1%}<br>%{value:,.2f}'
     )
     
-    # Create a row layout
-    return pn.Row(
-        pn.pane.Plotly(income_fig, height=400),
-        pn.pane.Plotly(expense_fig, height=400),
+    # Create a row layout with totals and charts
+    return pn.Column(
+        pn.Row(
+            income_card,
+            expense_card,
+            sizing_mode='stretch_width'
+        ),
+        pn.Row(
+            pn.pane.Plotly(income_fig, height=400),
+            pn.pane.Plotly(expense_fig, height=400),
+            sizing_mode='stretch_width'
+        ),
         sizing_mode='stretch_width'
     )
 
