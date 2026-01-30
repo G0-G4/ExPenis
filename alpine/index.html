@@ -1,4 +1,4 @@
-<html lang="en">
+<html lang="en" xmlns:x-on="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +14,7 @@
 <div x-data="state">
   <label for="start">Start date:</label>
   <input type="date" id="start" name="trip-start"
+         x-on:input="$store.store.addTransaction()"
          x-model="startDate"
          min="2025-01-01" max="2027-12-31">
 
@@ -21,16 +22,38 @@
   <input type="date" id="end" name="trip-start"
          x-model="endDate"
          min="2025-01-01" max="2027-12-31">
+
+  <div style="display: flex; gap: 20px;">
+    <div style="width: 45%;">
+      <canvas id="incomeChart"></canvas>
+    </div>
+    <div style="width: 45%;">
+      <canvas id="expenseChart"></canvas>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+    <tr>
+      <th>Account</th>
+      <th>Type</th>
+      <th>Category</th>
+      <th>Amount</th>
+    </tr>
+    </thead>
+    <tbody>
+    <template x-for="tr in $store.store.transactions" :key="tr.id">
+      <tr>
+        <td x-text="tr.account"></td>
+        <td x-text="tr.type"></td>
+        <td x-text="tr.category"></td>
+        <td x-text="tr.amount"></td>
+      </tr>
+    </template>
+    </tbody>
+  </table>
 </div>
 
-<div style="display: flex; gap: 20px;">
-  <div style="width: 45%;">
-    <canvas id="incomeChart"></canvas>
-  </div>
-  <div style="width: 45%;">
-    <canvas id="expenseChart"></canvas>
-  </div>
-</div>
 
 </body>
 </html>

@@ -37,30 +37,35 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('store', {
         transactions: [
             {
+                id: 1,
                 account: 'main',
                 category: 'salary',
                 type: 'income',
                 amount: 100000.00
             },
             {
+                id: 2,
                 account: 'main',
                 category: 'present',
                 type: 'income',
                 amount: 100000.00
             },
             {
+                id: 3,
                 account: 'main',
                 category: 'family',
                 type: 'expense',
                 amount: 50000.00
             },
             {
+                id: 4,
                 account: 'main',
                 category: 'food',
                 type: 'expense',
                 amount: 50000.00
             },
             {
+                id: 5,
                 account: 'main',
                 category: 'transport',
                 type: 'expense',
@@ -70,6 +75,9 @@ document.addEventListener('alpine:init', () => {
         incomeCategories: ['salary', 'present'],
         expenseCategories: ['food', 'family', 'transport'],
         accounts: ['main'],
+        addTransaction() {
+            this.accounts.push({ account: 'main', category: 'transport', type: 'expense', amount: 1000.00, id: this.transactions.length + 1 });
+        }
     });
 
     // Initialize component with data and chart logic
