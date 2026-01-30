@@ -34,7 +34,47 @@ function createChart(elementId, title, labels, data) {
 }
 
 document.addEventListener('alpine:init', () => {
-    Alpine.store('state', {
+    // Initialize stores first
+    Alpine.store('notifications', {
+        transactions: [
+            {
+                account: 'main',
+                category: 'salary',
+                type: 'income',
+                amount: 100000.00
+            },
+            {
+                account: 'main',
+                category: 'present',
+                type: 'income',
+                amount: 100000.00
+            },
+            {
+                account: 'main',
+                category: 'family',
+                type: 'expense',
+                amount: 50000.00
+            },
+            {
+                account: 'main',
+                category: 'family',
+                type: 'expense',
+                amount: 50000.00
+            },
+            {
+                account: 'food',
+                category: 'family',
+                type: 'expense',
+                amount: 500.00
+            }
+        ],
+        incomeCategories: ['salary', 'present'],
+        expenseCategories: ['food', 'family', 'transport'],
+        accounts: ['main'],
+    });
+
+    // Then initialize component
+    Alpine.data('state', () => ({
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
         get incomeData() {
@@ -123,5 +163,5 @@ document.addEventListener('alpine:init', () => {
                 state.expenseData.data
             );
         }
-    });
+    }));
 });
