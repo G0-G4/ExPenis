@@ -2,72 +2,47 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('state', () => ({
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
-        transactions: [
-            {
-                id: 1,
-                account: 'main',
-                category: 'salary',
-                type: 'income',
-                amount: 100000.00
-            },
-            {
-                id: 2,
-                account: 'main',
-                category: 'present',
-                type: 'income',
-                amount: 100000.00
-            },
-            {
-                id: 3,
-                account: 'main',
-                category: 'family',
-                type: 'expense',
-                amount: 50000.00
-            },
-            {
-                id: 4,
-                account: 'main',
-                category: 'food',
-                type: 'expense',
-                amount: 50000.00
-            },
-            {
-                id: 5,
-                account: 'main',
-                category: 'transport',
-                type: 'expense',
-                amount: 1000.00
-            }
-        ],
-        incomeCategories: ['salary', 'present'],
-        expenseCategories: ['food', 'family', 'transport'],
-        accounts: ['main'],
+        transactions: [],
+        incomeCategories: [],
+        expenseCategories: [],
+        accounts: [],
         incomeChart: null,
         expenseChart: null,
+        isLoading: false,
 
         init() {
-            this.$watch('transactions', () => this.updateCharts());
-            this.updateCharts();
+            this.$watch(['startDate', 'endDate'], () => this.fetchTransactions());
+            this.fetchTransactions();
         },
 
-        addTransaction() {
-            // Create a more varied sample transaction
-            const types = ['income', 'expense'];
-            const type = types[Math.floor(Math.random() * types.length)];
-            const categories = type === 'income' ? this.incomeCategories : this.expenseCategories;
-            const category = categories[Math.floor(Math.random() * categories.length)];
-            const amount = type === 'income' 
-                ? Math.floor(Math.random() * 5000) + 1000 
-                : -(Math.floor(Math.random() * 500) + 50);
-            
-            this.transactions.push({
-                id: Date.now(), // Use timestamp for unique ID
-                account: 'main',
-                category: category,
-                type: type,
-                amount: amount
-            });
-            this.updateCharts();
+        async fetchTransactions() {
+            this.isLoading = true;
+            try {
+                const response = await fetch(`/transactions?date_from=${this.startDate}&date_to=${this.endDate}`);
+                const data = await response.json();
+                this.transactions = data.transactions;
+                
+                // Extract unique categories and accounts
+                this.incomeCategories = [...new Set(
+                    this.transactions
+                        .filter(t => t.type === 'income')
+                        .map(t => t.category)
+                )];
+                
+                this.expenseCategories = [...new Set(
+                    this.transactions
+                        .filter(t => t.type === 'expense')
+                        .map(t => t.category)
+                )];
+                
+                this.accounts = [...new Set(this.transactions.map(t => t.account))];
+                
+                this.updateCharts();
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+            } finally {
+                this.isLoading = false;
+            }
         },
 
         get incomeData() {
