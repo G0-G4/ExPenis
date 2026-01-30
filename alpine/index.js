@@ -5,9 +5,37 @@ document.addEventListener('alpine:init', () => {
         init() {
             this.startDate = new Date().toISOString().split('T')[0];
             this.endDate = new Date().toISOString().split('T')[0];
-            console.log(this.startDate);
+        },
+        get incomeData() {
+            const income = Alpine.store('notifications').transactions.filter(t => t.type === 'income');
+            const sum = income.reduce((acc, t) => acc + t.amount, 0);
+            const byCategory = {};
+            
+            income.forEach(t => {
+                byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+            });
+            
+            return {
+                labels: Object.keys(byCategory),
+                data: Object.values(byCategory),
+                sum: sum
+            };
+        },
+        get expenseData() {
+            const expense = Alpine.store('notifications').transactions.filter(t => t.type === 'expense');
+            const sum = expense.reduce((acc, t) => acc + t.amount, 0);
+            const byCategory = {};
+            
+            expense.forEach(t => {
+                byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+            });
+            
+            return {
+                labels: Object.keys(byCategory),
+                data: Object.values(byCategory),
+                sum: sum
+            };
         }
-
     }));
     Alpine.store('notifications', {
         transactions: [
