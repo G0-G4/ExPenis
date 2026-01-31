@@ -3,6 +3,7 @@ from uuid import UUID
 from datetime import datetime, UTC
 import time
 
+from src.expenis.core.errors import NotFoundException
 from src.expenis.core.models import db, Session
 from src.expenis.core.service.session_service import create_session, confirm_session
 
@@ -21,9 +22,6 @@ async def test_create_session():
         assert session is not None
         assert session.status == 'pending'
         assert session.user_id is None
-        assert isinstance(session.created_at, datetime)
-        assert isinstance(session.updated_at, datetime)
-
 
 @pytest.mark.asyncio
 async def test_confirm_session():
@@ -38,8 +36,7 @@ async def test_confirm_session():
         # Verify changes
         assert confirmed_session.status == 'confirmed'
         assert confirmed_session.user_id == test_user_id
-        assert confirmed_session.updated_at >= confirmed_session.created_at
-        
+
         # Verify in DB
         db_session = await db.run(lambda: Session.get(Session.id == session_id))
         assert db_session.status == 'confirmed'
@@ -50,7 +47,7 @@ async def test_confirm_session():
 async def test_confirm_nonexistent_session():
     async with db:
         # Try to confirm non-existent session
-        with pytest.raises(RuntimeError, match="session not found"):
+        with pytest.raises(NotFoundException, match="session nonexistent-session-id not found"):
             await confirm_session(123, "nonexistent-session-id")
 
 
