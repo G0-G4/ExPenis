@@ -1,7 +1,7 @@
 import pytest
 
 from src.expenis.core.models import db
-from src.expenis.core import create_account, get_account_by_id, get_user_account_with_balance, get_user_accounts, \
+from src.expenis.core.service import create_account, get_account_by_id, get_user_account_with_balance, get_user_accounts, \
     get_user_accounts_with_balance
 
 

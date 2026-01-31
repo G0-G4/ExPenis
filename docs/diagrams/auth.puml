@@ -1,0 +1,48 @@
+@startuml
+title Упрощенная схема авторизации через Deep Link
+
+actor "Пользователь" as User
+participant "Веб-сайт" as Site
+participant "Сервер" as Server
+participant "Telegram Bot" as Bot
+database "Хранилище" as Storage
+
+== Основной поток ==
+
+User -> Site: Открывает сайт
+Site -> Server: Запрос на начало авторизации
+Server -> Storage: Создает сессию (id=ABC123, status=pending)
+Server -> Site: Возвращает deep link: tg://...start=ABC123
+Site -> User: Перенаправляет в Telegram
+
+User -> Bot: Открывает бота через deep link
+Bot -> Server: "Пользователь открыл сессию ABC123"
+Server -> Bot: "Запрос на подтверждение"
+
+Bot -> User: "Разрешить вход с Chrome на Windows?"
+User -> Bot: Нажимает "Разрешить"
+Bot -> Server: "Подтверждаю сессию ABC123, user_id=123"
+Server -> Storage: Обновляет сессию (status=confirmed, user_id=123)
+Server -> Storage: Создает долгосрочный токен (24h)
+Server -> Bot: "Готово, токен создан"
+
+Bot -> User: "Возвращайтесь на сайт"
+User -> Site: Возвращается на сайт
+
+Site -> Server: "Каков статус сессии ABC123?"
+Server -> Storage: Проверяет статус ABC123
+Storage -> Server: "Сессия подтверждена, токен XYZ"
+Server -> Site: "Сессия подтверждена, используйте токен XYZ"
+Site -> User: "Вы авторизованы!"
+
+== Поток истечения сессии ==
+
+User -> Site: Использует сайт через 25 часов
+Site -> Server: Запрос с токеном XYZ
+Server -> Storage: Проверяет токен XYZ
+Storage -> Server: "Токен истек 1 час назад"
+Server -> Site: "Токен недействителен"
+Site -> User: "Войдите снова"
+User -> Site: Начинает процесс заново
+
+@enduml
