@@ -9,6 +9,7 @@ from tuican.components import Button, Component, Hline, Screen, ScreenGroup
 from ...bot.components.transaction_screen import TransactionCreate, TransactionEdit
 from ...core.helpers import format_amount
 from ...core.models import Transaction
+from ...core.service import confirm_session
 from ...core.service.transaction_service import get_transactions_for_period
 
 
@@ -113,6 +114,34 @@ class DailyScreen(Screen):
             self.delete_component(button)
         self.transactions_buttons = []
         self.transactions = None
+
+    async def command_handler(self, args: list[str], update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if len(args) == 2:
+            screen = ConfirmSessionScreen(args[1], self.group)
+            await self.group.go_to_screen(update, context, screen)
+
+
+
+class ConfirmSessionScreen(Screen):
+    def __init__(self, session_id: str, group: ScreenGroup):
+        self.group = group
+        self.session_id = session_id
+        self.confirm = Button("✅ подтвердить вход", on_change=self.handle_confirm)
+        self.cancel = Button("❌ запретить", on_change=self.handel_cancel)
+        super().__init__([self.confirm, self.cancel], message="подтвердить вход?")
+
+    async def handle_confirm(self, update, context, callback_data, component):
+        await confirm_session(get_user_id(update), self.session_id)
+        await self.send_message(update, context, f"входи подтвержден, подождите немного")
+        await self.group.go_home(update, context)
+
+    async def handel_cancel(self, update, context, callback_data, component):
+        await self.group.go_home(update, context)
+
+    async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
+        Sequence[InlineKeyboardButton]]:
+        return [[self.confirm.render(update, context), self.cancel.render(update,context)]]
+
 
 class MainScreen(ScreenGroup):
     description: ClassVar[str] = "траты по дням"
