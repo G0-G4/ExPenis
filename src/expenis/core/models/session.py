@@ -16,4 +16,4 @@ class Session(Model):
 
     class Meta:
         database = db
-        table_name = "transactions"
+        table_name = "sessions"
