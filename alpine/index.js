@@ -48,7 +48,7 @@ document.addEventListener('alpine:init', () => {
             
             this.authInterval = setInterval(async () => {
                 try {
-                    const authResponse = await fetch(`http://localhost:8000/auth/${this.sessionId}`);
+                    const authResponse = await fetch(`http://localhost:8000/auth/${this.sessionId}`, {credentials: 'include'});
                     const { status } = await authResponse.json();
                     
                     if (status === 'confirmed') {
