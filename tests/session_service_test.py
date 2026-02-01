@@ -1,6 +1,6 @@
 import pytest
 from uuid import UUID
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 import time
 
 from src.expenis.core.errors import NotFoundException
