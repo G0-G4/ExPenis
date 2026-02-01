@@ -3,7 +3,10 @@ from datetime import date, timedelta
 from typing import Annotated
 
 from authx import AuthX, AuthXConfig, TokenPayload
+import io
+import qrcode
 from fastapi import Depends, FastAPI, Query, Response
+from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from .dto import SessionCreateResponse, SessionStatusResponse, Transaction, TransactionsResponse
@@ -54,9 +57,27 @@ async def get_user_transactions(
 
 
 @app.post("/create-session")
-async def create_session_route() -> SessionCreateResponse:
+async def create_session_route() -> StreamingResponse:
     session_id = await create_session()
-    return SessionCreateResponse(session_id=session_id)
+    
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(session_id)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert to bytes
+    byte_io = io.BytesIO()
+    img.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    
+    return StreamingResponse(byte_io, media_type="image/png")
 
 
 @app.get("/auth/{session_id}")
