@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/snap/bin/uv run -m src.expenis.bot
+ExecStart=/snap/bin/uv run -m src.expenis.server
 WorkingDirectory=/home/gog4/ExPenis
-StandardOutput=append:/var/log/expenis.log
-StandardError==append:/var/log/expenis-error.log
+StandardOutput=append:/var/log/expenis-server.log
+StandardError==append:/var/log/expenis-server-error.log
 Environment="EXPENIS_ENV=production"
 
 [Install]
