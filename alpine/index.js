@@ -13,6 +13,8 @@ document.addEventListener('alpine:init', () => {
         sessionId: null,
         qrCodeUrl: null,
         authInterval: null,
+        authStartTime: null,
+        timeoutMessage: null,
 
         init() {
             this.$watch('startDate', () => this.fetchTransactions());
@@ -37,6 +39,9 @@ document.addEventListener('alpine:init', () => {
 
         async startAuthFlow() {
             this.authStatus = 'unauthenticated';
+            this.timeoutMessage = null;
+            this.authStartTime = Date.now();
+            
             const response = await fetch('http://localhost:8000/create-session', {method: 'POST'});
             if (!response.ok) {
                 throw new Error(`${response.status} ${response.statusText}`);
@@ -47,6 +52,12 @@ document.addEventListener('alpine:init', () => {
             
             this.authInterval = setInterval(async () => {
                 try {
+                    if (Date.now() - this.authStartTime > 300000) {
+                        clearInterval(this.authInterval);
+                        this.timeoutMessage = "Authentication timed out. Please refresh the page to try again.";
+                        return;
+                    }
+                    
                     const authResponse = await fetch(`http://localhost:8000/auth/${this.sessionId}`, {credentials: 'include'});
                     const { status } = await authResponse.json();
                     

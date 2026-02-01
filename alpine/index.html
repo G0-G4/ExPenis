@@ -22,6 +22,7 @@
         <h2 class="text-xl font-bold mb-4">Scan QR Code to Authenticate</h2>
         <img :src="qrCodeUrl" alt="QR Code" class="mx-auto mb-4">
         <p class="text-gray-600">Scan this QR code with your mobile app to login</p>
+        <p x-show="timeoutMessage" class="text-red-500 mt-2" x-text="timeoutMessage"></p>
       </div>
     </template>
   </div>
