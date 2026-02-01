@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  frontend:
+    volumes:
+      - /etc/letsencrypt:/etc/nginx/ssl:ro
+#      - ./nginx/ssl:/etc/nginx/ssl:ro
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

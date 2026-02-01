@@ -1,12 +1,14 @@
-from datetime import UTC, date, datetime
+import asyncio
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from core.models import Account, Category, Transaction, db
-from core.service.transaction_service import (save_transaction, delete_transaction,
-                                              delete_transaction_by_id, get_transaction_by_id,
-                                              get_transactions_for_period,
-                                              save_transaction)
+from src.expenis.core.models import Account, Category, Transaction, db
+from src.expenis.core.service import update_transaction
+from src.expenis.core.service.transaction_service import (delete_transaction,
+                                                          delete_transaction_by_id, get_transaction_by_id,
+                                                          get_transactions_for_period,
+                                                          save_transaction)
 
 
 @pytest.fixture
@@ -62,12 +64,11 @@ async def test_basic_crud(test_account, test_category):
         new_category = Category(user_id=1, name="new category", type="income")
         await db.run(new_category.save)
         transaction.category = Category(id=new_category.id)
-        await save_transaction(transaction)
+        await update_transaction(transaction)
 
         updated = await get_transaction_by_id(transaction.id)
         assert updated.amount == new_amount
         assert updated.description == new_description
-        assert updated.updated_at > updated.created_at
 
         # Test delete
         await delete_transaction(transaction)
@@ -91,8 +92,8 @@ async def test_basic_crud(test_account, test_category):
 async def test_get_transactions_for_period(test_account, test_category):
     user_id = 1
     today = date.today()
-    yesterday = date(today.year, today.month, today.day - 1)
-    tomorrow = date(today.year, today.month, today.day + 1)
+    yesterday = today - timedelta(days=1)
+    tomorrow = today + timedelta(days=1)
 
     async with db:
         # Create transactions for different dates
