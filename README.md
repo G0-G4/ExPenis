@@ -8,8 +8,7 @@
 - Учет ежедневных расходов и доходов
 - Категоризация транзакций
 - Управление несколькими счетами
-- Просмотр статистики и графиков
-- Интерфейс Telegram бота
+- Просмотр статистики [expenis.g0g4.ru](https://expenis.g0g4.ru) с авторизацией через телеграм
 
 ## Демо
 
@@ -26,40 +25,26 @@ src/expenis/
 ├── server/               # Веб-сервер
 └── config.py             # Конфигурация
 ```
+- Для реализации бота используется библиотека [TUIcan](https://github.com/G0-G4/TUIcan)
+- Сервер реализован с помощью [FastApi](https://fastapi.tiangolo.com/)
+- Фронтенд реализован с помощью [Alpine.js](https://alpinejs.dev/)
 
 ## Требования
-- Python 3.10+
-- Poetry (для управления зависимостями)
+- Python 3.13+
+- uv (для управления зависимостями)
 
 ## Установка
 ```bash
-poetry install
+uv sync
 ```
 
 ## Запуск бота
 ```bash
-# Запуск Telegram бота
-poetry run python src/expenis/bot/__main__.py
-
-# Или с использованием uv
-uv run python src/expenis/bot/__main__.py
+uv run -m src.expenis.bot
 ```
 
 ## Запуск сервера
 ```bash
-# Запуск веб-сервера
-poetry run python src/expenis/server/__main__.py
+uv run -m src.expenis.server
 ```
 
-## Настройка переменных окружения
-Создайте файл `.env` со следующим содержимым:
-```
-token=ВАШ_ТОКЕН_ТЕЛЕГРАМ_БОТА
-secret=ВАШ_СЕКРЕТНЫЙ_КЛЮЧ
-cookie_domain=ВАШ_ДОМЕН
-expiration_time_seconds=3600
-bot_name=ExPenisBot
-```
-
-## Участие в разработке
-Приветствуются pull request'ы! Для крупных изменений сначала откройте issue.
