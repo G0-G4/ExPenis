@@ -42,7 +42,7 @@ document.addEventListener('alpine:init', () => {
             this.timeoutMessage = null;
             this.authStartTime = Date.now();
             
-            const response = await fetch('http://localhost:8000/create-session', {method: 'POST'});
+            const response = await fetch('/api/create-session', {method: 'POST'});
             if (!response.ok) {
                 throw new Error(`${response.status} ${response.statusText}`);
             }
@@ -58,7 +58,7 @@ document.addEventListener('alpine:init', () => {
                         return;
                     }
                     
-                    const authResponse = await fetch(`http://localhost:8000/auth/${this.sessionId}`, {credentials: 'include'});
+                    const authResponse = await fetch(`/api/auth/${this.sessionId}`, {credentials: 'include'});
                     const { status } = await authResponse.json();
                     
                     if (status === 'confirmed') {
@@ -74,7 +74,7 @@ document.addEventListener('alpine:init', () => {
         async fetchTransactions() {
             this.isLoading = true;
             try {
-                const response = await fetch(`http://localhost:8000/transactions?date_from=${this.startDate}&date_to=${this.endDate}`, {
+                const response = await fetch(`/api/transactions?date_from=${this.startDate}&date_to=${this.endDate}`, {
                     credentials: 'include'
                 });
                 

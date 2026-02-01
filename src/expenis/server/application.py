@@ -60,7 +60,7 @@ auth = AuthX(config)
 auth.handle_errors(app)
 
 
-@app.get("/transactions")
+@app.get("/api/transactions")
 async def get_user_transactions(
         date_from: Annotated[date, Query(title="начальная дата", description="Начальная дата в формате yyyy-MM-dd")],
         date_to: Annotated[date, Query(title="конечная дата", description="Конечная дата в формате yyyy-MM-dd")],
@@ -71,7 +71,7 @@ async def get_user_transactions(
     return TransactionsResponse(transactions=[convert_transaction_to_dto(tx) for tx in transactions])
 
 
-@app.post("/create-session")
+@app.post("/api/create-session")
 async def create_session_route() -> QRCodeResponse:
     session_id = await create_session()
     deeplink = f'https://t.me/{BOT_NAME}?start={session_id}'
@@ -99,7 +99,7 @@ async def create_session_route() -> QRCodeResponse:
     )
 
 
-@app.get("/auth/{session_id}")
+@app.get("/api/auth/{session_id}")
 async def auth_user(session_id: str, response: Response) -> SessionStatusResponse:
     session = await get_session(session_id)
     if session.status == 'confirmed':
