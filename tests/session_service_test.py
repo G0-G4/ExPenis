@@ -104,7 +104,7 @@ async def test_clear_old_sessions():
         
         # Clear old sessions
         await clear_old_sessions()
-        
+
         # Verify old session was deleted
         old_session = await db.run(lambda: Session.get_or_none(Session.id == old_session_id))
         assert old_session is None

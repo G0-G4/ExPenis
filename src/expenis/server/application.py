@@ -2,24 +2,35 @@ from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from typing import Annotated
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from authx import AuthX, AuthXConfig, TokenPayload
 import base64
 import io
 import qrcode
 from fastapi import Depends, FastAPI, Query, Response
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 
-from .dto import SessionCreateResponse, SessionStatusResponse, Transaction, TransactionsResponse
+from .dto import SessionStatusResponse, Transaction, TransactionsResponse
 from ..core.models import Transaction as ModelTransaction, db
-from ..core.service import create_session, get_session, get_transactions_for_period
+from ..core.service import clear_old_sessions, create_session, get_session, get_transactions_for_period
 
+
+async def clear_job():
+    print("clearing sessions")
+    await clear_old_sessions()
+
+scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.aconnect()
+    scheduler.add_job(clear_job, IntervalTrigger(minutes=5))
+    scheduler.start()
+    await clear_old_sessions()
     yield
+    scheduler.shutdown()
     await db.aclose()
     await db.close_pool()
 

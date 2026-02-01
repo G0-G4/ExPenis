@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from ..errors import NotFoundException
@@ -31,12 +31,6 @@ async def confirm_session(user_id: int, session_id: str) -> Session:
     await db.run(session.save)
     return session
 
-async def auth_session(session_id: str) -> Session:
-    session = await get_session(session_id)
-        # if session.status == 'confirmed': TODO delete in several minutes
-        #     await delete_session_by_id(session_id)
-    return session
-
 async def get_session(session_id: str) -> Session:
     session = await db.run(lambda:
                            Session.get_or_none(Session.id == session_id))
@@ -44,5 +38,7 @@ async def get_session(session_id: str) -> Session:
         raise NotFoundException(f"session {session_id} not found")
     return session
 
-async def delete_session_by_id(session_id: str):
-    await db.run(lambda: Session.delete_by_id(session_id))
+async def clear_old_sessions():
+    now = datetime.now(UTC)
+    old_time = now - timedelta(minutes=5)
+    await db.run(lambda: Session.delete().where(Session.created_at <= old_time).execute())
