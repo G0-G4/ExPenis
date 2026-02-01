@@ -1,0 +1,21 @@
+# Build stage
+FROM ghcr.io/astral-sh/uv:python3.13-alpine
+
+RUN apk update && apk add git && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# Copy dependency specifications
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies with uv using the lock file
+RUN uv sync
+
+# Copy application code (only necessary files)
+COPY src/ /app/src/
+
+# Create directory for SQLite db and set permissions
+
+CMD ["uv", "run", "-m", "src.expenis.server"]
+
+# PROCESS INSIDE DOCKER DOESNT SEE CHANGES FROM OUTSIDE
