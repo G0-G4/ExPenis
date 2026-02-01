@@ -59,7 +59,7 @@ async def create_session_route() -> SessionCreateResponse:
     return SessionCreateResponse(session_id=session_id)
 
 
-@app.post("/auth/{session_id}")
+@app.get("/auth/{session_id}")
 async def auth_user(session_id: str, response: Response) -> SessionStatusResponse:
     session = await get_session(session_id)
     if session.status == 'confirmed':
