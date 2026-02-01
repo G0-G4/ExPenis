@@ -9,21 +9,68 @@ document.addEventListener('alpine:init', () => {
         incomeChart: null,
         expenseChart: null,
         isLoading: false,
+        authStatus: 'checking',
+        sessionId: null,
+        qrCodeUrl: null,
+        authInterval: null,
 
         init() {
             this.$watch('startDate', () => this.fetchTransactions());
             this.$watch('endDate', () => this.fetchTransactions());
-            this.fetchTransactions();
+            this.checkAuthAndFetch();
+        },
+
+        async checkAuthAndFetch() {
+            this.authStatus = 'checking';
+            try {
+                await this.fetchTransactions();
+                this.authStatus = 'authenticated';
+            } catch (error) {
+                if (error instanceof Error && (error.message.includes('401') || error.message.includes('403'))) {
+                    await this.startAuthFlow();
+                } else {
+                    console.error('Error:', error);
+                    this.authStatus = 'error';
+                }
+            }
+        },
+
+        async startAuthFlow() {
+            this.authStatus = 'unauthenticated';
+            const response = await fetch('http://localhost:8000/create-session');
+            const { session_id } = await response.json();
+            this.sessionId = session_id;
+            this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${session_id}`;
+            
+            this.authInterval = setInterval(async () => {
+                try {
+                    const authResponse = await fetch(`http://localhost:8000/auth/${this.sessionId}`);
+                    const { status } = await authResponse.json();
+                    
+                    if (status === 'confirmed') {
+                        clearInterval(this.authInterval);
+                        await this.checkAuthAndFetch();
+                    }
+                } catch (error) {
+                    console.error('Auth polling error:', error);
+                }
+            }, 2000);
         },
 
         async fetchTransactions() {
             this.isLoading = true;
             try {
-                const response = await fetch(`http://localhost:8000/transactions?date_from=${this.startDate}&date_to=${this.endDate}`);
+                const response = await fetch(`http://localhost:8000/transactions?date_from=${this.startDate}&date_to=${this.endDate}`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(response.status.toString());
+                }
+                
                 const data = await response.json();
                 this.transactions = data.transactions;
                 
-                // Extract unique categories and accounts
                 this.incomeCategories = [...new Set(
                     this.transactions
                         .filter(t => t.type === 'income')
@@ -41,6 +88,7 @@ document.addEventListener('alpine:init', () => {
                 this.updateCharts();
             } catch (error) {
                 console.error('Error fetching transactions:', error);
+                throw error;
             } finally {
                 this.isLoading = false;
             }

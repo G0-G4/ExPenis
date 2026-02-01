@@ -12,7 +12,22 @@
 <body class="bg-gray-50 p-8">
 
 <div x-data="state" class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
-  <h1 class="text-2xl font-bold text-gray-800 mb-6">Transaction Dashboard</h1>
+  <div x-show="authStatus !== 'authenticated'" class="mb-6">
+    <template x-if="authStatus === 'checking'">
+      <div class="text-blue-600">Checking authentication...</div>
+    </template>
+    
+    <template x-if="authStatus === 'unauthenticated'">
+      <div class="text-center">
+        <h2 class="text-xl font-bold mb-4">Scan QR Code to Authenticate</h2>
+        <img :src="qrCodeUrl" alt="QR Code" class="mx-auto mb-4">
+        <p class="text-gray-600">Scan this QR code with your mobile app to login</p>
+      </div>
+    </template>
+  </div>
+
+  <div x-show="authStatus === 'authenticated'">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">Transaction Dashboard</h1>
   
   <div class="flex flex-col sm:flex-row gap-4 mb-6">
     <div class="w-full sm:w-1/2">
@@ -69,6 +84,7 @@
         </template>
       </tbody>
     </table>
+  </div>
   </div>
 </div>
 
