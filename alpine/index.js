@@ -37,8 +37,12 @@ document.addEventListener('alpine:init', () => {
 
         async startAuthFlow() {
             this.authStatus = 'unauthenticated';
-            const response = await fetch('http://localhost:8000/create-session');
+            const response = await fetch('http://localhost:8000/create-session', {method: 'POST'});
+            if (!response.ok) {
+                throw new Error(`${response.status} ${response.statusText}`);
+            }
             const { session_id } = await response.json();
+            console.log(response);
             this.sessionId = session_id;
             this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${session_id}`;
             
