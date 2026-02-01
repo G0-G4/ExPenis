@@ -158,7 +158,7 @@ document.addEventListener('alpine:init', () => {
                     plugins: {
                         title: {
                             display: true,
-                            text: `${titlePrefix}: $${chartData.sum.toFixed(2)}`,
+                            text: `${titlePrefix}: ${chartData.sum.toFixed(2)}`,
                             font: {
                                 size: 16
                             }
@@ -186,7 +186,7 @@ document.addEventListener('alpine:init', () => {
                                     const value = context.raw || 0;
                                     const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                     const percentage = Math.round((value / total) * 100);
-                                    return `${label}: $${value.toFixed(2)} (${percentage}%)`;
+                                    return `${label}: ${value.toFixed(2)} (${percentage}%)`;
                                 }
                             }
                         }
