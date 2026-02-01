@@ -41,10 +41,9 @@ document.addEventListener('alpine:init', () => {
             if (!response.ok) {
                 throw new Error(`${response.status} ${response.statusText}`);
             }
-            const { session_id } = await response.json();
-            console.log(response);
-            this.sessionId = session_id;
-            this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${session_id}`;
+            // Get the image blob directly
+            const blob = await response.blob();
+            this.qrCodeUrl = URL.createObjectURL(blob);
             
             this.authInterval = setInterval(async () => {
                 try {
