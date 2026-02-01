@@ -1,13 +1,8 @@
-import os
-
-from dotenv import load_dotenv
 from tuican import Application
 
+from ..config import TOKEN
 from .components import MainScreen, CategoriesMain, AccountMain
 from ..core.models import db
-
-load_dotenv()
-token = os.getenv("token")
 
 async def post_init(application):
     await db.aconnect()
@@ -18,7 +13,7 @@ async def post_shutdown(application):
 
 
 def main():
-    app = Application(token, {
+    app = Application(TOKEN, {
         'start': MainScreen,
         'accounts': AccountMain,
         'categories': CategoriesMain

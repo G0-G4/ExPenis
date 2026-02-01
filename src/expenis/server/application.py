@@ -1,18 +1,18 @@
+import base64
+import io
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from datetime import date
 from typing import Annotated
 
+import qrcode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from authx import AuthX, AuthXConfig, TokenPayload
-import base64
-import io
-import qrcode
 from fastapi import Depends, FastAPI, Query, Response
-from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 
-from .dto import SessionStatusResponse, Transaction, TransactionsResponse
+from .dto import QRCodeResponse, SessionStatusResponse, Transaction, TransactionsResponse
+from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, SECRET
 from ..core.models import Transaction as ModelTransaction, db
 from ..core.service import clear_old_sessions, create_session, get_session, get_transactions_for_period
 
@@ -21,7 +21,9 @@ async def clear_job():
     print("clearing sessions")
     await clear_old_sessions()
 
+
 scheduler = AsyncIOScheduler()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,21 +39,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-EXPIRATION_TIME = timedelta(days=1)
+if DEV:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 config = AuthXConfig(
-    JWT_SECRET_KEY="SECRET",  # TODO
+    JWT_SECRET_KEY=SECRET,
     JWT_TOKEN_LOCATION=["cookies"],
     JWT_ACCESS_COOKIE_NAME="access_token",
-    JWT_COOKIE_DOMAIN="localhost",  # TODO
+    JWT_COOKIE_DOMAIN=COOKIE_DOMAIN,
     JWT_COOKIE_SAMESITE="strict",
-    JWT_ACCESS_TOKEN_EXPIRES=EXPIRATION_TIME,
+    JWT_ACCESS_TOKEN_EXPIRES=EXPIRATION_TIME_SECONDS,
     JWT_COOKIE_CSRF_PROTECT=False
 )
 auth = AuthX(config)
@@ -69,14 +71,11 @@ async def get_user_transactions(
     return TransactionsResponse(transactions=[convert_transaction_to_dto(tx) for tx in transactions])
 
 
-class QRCodeResponse(BaseModel):
-    session_id: str
-    qr_code: str  # base64 encoded image
-
 @app.post("/create-session")
 async def create_session_route() -> QRCodeResponse:
     session_id = await create_session()
-    
+    deeplink = f'https://t.me/{BOT_NAME}?start={session_id}'
+
     # Generate QR code
     qr = qrcode.QRCode(
         version=1,
@@ -84,16 +83,16 @@ async def create_session_route() -> QRCodeResponse:
         box_size=10,
         border=4,
     )
-    qr.add_data(session_id)
+    qr.add_data(deeplink)
     qr.make(fit=True)
-    
+
     img = qr.make_image(fill_color="black", back_color="white")
-    
+
     # Convert to base64
     byte_io = io.BytesIO()
     img.save(byte_io, 'PNG')
     qr_code_base64 = base64.b64encode(byte_io.getvalue()).decode('utf-8')
-    
+
     return QRCodeResponse(
         session_id=session_id,
         qr_code=f"data:image/png;base64,{qr_code_base64}"
@@ -105,7 +104,7 @@ async def auth_user(session_id: str, response: Response) -> SessionStatusRespons
     session = await get_session(session_id)
     if session.status == 'confirmed':
         token = auth.create_access_token(uid=str(session.user_id))
-        auth.set_access_cookies(token, response, int(EXPIRATION_TIME.total_seconds()))
+        auth.set_access_cookies(token, response, EXPIRATION_TIME_SECONDS)
     return SessionStatusResponse(status=session.status, session_id=session_id)
 
 

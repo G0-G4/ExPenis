@@ -15,10 +15,10 @@ class TransactionsResponse(BaseModel):
     transactions: list[Transaction]
 
 
-class SessionCreateResponse(BaseModel):
-   session_id: str
-
-
 class SessionStatusResponse(BaseModel):
     session_id: str
     status: SessionStatus
+
+class QRCodeResponse(BaseModel):
+    session_id: str
+    qr_code: str  # base64 encoded image
