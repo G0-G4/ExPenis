@@ -30,3 +30,19 @@ async def confirm_session(user_id: int, session_id: str) -> Session:
     session.updated_at = now
     await db.run(session.save)
     return session
+
+async def auth_session(session_id: str) -> Session:
+    session = await get_session(session_id)
+        # if session.status == 'confirmed': TODO delete in several minutes
+        #     await delete_session_by_id(session_id)
+    return session
+
+async def get_session(session_id: str) -> Session:
+    session = await db.run(lambda:
+                           Session.get_or_none(Session.id == session_id))
+    if session is None:
+        raise NotFoundException(f"session {session_id} not found")
+    return session
+
+async def delete_session_by_id(session_id: str):
+    await db.run(lambda: Session.delete_by_id(session_id))
