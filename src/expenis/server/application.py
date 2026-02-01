@@ -3,10 +3,12 @@ from datetime import date, timedelta
 from typing import Annotated
 
 from authx import AuthX, AuthXConfig, TokenPayload
+import base64
 import io
 import qrcode
 from fastapi import Depends, FastAPI, Query, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 
 from .dto import SessionCreateResponse, SessionStatusResponse, Transaction, TransactionsResponse
@@ -56,8 +58,12 @@ async def get_user_transactions(
     return TransactionsResponse(transactions=[convert_transaction_to_dto(tx) for tx in transactions])
 
 
+class QRCodeResponse(BaseModel):
+    session_id: str
+    qr_code: str  # base64 encoded image
+
 @app.post("/create-session")
-async def create_session_route() -> StreamingResponse:
+async def create_session_route() -> QRCodeResponse:
     session_id = await create_session()
     
     # Generate QR code
@@ -72,12 +78,15 @@ async def create_session_route() -> StreamingResponse:
     
     img = qr.make_image(fill_color="black", back_color="white")
     
-    # Convert to bytes
+    # Convert to base64
     byte_io = io.BytesIO()
     img.save(byte_io, 'PNG')
-    byte_io.seek(0)
+    qr_code_base64 = base64.b64encode(byte_io.getvalue()).decode('utf-8')
     
-    return StreamingResponse(byte_io, media_type="image/png")
+    return QRCodeResponse(
+        session_id=session_id,
+        qr_code=f"data:image/png;base64,{qr_code_base64}"
+    )
 
 
 @app.get("/auth/{session_id}")

@@ -41,9 +41,9 @@ document.addEventListener('alpine:init', () => {
             if (!response.ok) {
                 throw new Error(`${response.status} ${response.statusText}`);
             }
-            // Get the image blob directly
-            const blob = await response.blob();
-            this.qrCodeUrl = URL.createObjectURL(blob);
+            const { session_id, qr_code } = await response.json();
+            this.sessionId = session_id;
+            this.qrCodeUrl = qr_code;
             
             this.authInterval = setInterval(async () => {
                 try {
