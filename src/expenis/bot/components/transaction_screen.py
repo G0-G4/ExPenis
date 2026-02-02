@@ -142,7 +142,7 @@ class TransactionCreate(Screen):
 
     def save_account_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE, callback_data: str, cmp: Component):
         if isinstance(cmp, CheckBox) and cmp.selected:
-            context.user_data['account_id'] = cmp.component_id
+            context.user_data['account_id'] = cmp.data
 
 
 class TransactionEdit(TransactionCreate):
