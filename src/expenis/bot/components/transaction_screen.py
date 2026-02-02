@@ -71,7 +71,7 @@ class TransactionCreate(Screen):
         if saved_account_id is not None and self.account_group.get_selected() is None:
             # TODO get components by id
             for account_cb in self.account_checkboxes:
-                if account_cb.component_id == saved_account_id:
+                if account_cb.data == saved_account_id:
                     await account_cb.check(update, context, update.callback_query.data)
         layout = [
             *render_by_n(update, context, self.account_checkboxes),
@@ -95,7 +95,7 @@ class TransactionCreate(Screen):
             user_id=get_user_id(update),
             category=Category(id=int(category_id)),
             transaction_type=self.type_group.get_selected().component_id,
-            account=Account(id=int(self.account_group.get_selected().component_id)),
+            account=Account(id=self.account_group.get_selected().data),
             amount=self.amount.value,
             description=self.description.value
         )
@@ -134,16 +134,15 @@ class TransactionCreate(Screen):
             if len(accounts_with_balances) > 0:
                 self.accounts = []
             for account, balance in accounts_with_balances:
-                cb = CheckBox(text=get_account_label(account, balance), group=self.account_group,
-                              component_id=str(account.id), on_change=self.save_account_id)
+                cb = CheckBox(text=get_account_label(account, balance), group=self.account_group, on_change=self.save_account_id)
+                cb.data = account.id
                 self.account_checkboxes.append(cb)
                 self.add_component(cb)
                 self.accounts.append(account)
 
     def save_account_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE, callback_data: str, cmp: Component):
-        if isinstance(cmp, CheckBox):
-            if cmp.selected:
-                context.user_data['account_id'] = cmp.component_id
+        if isinstance(cmp, CheckBox) and cmp.selected:
+            context.user_data['account_id'] = cmp.component_id
 
 
 class TransactionEdit(TransactionCreate):
@@ -171,7 +170,7 @@ class TransactionEdit(TransactionCreate):
             user_id=get_user_id(update),
             category=Category(id=int(category_id)),
             transaction_type=self.type_group.get_selected().component_id,
-            account=Account(id=int(self.account_group.get_selected().component_id)),
+            account=Account(id=self.account_group.get_selected().data),
             amount=self.amount.value,
             description=self.description.value
         )
@@ -186,9 +185,9 @@ class TransactionEdit(TransactionCreate):
         await super().init_if_necessary(get_user_id(update))
         if self.transaction is None:
             self.transaction = await get_transaction_by_id(self.transaction_id)
-            for account in self.account_checkboxes:
-                if account.component_id == str(self.transaction.account_id):
-                    await account.check(update, context, update.callback_query.data)
+            for cb in self.account_checkboxes:
+                if cb.data == self.transaction.account_id:
+                    await cb.check(update, context, update.callback_query.data)
             if self.transaction.category.type == 'income':
                 await self.income.check(update, context, update.callback_query.data)
                 for category in self.income_checkboxes:
