@@ -6,6 +6,7 @@ from tuican import get_user_id
 from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
 from tuican.validation import identity
 
+from .delete_screen import DeleteScreen
 from .transaction_screen import render_by_n
 from ...core.models.category import Category
 from ...core.service.category_service import (
@@ -127,30 +128,8 @@ class CategoryEditScreen(CategoryCreateScreen):
         await self.group.go_back(update, context)
 
     async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        screen = DeleteScreen(self.category.id, self.group)
+        screen = DeleteScreen[int](self.category.id, delete_category_by_id, self.group)
         await self.group.go_to_screen(update, context, screen)
-
-
-class DeleteScreen(Screen):
-
-    def __init__(self, category_id: int, group: ScreenGroup):
-        self.group = group
-        self.category_id = category_id
-        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
-        self.cancel = Button(text="❌ Cancel", on_change=self.cancel_handler)
-        super().__init__([self.delete, self.cancel], message="Удалить?")
-
-    async def get_layout(self, update, context) -> Sequence[Sequence[InlineKeyboardButton]]:
-        return [
-            [self.delete.render(update, context), self.cancel.render(update, context)]
-        ]
-
-    async def cancel_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await self.group.go_back(update, context)
-
-    async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await delete_category_by_id(self.category_id)
-        await self.group.go_home(update, context)
 
 
 class CategoriesMain(ScreenGroup):

@@ -6,10 +6,11 @@ from tuican import get_user_id
 from tuican.components import Button, Component, Input, Screen, ScreenGroup
 from tuican.validation import any_float, identity
 
+from .delete_screen import DeleteScreen
 from ..components.transaction_screen import render_by_n
 from ...core.helpers import format_amount
 from ...core.models.account import Account
-from ...core.service import get_user_accounts_with_balance
+from ...core.service import delete_account_by_id, get_user_accounts_with_balance
 from ...core.service import create_account, get_user_account_with_balance, update_account
 
 
@@ -97,15 +98,16 @@ class AccountEditScreen(AccountCreateScreen):
         self.account_id = account_id
         self.group = group
         self.account: Account | None = None
+        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
         super().__init__(self.group)
-        self.add_components([])
+        self.add_components([self.delete])
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
         await self.init_if_necessary(update, context)
         layout = await super().get_layout(update, context)
         layout += [[]]
-        return layout
+        return layout + [[self.delete.render(update, context)]]
 
     async def init_if_necessary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if self.account is None:
@@ -118,6 +120,10 @@ class AccountEditScreen(AccountCreateScreen):
         self.account.name = self.name.value
         await update_account(get_user_id(update), self.account, self.amount.value)
         await self.group.go_back(update, context)
+
+    async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        screen = DeleteScreen[int](self.account_id, delete_account_by_id, self.group)
+        await self.group.go_to_screen(update, context, screen)
 
 
 class AccountMain(ScreenGroup):
