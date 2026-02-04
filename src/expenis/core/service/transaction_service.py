@@ -37,8 +37,6 @@ async def save_transaction(transaction: Transaction):
 
 async def update_transaction(transaction: Transaction):
     """Update an existing transaction"""
-    now = datetime.now(UTC)
-    transaction.updated_at = now if transaction.updated_at is None else transaction.updated_at
     await db.run(transaction.save)
 
 async def delete_transaction(transaction: Transaction):

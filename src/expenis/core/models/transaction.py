@@ -14,7 +14,7 @@ class Transaction(Model):
     category = ForeignKeyField(Category, backref="transactions")
     amount = FloatField(null=False, default=0.0)
     description = TextField(null=True)
-    created_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+    created_at = DateTimeField(null=False)
     updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
 
     class Meta:
