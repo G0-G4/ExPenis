@@ -6,10 +6,11 @@ from tuican import get_user_id
 from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGroup, Input, Screen, ScreenGroup
 from tuican.validation import identity, positive_float
 
+from .delete_screen import DeleteScreen
 from ...core.helpers import format_amount
+from ...core.models import Transaction
 from ...core.models.account import Account
 from ...core.models.category import Category
-from ...core.models import Transaction
 from ...core.service import get_user_accounts_with_balance
 from ...core.service.category_service import create_default_categories, get_user_categories
 from ...core.service.transaction_service import delete_transaction_by_id, get_transaction_by_id, save_transaction, \
@@ -20,7 +21,7 @@ def get_account_label(account: Account, amount: float):
     return f'{account.name} ({format_amount(amount)})'
 
 
-def render_by_n(update: Update, context: ContextTypes.DEFAULT_TYPE, cmp: list[Component], n: int=3) -> Sequence[
+def render_by_n(update: Update, context: ContextTypes.DEFAULT_TYPE, cmp: list[Component], n: int = 3) -> Sequence[
     Sequence[InlineKeyboardButton]]:
     keyboard = []
     row = []
@@ -60,7 +61,8 @@ class TransactionCreate(Screen):
 
         self.group = group
 
-        super().__init__([self.income, self.expense, self.amount, self.description, self.save, self.back], message="transaction")
+        super().__init__([self.income, self.expense, self.amount, self.description, self.save, self.back],
+                         message="transaction")
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
@@ -129,12 +131,13 @@ class TransactionCreate(Screen):
                 cb = CheckBox(text=category.name, group=self.expense_group, component_id=str(category.id))
                 self.expense_checkboxes.append(cb)
                 self.add_component(cb)
-        if self.accounts is None :
+        if self.accounts is None:
             accounts_with_balances = await get_user_accounts_with_balance(user_id)
             if len(accounts_with_balances) > 0:
                 self.accounts = []
             for account, balance in accounts_with_balances:
-                cb = CheckBox(text=get_account_label(account, balance), group=self.account_group, on_change=self.save_account_id)
+                cb = CheckBox(text=get_account_label(account, balance), group=self.account_group,
+                              on_change=self.save_account_id)
                 cb.data = account.id
                 self.account_checkboxes.append(cb)
                 self.add_component(cb)
@@ -159,6 +162,7 @@ class TransactionEdit(TransactionCreate):
         layout = await super().get_layout(update, context)
         layout += [[self.delete.render(update, context)]]
         return layout
+
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         category_id = None
         if self.income.selected:
@@ -178,7 +182,7 @@ class TransactionEdit(TransactionCreate):
         await self.group.go_back(update, context)
 
     async def delete_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        screen = DeleteScreen(self.transaction_id, self.group)
+        screen = DeleteScreen[int](self.transaction_id, delete_transaction_by_id, self.group)
         await self.group.go_to_screen(update, context, screen)
 
     async def initial_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -201,23 +205,3 @@ class TransactionEdit(TransactionCreate):
             self.amount.value = self.transaction.amount
             self.description.value = self.transaction.description
 
-class DeleteScreen(Screen):
-
-    def __init__(self, transaction_id: int, group: ScreenGroup):
-        self.group = group
-        self.transaction_id = transaction_id
-        self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
-        self.cancel = Button(text="❌ Cancel", on_change=self.cancel_handler)
-        super().__init__([self.delete, self.cancel], message="Удалить?")
-
-    async def get_layout(self, update, context) -> Sequence[Sequence[InlineKeyboardButton]]:
-        return [
-            [self.delete.render(update, context), self.cancel.render(update, context)]
-        ]
-
-    async def cancel_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await self.group.go_back(update, context)
-
-    async def delete_handler(self,update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await delete_transaction_by_id(self.transaction_id)
-        await self.group.go_home(update, context)

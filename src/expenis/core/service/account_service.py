@@ -61,3 +61,7 @@ async def update_account(user_id: int, account: Account, new_balance: float | No
             account.adjustment_amount = new_balance - balance + account.adjustment_amount
         account.updated_at = now
         await db.run(account.save)
+
+async def delete_account_by_id(account_id: int):
+    """Delete a category"""
+    await db.run(lambda: Account.delete_by_id(account_id))
