@@ -10,7 +10,7 @@ class Category(Model):
     user_id = IntegerField(null=False)
     type = TextField(constraints=[Check("type IN ('income', 'expense')")])
     name = TextField(null=False)
-    created_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+    created_at = DateTimeField(null=False)
     updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
     class Meta:
         database = db

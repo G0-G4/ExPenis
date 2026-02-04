@@ -11,7 +11,7 @@ class Session(Model):
     id = TextField(primary_key=True)
     user_id = IntegerField(null=True)
     status = TextField(null=False, constraints=[Check("type IN ('pending', 'confirmed')")])
-    created_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
+    created_at = DateTimeField(null=False)
     updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
 
     class Meta:
