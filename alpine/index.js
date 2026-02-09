@@ -18,9 +18,37 @@ document.addEventListener('alpine:init', () => {
         timeoutMessage: null,
 
         init() {
-            this.$watch('startDate', () => this.fetchTransactions());
-            this.$watch('endDate', () => this.fetchTransactions());
+            // Parse URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlStartDate = urlParams.get('startDate');
+            const urlEndDate = urlParams.get('endDate');
+            
+            // Set default dates
+            const today = new Date();
+            const firstDayOfMonth = new Date(Date.UTC(today.getFullYear(), today.getMonth(), 1))
+                .toISOString().split('T')[0];
+            
+            this.startDate = urlStartDate || firstDayOfMonth;
+            this.endDate = urlEndDate || today.toISOString().split('T')[0];
+            
+            // Update URL when dates change
+            this.$watch('startDate', () => {
+                this.updateUrl();
+                this.fetchTransactions();
+            });
+            this.$watch('endDate', () => {
+                this.updateUrl();
+                this.fetchTransactions();
+            });
+            
             this.checkAuthAndFetch();
+        },
+
+        updateUrl() {
+            const url = new URL(window.location);
+            url.searchParams.set('startDate', this.startDate);
+            url.searchParams.set('endDate', this.endDate);
+            window.history.pushState({}, '', url);
         },
 
         async checkAuthAndFetch() {
