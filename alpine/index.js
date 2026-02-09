@@ -1,5 +1,6 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('state', () => ({
+        API_BASE_URL: window.APP_CONFIG?.API_BASE_URL,
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
         transactions: [],
@@ -42,7 +43,7 @@ document.addEventListener('alpine:init', () => {
             this.timeoutMessage = null;
             this.authStartTime = Date.now();
             
-            const response = await fetch('/api/create-session', {method: 'POST'});
+            const response = await fetch(`${this.API_BASE_URL}/create-session`, {method: 'POST'});
             if (!response.ok) {
                 throw new Error(`${response.status} ${response.statusText}`);
             }
@@ -58,7 +59,7 @@ document.addEventListener('alpine:init', () => {
                         return;
                     }
                     
-                    const authResponse = await fetch(`/api/auth/${this.sessionId}`, {credentials: 'include'});
+                    const authResponse = await fetch(`${this.API_BASE_URL}/auth/${this.sessionId}`, {credentials: 'include'});
                     const { status } = await authResponse.json();
                     
                     if (status === 'confirmed') {
@@ -74,7 +75,7 @@ document.addEventListener('alpine:init', () => {
         async fetchTransactions() {
             this.isLoading = true;
             try {
-                const response = await fetch(`/api/transactions?date_from=${this.startDate}&date_to=${this.endDate}`, {
+                const response = await fetch(`${this.API_BASE_URL}/transactions?date_from=${this.startDate}&date_to=${this.endDate}`, {
                     credentials: 'include'
                 });
                 
