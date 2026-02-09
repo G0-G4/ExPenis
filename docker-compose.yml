@@ -3,8 +3,8 @@ version: '3.8'
 services:
   frontend:
     volumes:
-      - /etc/letsencrypt:/etc/nginx/ssl:ro
-#      - ./nginx/ssl:/etc/nginx/ssl:ro
+#      - /etc/letsencrypt:/etc/nginx/ssl:ro
+      - ${SSL_VOLUME}:/etc/nginx/ssl:ro
     build:
       context: .
       dockerfile: Dockerfile.frontend
