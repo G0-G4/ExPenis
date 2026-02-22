@@ -16,7 +16,8 @@ from ...core.service.transaction_service import get_transactions_for_period
 def get_transaction_label(transaction: Transaction)-> str:
     emoji = "🟢" if transaction.category.type == "income" else "🔴"
     formatted_amount = format_amount(transaction.amount)
-    return f"{emoji} {formatted_amount} ({transaction.category.name})"
+    comment =  transaction.description or ""
+    return f"{emoji} {formatted_amount} ({transaction.category.name}) {comment}"
 
 def get_paddings(transactions: list[Transaction]) -> tuple[int, int]:
     if len(transactions) == 0:

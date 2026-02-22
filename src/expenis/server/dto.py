@@ -10,6 +10,7 @@ class Transaction(BaseModel):
     type: Literal["income", "expense"]
     category: str
     amount: float
+    description: str | None
 
 class TransactionsResponse(BaseModel):
     transactions: list[Transaction]
