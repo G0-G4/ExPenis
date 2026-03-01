@@ -1,3 +1,4 @@
+from cmath import acos
 from typing import ClassVar, Sequence
 
 from telegram import InlineKeyboardButton, Update
@@ -10,8 +11,45 @@ from .delete_screen import DeleteScreen
 from ..components.transaction_screen import render_by_n
 from ...core.helpers import format_amount
 from ...core.models.account import Account
-from ...core.service import delete_account_by_id, get_user_accounts_with_balance
-from ...core.service import create_account, get_user_account_with_balance, update_account
+from ...core.service import create_account, delete_account_by_id, get_user_account_with_balance, \
+    get_user_accounts_with_balance, update_account
+from ...core.service.exchage_rate_service import get_currency_exchange_rate
+from ...core.utils.currency_codes import CODES
+
+
+async def get_account_label(account: Account, balance: float):
+    if account.currency_code == "RUB":
+        f"{account.name} {format_amount(balance)} ₽"
+    return f"{account.name} {format_amount(balance)} {account.currency_code}"
+
+async def get_total(accounts_with_balances: list[tuple[Account, float]]) -> float:
+    amount = 0
+    for account, balance in accounts_with_balances:
+        amount += balance * await get_currency_exchange_rate(account.currency_code)
+    return amount
+
+async def get_formatted_amount(account: Account, balance: float):
+    amount = balance
+    if account.currency_code != 'RUB':
+        amount = balance * await get_currency_exchange_rate(account.currency_code)
+    return f"{format_amount(amount)} ₽"
+
+async def get_message_text(accounts_with_balances: list[tuple[Account, float]]) -> str:
+    total_name = '📊 Итого'
+    total = await get_total(accounts_with_balances)
+    total_str = f"{format_amount(total)} ₽"
+    message = "<code>список счетов:</code>\n"
+    max_amount_length = len(total_str) + 2
+    max_name_length = max([len(account.name) for account, balance in accounts_with_balances] + [len(total_name) + 1] ) + 2
+    padding_width = max_amount_length + 2
+    separator = (10 + padding_width) * "─"
+    for account, balance in accounts_with_balances:
+        message += f"<code>{account.name:<{max_name_length}} {await get_formatted_amount(account, balance):>{padding_width}}</code>\n"
+    message += f"<code>{separator}</code>\n"
+    # -1 cause 📊3 takes two places
+    #          123
+    message += f"<code>{total_name:<{max_name_length - 1}} {total_str:>{padding_width}}</code>"
+    return message
 
 
 class AccountsScreen(Screen):
@@ -45,11 +83,12 @@ class AccountsScreen(Screen):
         if self.accounts is None:
             user_id = get_user_id(update)
             accounts_with_balance = await get_user_accounts_with_balance(user_id)
+            self.message = await get_message_text(accounts_with_balance)
             if len(accounts_with_balance) > 0:
                 self.accounts = []
             for account, balance in accounts_with_balance:
-                btn = Button(text=f"{account.name} {format_amount(balance)}", component_id=str(account.id),
-                             on_change=self.edit_account_handler)
+                label = await get_account_label(account, balance)
+                btn = Button(text=label, component_id=str(account.id), on_change=self.edit_account_handler)
                 self.account_buttons.append(btn)
                 self.add_component(btn)
                 self.accounts.append(account)
@@ -65,17 +104,20 @@ class AccountCreateScreen(Screen):
     def __init__(self, group: ScreenGroup):
         self.name = Input[str](identity, text="Название:")
         self.amount = Input[float](any_float, text="Сумма:")
+        self.currency_code = Input[str](currency_check, value="RUB", text="валюта:", component_id="currency_code")
         self.save = Button(text="✅ Save", on_change=self.save_handler)
         self.back = Button(text="⬅️ back", on_change=self.back_handler)
         self.account = None
         self.group = group
-        super().__init__([self.name, self.amount, self.back, self.save], message="редактирование счета")
+        super().__init__([self.name, self.amount, self.back, self.save, self.currency_code],
+                         message="редактирование счета")
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
         layout = [
             [self.name.render(update, context)],
-            [self.amount.render(update, context)]
+            [self.amount.render(update, context)],
+            [self.currency_code.render(update, context)]
         ]
         if self.check_form_filled():
             layout += [[self.save.render(update, context)]]
@@ -83,14 +125,14 @@ class AccountCreateScreen(Screen):
         return layout
 
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        await create_account(get_user_id(update), self.name.value, self.amount.value)
+        await create_account(get_user_id(update), self.name.value, self.amount.value, self.currency_code.value)
         await self.group.go_back(update, context)
 
     async def back_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         await self.group.go_back(update, context)
 
     def check_form_filled(self) -> bool:
-        return self.name.value is not None and self.amount.value is not None
+        return self.name.value is not None and self.amount.value is not None and self.currency_code.value is not None
 
 
 class AccountEditScreen(AccountCreateScreen):
@@ -101,6 +143,11 @@ class AccountEditScreen(AccountCreateScreen):
         self.delete = Button(text="🗑 Delete", on_change=self.delete_handler)
         super().__init__(self.group)
         self.add_components([self.delete])
+        # TODO system to hide and deactivate components
+        for component in self._components:
+            if component.component_id == 'currency_code':
+                self._components.remove(component)
+                break
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
@@ -115,6 +162,7 @@ class AccountEditScreen(AccountCreateScreen):
             self.account, balance = await get_user_account_with_balance(user_id, self.account_id)
             self.name.value = self.account.name
             self.amount.value = balance
+            self.currency_code.value = self.account.currency_code
 
     async def save_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         self.account.name = self.name.value
@@ -132,3 +180,9 @@ class AccountMain(ScreenGroup):
     def __init__(self):
         self.main = AccountsScreen(self)
         super().__init__(self.main)
+
+
+def currency_check(code: str) -> str:
+    if code not in CODES:
+        raise RuntimeError(f"unknown currency {code}")
+    return code
