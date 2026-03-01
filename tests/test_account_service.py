@@ -11,11 +11,7 @@ async def test_basic_crud():
     name = "name"
     adjustment_amount = 10.0
     async with db:
-        await create_account(
-            user_id=user_id,
-            name=name,
-            adjustment_amount=adjustment_amount
-        )
+        await create_account(user_id=user_id, name=name, adjustment_amount=adjustment_amount)
 
         accounts = await get_user_accounts(user_id)
         assert len(accounts) > 0

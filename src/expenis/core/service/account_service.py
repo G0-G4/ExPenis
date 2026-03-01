@@ -41,17 +41,12 @@ async def get_user_account_with_balance(user_id: int, account_id) -> tuple[Accou
     return (accounts[0], accounts[0].balance) if len(accounts) > 0 else (None, None)
 
 
-async def create_account(user_id: int, name: str, adjustment_amount: float):
+async def create_account(user_id: int, name: str, adjustment_amount: float, currency_code="RUB"):
     now = datetime.now(UTC)
-    account = Account(user_id=user_id, name=name, adjustment_amount=adjustment_amount, created_at=now, updated_at=now)
+    account = Account(user_id=user_id, name=name, adjustment_amount=adjustment_amount, currency_code=currency_code,
+                      created_at=now, updated_at=now)
     await db.run(account.save)
 
-
-async def set_balance(user_id: int, id: int, new_balance: float):
-    async with db.atomic():
-        account, balance = await get_user_account_with_balance(user_id, id)
-        account.adjustment_amount = new_balance - balance + account.adjustment_amount
-        await db.run(account.save)
 
 async def update_account(user_id: int, account: Account, new_balance: float | None = None):
     now = datetime.now(UTC)
