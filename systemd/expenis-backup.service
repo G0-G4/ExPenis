@@ -1,0 +1,19 @@
+[Unit]
+Description=ExPenis daily backup script
+After=network.target
+
+[Service]
+Type=oneshot
+User=gog4
+Group=gog4
+ExecStart=/home/gog4/ExPenis/backup.sh
+WorkingDirectory=/home/gog4/ExPenis
+StandardOutput=append:/var/log/expenis-backup.log
+StandardError==append:/var/log/expenis-backup-error.log
+LimitMEMLOCK=infinity
+LimitRTPRIO=infinity
+LimitRTTIME=infinity
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+
+[Install]
+WantedBy=multi-user.target
