@@ -114,6 +114,6 @@ def convert_transaction_to_dto(transaction: ModelTransaction) -> Transaction:
         account=transaction.account.name,
         type=transaction.category.type,
         category=transaction.category.name,
-        amount=transaction.amount,
+        amount=transaction.amount * transaction.exchange_rate,
         description=transaction.description
     )
