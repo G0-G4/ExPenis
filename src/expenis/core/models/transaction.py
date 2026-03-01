@@ -10,10 +10,11 @@ from .database import db
 class Transaction(Model):
     id = AutoField(primary_key=True)
     user_id = IntegerField(null=False)
-    account = ForeignKeyField(Account, backref="transactions")
+    account: Account = ForeignKeyField(Account, backref="transactions")
     category = ForeignKeyField(Category, backref="transactions")
     amount = FloatField(null=False, default=0.0)
     description = TextField(null=True)
+    exchange_rate = FloatField(null=False, default=1.0)
     created_at = DateTimeField(null=False)
     updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
 

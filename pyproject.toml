@@ -10,6 +10,7 @@ dependencies = [
     "authx>=1.5.0",
     "fastapi>=0.128.0",
     "greenlet>=3.3.1",
+    "httpx>=0.28.1",
     "mypy>=1.19.1",
     "peewee",
     "pydantic>=2.12.5",
