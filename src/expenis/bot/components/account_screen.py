@@ -9,34 +9,17 @@ from tuican.validation import any_float, identity
 
 from .delete_screen import DeleteScreen
 from ..components.transaction_screen import render_by_n
+from ..service.account_service import get_account_label, get_account_label_in_rubles, get_total_sum_in_rubles
 from ...core.helpers import format_amount
 from ...core.models.account import Account
 from ...core.service import create_account, delete_account_by_id, get_user_account_with_balance, \
     get_user_accounts_with_balance, update_account
-from ...core.service.exchage_rate_service import get_currency_exchange_rate
 from ...core.utils.currency_codes import CODES
 
 
-async def get_account_label(account: Account, balance: float):
-    if account.currency_code == "RUB":
-        f"{account.name} {format_amount(balance)} ₽"
-    return f"{account.name} {format_amount(balance)} {account.currency_code}"
-
-async def get_total(accounts_with_balances: list[tuple[Account, float]]) -> float:
-    amount = 0
-    for account, balance in accounts_with_balances:
-        amount += balance * await get_currency_exchange_rate(account.currency_code)
-    return amount
-
-async def get_formatted_amount(account: Account, balance: float):
-    amount = balance
-    if account.currency_code != 'RUB':
-        amount = balance * await get_currency_exchange_rate(account.currency_code)
-    return f"{format_amount(amount)} ₽"
-
 async def get_message_text(accounts_with_balances: list[tuple[Account, float]]) -> str:
     total_name = '📊 Итого'
-    total = await get_total(accounts_with_balances)
+    total = await get_total_sum_in_rubles(accounts_with_balances)
     total_str = f"{format_amount(total)} ₽"
     message = "<code>список счетов:</code>\n"
     max_amount_length = len(total_str) + 2
@@ -44,7 +27,7 @@ async def get_message_text(accounts_with_balances: list[tuple[Account, float]]) 
     padding_width = max_amount_length + 2
     separator = (10 + padding_width) * "─"
     for account, balance in accounts_with_balances:
-        message += f"<code>{account.name:<{max_name_length}} {await get_formatted_amount(account, balance):>{padding_width}}</code>\n"
+        message += f"<code>{account.name:<{max_name_length}} {await get_account_label_in_rubles(account, balance):>{padding_width}}</code>\n"
     message += f"<code>{separator}</code>\n"
     # -1 cause 📊3 takes two places
     #          123
@@ -87,7 +70,7 @@ class AccountsScreen(Screen):
             if len(accounts_with_balance) > 0:
                 self.accounts = []
             for account, balance in accounts_with_balance:
-                label = await get_account_label(account, balance)
+                label = get_account_label(account, balance)
                 btn = Button(text=label, component_id=str(account.id), on_change=self.edit_account_handler)
                 self.account_buttons.append(btn)
                 self.add_component(btn)

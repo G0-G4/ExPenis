@@ -10,7 +10,7 @@ from .database import db
 class Transaction(Model):
     id = AutoField(primary_key=True)
     user_id = IntegerField(null=False)
-    account = ForeignKeyField(Account, backref="transactions")
+    account: Account = ForeignKeyField(Account, backref="transactions")
     category = ForeignKeyField(Category, backref="transactions")
     amount = FloatField(null=False, default=0.0)
     description = TextField(null=True)

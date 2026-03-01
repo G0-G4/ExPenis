@@ -7,32 +7,16 @@ from tuican.components import Button, CheckBox, Component, ExclusiveCheckBoxGrou
 from tuican.validation import identity, positive_float
 
 from .delete_screen import DeleteScreen
-from ...core.helpers import format_amount
+from .utils.render_utils import render_by_n
+from ..service.account_service import get_account_label
 from ...core.models import Transaction
 from ...core.models.account import Account
 from ...core.models.category import Category
-from ...core.service import get_user_accounts_with_balance
+from ...core.service import get_account_by_id, get_user_accounts_with_balance
 from ...core.service.category_service import create_default_categories, get_user_categories
+from ...core.service.exchage_rate_service import get_currency_exchange_rate
 from ...core.service.transaction_service import delete_transaction_by_id, get_transaction_by_id, save_transaction, \
     update_transaction
-
-
-def get_account_label(account: Account, amount: float):
-    return f'{account.name} ({format_amount(amount)})'
-
-
-def render_by_n(update: Update, context: ContextTypes.DEFAULT_TYPE, cmp: list[Component], n: int = 3) -> Sequence[
-    Sequence[InlineKeyboardButton]]:
-    keyboard = []
-    row = []
-    for component in cmp:
-        row.append(component.render(update, context))
-        if len(row) == n:
-            keyboard.append(row)
-            row = []
-    if len(row):
-        keyboard.append(row)
-    return keyboard
 
 
 class TransactionCreate(Screen):
@@ -73,7 +57,7 @@ class TransactionCreate(Screen):
         if saved_account_id is not None and self.account_group.get_selected() is None:
             # TODO get components by id
             for account_cb in self.account_checkboxes:
-                if account_cb.data == saved_account_id:
+                if account_cb.data == saved_account_id: #TODO make component generic by type it contains in data
                     await account_cb.check(update, context, update.callback_query.data)
         layout = [
             *render_by_n(update, context, self.account_checkboxes),
@@ -93,13 +77,16 @@ class TransactionCreate(Screen):
             category_id = self.income_group.get_selected().component_id
         if self.expense.selected:
             category_id = self.expense_group.get_selected().component_id
+        account = await get_account_by_id(get_user_id(update), self.account_group.get_selected().data)
+        rate = await get_currency_exchange_rate(account.currency_code)
         transaction = Transaction(
             user_id=get_user_id(update),
             category=Category(id=int(category_id)),
             transaction_type=self.type_group.get_selected().component_id,
-            account=Account(id=self.account_group.get_selected().data),
+            account=account,
             amount=self.amount.value,
-            description=self.description.value
+            description=self.description.value,
+            exchange_rate = rate
         )
         await save_transaction(transaction)
         await self.group.go_back(update, context)
@@ -169,14 +156,17 @@ class TransactionEdit(TransactionCreate):
             category_id = self.income_group.get_selected().component_id
         if self.expense.selected:
             category_id = self.expense_group.get_selected().component_id
+        account = await get_account_by_id(get_user_id(update), self.account_group.get_selected().data)
+        rate = await get_currency_exchange_rate(account.currency_code)
         transaction = Transaction(
             id=self.transaction_id,
             user_id=get_user_id(update),
             category=Category(id=int(category_id)),
             transaction_type=self.type_group.get_selected().component_id,
-            account=Account(id=self.account_group.get_selected().data),
+            account=account,
             amount=self.amount.value,
-            description=self.description.value
+            description=self.description.value,
+            exchange_rate=rate
         )
         await update_transaction(transaction)
         await self.group.go_back(update, context)
@@ -204,4 +194,3 @@ class TransactionEdit(TransactionCreate):
                         await category.check(update, context, update.callback_query.data)
             self.amount.value = self.transaction.amount
             self.description.value = self.transaction.description
-
