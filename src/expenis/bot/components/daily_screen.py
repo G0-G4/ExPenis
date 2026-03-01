@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes
 from tuican import get_user_id
 from tuican.components import Button, Component, Hline, Screen, ScreenGroup
 
+from ..service.transaction_service import calculate_transaction_stats, get_transaction_label
 from ...bot.components.transaction_screen import TransactionCreate, TransactionEdit
 from ...core.helpers import format_amount
 from ...core.models import Transaction
@@ -13,43 +14,18 @@ from ...core.service import confirm_session
 from ...core.service.transaction_service import get_transactions_for_period
 
 
-def get_transaction_label(transaction: Transaction)-> str:
-    emoji = "🟢" if transaction.category.type == "income" else "🔴"
-    formatted_amount = format_amount(transaction.amount)
-    comment =  transaction.description or ""
-    return f"{emoji} {formatted_amount} ({transaction.category.name}) {comment}"
-
-def get_paddings(transactions: list[Transaction]) -> tuple[int, int]:
-    if len(transactions) == 0:
-        return 0, 0
-    amount_padding = max([len(format_amount(transaction.amount)) for transaction in transactions]) + 2
-    category_padding = max([len(transaction.category.name) for transaction in transactions]) + 2
-    return amount_padding, category_padding
-
 def get_message(transactions: list[Transaction], dt: date) -> str:
-    income, expense, total = calculate_stats(transactions)
+    income, expense, total = calculate_transaction_stats(transactions)
     max_length = max(len(format_amount(income)), len(format_amount(expense)), len(format_amount(total)))
     padding_width = max_length + 2
     separator = (10 + padding_width) * "─"
     return f"""
 <code>{dt}</code>
-<code>🟢 Доходы  {format_amount(income):>{padding_width}}</code>
-<code>🔴 Расходы {format_amount(expense):>{padding_width}}</code>
+<code>🟢 Доходы  {f'{format_amount(income)} ₽':>{padding_width}}</code>
+<code>🔴 Расходы {f'{format_amount(expense)} ₽':>{padding_width}}</code>
 <code>{separator}</code>
-<code>📊 Итого   {format_amount(total):>{padding_width}}</code>
+<code>📊 Итого   {f'{format_amount(total)} ₽':>{padding_width}}</code>
 """
-
-def calculate_stats(transactions: list[Transaction]) -> tuple[float, float, float]:
-    income = 0.0
-    expense = 0.0
-    total = 0.0
-    for transaction in transactions:
-        if transaction.category.type == 'income':
-            income += transaction.amount
-        if transaction.category.type == 'expense':
-            expense += transaction.amount
-    total = income - expense
-    return income, expense, total
 
 
 class DailyScreen(Screen):
@@ -65,8 +41,8 @@ class DailyScreen(Screen):
         self.group = group
         super().__init__([self.left, self.today, self.right, self.new_transaction])
 
-
-    async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[Sequence[InlineKeyboardButton]]:
+    async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
+        Sequence[InlineKeyboardButton]]:
         await self.add_transactions(get_user_id(update))
         return ([[b.render(update, context)] for b in self.transactions_buttons] +
                 [
@@ -89,13 +65,13 @@ class DailyScreen(Screen):
         self.remove_transactions()
 
     async def new_transaction_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
-                                callback_data: str | None, cmp: Component):
+                                      callback_data: str | None, cmp: Component):
         screen = TransactionCreate(self.group)
         self.remove_transactions()
         await self.group.go_to_screen(update, context, screen)
 
     async def edit_transaction_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
-                                      callback_data: str | None, cmp: Component):
+                                       callback_data: str | None, cmp: Component):
         screen = TransactionEdit(int(cmp.component_id), self.group)
         self.remove_transactions()
         await self.group.go_to_screen(update, context, screen)
@@ -122,7 +98,6 @@ class DailyScreen(Screen):
             await self.group.go_to_screen(update, context, screen)
 
 
-
 class ConfirmSessionScreen(Screen):
     def __init__(self, session_id: str, group: ScreenGroup):
         self.group = group
@@ -141,11 +116,12 @@ class ConfirmSessionScreen(Screen):
 
     async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
         Sequence[InlineKeyboardButton]]:
-        return [[self.confirm.render(update, context), self.cancel.render(update,context)]]
+        return [[self.confirm.render(update, context), self.cancel.render(update, context)]]
 
 
 class MainScreen(ScreenGroup):
     description: ClassVar[str] = "траты по дням"
+
     def __init__(self):
         self.main = DailyScreen(self)
         super().__init__(self.main)
