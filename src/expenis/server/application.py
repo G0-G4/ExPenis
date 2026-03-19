@@ -11,10 +11,17 @@ from authx import AuthX, AuthXConfig, TokenPayload
 from fastapi import Depends, FastAPI, Query, Response
 from starlette.middleware.cors import CORSMiddleware
 
-from .dto import QRCodeResponse, SessionStatusResponse, Transaction, TransactionsResponse
+from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, CurrencyCode, CurrencyCodes, \
+    QRCodeResponse, \
+    SessionStatusResponse, Transaction, \
+    TransactionsResponse
 from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, SECRET
-from ..core.models import Transaction as ModelTransaction, db
-from ..core.service import clear_old_sessions, create_session, get_session, get_transactions_for_period
+from ..core.models import Account, Transaction as ModelTransaction, db
+from ..core.service import clear_old_sessions, create_account, create_session, delete_account_by_id, \
+    delete_account_by_id_and_user_id, get_session, \
+    get_transactions_for_period, \
+    get_user_account_with_balance, get_user_accounts_with_balance, update_account
+from ..core.utils.currency_codes import CODES
 
 
 async def clear_job():
@@ -106,6 +113,57 @@ async def auth_user(session_id: str, response: Response) -> SessionStatusRespons
         token = auth.create_access_token(uid=str(session.user_id))
         auth.set_access_cookies(token, response, EXPIRATION_TIME_SECONDS)
     return SessionStatusResponse(status=session.status, session_id=session_id)
+
+
+@app.get("/api/accounts")
+async def get_user_accounts() -> AccountsResponse:
+    accounts = await get_user_accounts_with_balance(433289417)
+    return AccountsResponse(accounts={acc.id: convert_account_with_balance_to_dto(acc, am) for acc, am in accounts},
+                            total=len(accounts))
+
+@app.get("/api/accounts")
+async def get_user_accounts() -> AccountsResponse:
+    accounts = await get_user_accounts_with_balance(433289417)
+    return AccountsResponse(accounts={acc.id: convert_account_with_balance_to_dto(acc, am) for acc, am in accounts},
+                            total=len(accounts))
+
+@app.get("/api/accounts/account/{account_id}")
+async def get_user_accounts(account_id: int) -> AccountDto:
+    account, balance = await get_user_account_with_balance(433289417, account_id)
+    return convert_account_with_balance_to_dto(account, balance)
+
+@app.put("/api/accounts/account/{account_id}")
+async def update_account_endpoint(account_id: int, update_request: AccountUpdateRequest) -> AccountDto:
+    account, balance = await get_user_account_with_balance(433289417, account_id)
+    account.name = update_request.name
+    updated_account = await update_account(433289417, account, update_request.amount)
+    return convert_account_with_balance_to_dto(updated_account, update_request.amount)
+
+@app.delete("/api/accounts/account/{account_id}")
+async def update_account_endpoint(account_id: int):
+    await delete_account_by_id_and_user_id(433289417, account_id)
+
+@app.post("/api/accounts/account")
+async def create_account_endpoint(create_request: AccountCreateRequest) -> AccountDto:
+    account = await create_account(433289417, create_request.name, create_request.amount, create_request.currency_code)
+    return convert_account_with_balance_to_dto(account, create_request.amount)
+
+@app.get("/api/currency/codes")
+async def update_account_endpoint() -> CurrencyCodes:
+    return CurrencyCodes(
+        codes={code.get("CharCode"): CurrencyCode(
+            num_code=int(code.get("NumCode", None)) if code.get("NumCode", None) is not None else None,
+            char_code=code.get("CharCode")) for code in CODES.values()}
+    )
+
+def convert_account_with_balance_to_dto(account: Account, balance: float):
+    return AccountDto(
+        id=account.id,
+        user_id=account.user_id,
+        name=account.name,
+        amount=balance,
+        currency_code=account.currency_code
+    )
 
 
 def convert_transaction_to_dto(transaction: ModelTransaction) -> Transaction:
