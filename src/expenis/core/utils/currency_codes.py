@@ -486,9 +486,12 @@ CODES = {
         "Previous": 36.7247
     },
     "RUB": {
+        "CharCode": "RUB",
     },
     "BTC": {
+        "CharCode": "BTC",
     },
     "ETH": {
+        "CharCode": "ETH",
     }
 }
