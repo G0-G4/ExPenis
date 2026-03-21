@@ -1,5 +1,6 @@
-from pydantic import BaseModel, field_validator
 from typing import Literal
+
+from pydantic import BaseModel, field_validator
 
 from src.expenis.core.service import SessionStatus
 from src.expenis.core.utils.currency_codes import CODES
@@ -13,6 +14,7 @@ class Transaction(BaseModel):
     amount: float
     description: str | None
 
+
 class TransactionsResponse(BaseModel):
     transactions: list[Transaction]
 
@@ -20,6 +22,7 @@ class TransactionsResponse(BaseModel):
 class SessionStatusResponse(BaseModel):
     session_id: str
     status: SessionStatus
+
 
 class QRCodeResponse(BaseModel):
     session_id: str
@@ -33,14 +36,17 @@ class AccountDto(BaseModel):
     amount: float
     currency_code: str
 
+
 class AccountsResponse(BaseModel):
     accounts: dict[int, AccountDto]
     total: int
+
 
 class AccountUpdateRequest(BaseModel):
     id: int
     name: str
     amount: float
+
 
 class AccountCreateRequest(BaseModel):
     name: str
@@ -59,5 +65,20 @@ class CurrencyCode(BaseModel):
     num_code: int | None
     char_code: str
 
+
 class CurrencyCodes(BaseModel):
     codes: dict[str, CurrencyCode]
+
+
+class CategoryDto(BaseModel):
+    id: int
+    type: Literal['income', 'expense']
+    name: str
+
+
+class CategoriesResponse(BaseModel):
+    categories: dict[int, CategoryDto]
+
+class CategoryCreateRequest(BaseModel):
+    type: Literal['income', 'expense']
+    name: str

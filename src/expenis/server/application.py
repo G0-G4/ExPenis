@@ -11,16 +11,20 @@ from authx import AuthX, AuthXConfig, TokenPayload
 from fastapi import Depends, FastAPI, Query, Response
 from starlette.middleware.cors import CORSMiddleware
 
-from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, CurrencyCode, CurrencyCodes, \
+from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, CategoriesResponse, \
+    CategoryCreateRequest, CategoryDto, CurrencyCode, \
+    CurrencyCodes, \
     QRCodeResponse, \
     SessionStatusResponse, Transaction, \
     TransactionsResponse
 from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, SECRET
-from ..core.models import Account, Transaction as ModelTransaction, db
-from ..core.service import clear_old_sessions, create_account, create_session, delete_account_by_id, \
-    delete_account_by_id_and_user_id, get_session, \
+from ..core.models import Account, Category, Transaction as ModelTransaction, db
+from ..core.service import clear_old_sessions, create_account, create_category, create_default_categories, \
+    create_session, \
+    delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, get_category_by_id, \
+    get_session, \
     get_transactions_for_period, \
-    get_user_account_with_balance, get_user_accounts_with_balance, update_account
+    get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, update_account, update_category
 from ..core.utils.currency_codes import CODES
 
 
@@ -121,12 +125,6 @@ async def get_user_accounts() -> AccountsResponse:
     return AccountsResponse(accounts={acc.id: convert_account_with_balance_to_dto(acc, am) for acc, am in accounts},
                             total=len(accounts))
 
-@app.get("/api/accounts")
-async def get_user_accounts() -> AccountsResponse:
-    accounts = await get_user_accounts_with_balance(433289417)
-    return AccountsResponse(accounts={acc.id: convert_account_with_balance_to_dto(acc, am) for acc, am in accounts},
-                            total=len(accounts))
-
 @app.get("/api/accounts/account/{account_id}")
 async def get_user_accounts(account_id: int) -> AccountDto:
     account, balance = await get_user_account_with_balance(433289417, account_id)
@@ -156,6 +154,39 @@ async def update_account_endpoint() -> CurrencyCodes:
             char_code=code.get("CharCode")) for code in CODES.values()}
     )
 
+@app.get("/api/categories")
+async def get_user_categories_endpoint() -> CategoriesResponse:
+    income, expense = await get_user_categories(433289417)
+    if not income or not expense:
+        await create_default_categories(433289417)
+        income, expense = await get_user_categories(433289417)
+    categories = {category.id : convert_category_to_dto(category) for category in income + expense}
+    return CategoriesResponse(
+        categories=categories
+    )
+
+@app.get("/api/categories/{category_id}")
+async def get_user_category_endpoint(category_id: int) -> CategoryDto:
+    category = await get_category_by_id(433289417, category_id)
+    return convert_category_to_dto(category)
+
+@app.post("/api/categories")
+async def create_category_endpoint(create_request: CategoryCreateRequest) -> CategoryDto:
+    category = await create_category(433289417, create_request.name, create_request.type)
+    return convert_category_to_dto(category)
+
+@app.put("/api/categories/{category_id}")
+async def create_category_endpoint(category_id: int, create_request: CategoryCreateRequest) -> CategoryDto:
+    category = await get_category_by_id(433289417, category_id)
+    category.name = create_request.name
+    category.type = create_request.type
+    category = await update_category(category)
+    return convert_category_to_dto(category)
+
+@app.delete("/api/categories/{category_id}")
+async def create_category_endpoint(category_id: int):
+    await delete_category_by_id_and_user_id(433289417, category_id)
+
 def convert_account_with_balance_to_dto(account: Account, balance: float):
     return AccountDto(
         id=account.id,
@@ -174,4 +205,11 @@ def convert_transaction_to_dto(transaction: ModelTransaction) -> Transaction:
         category=transaction.category.name,
         amount=transaction.amount * transaction.exchange_rate,
         description=transaction.description
+    )
+
+def convert_category_to_dto(category: Category) -> CategoryDto:
+    return CategoryDto(
+        id=category.id,
+        name=category.name,
+        type=category.type
     )
