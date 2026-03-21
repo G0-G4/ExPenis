@@ -33,20 +33,22 @@ async def get_user_categories(user_id: int) -> tuple[list[Category], list[Catego
 
 async def get_category_by_id(user_id: int, id: int) -> Category | None:
     category = await db.run(lambda:
-                            Category.get_or_none(Category.id == id))
+                            Category.get_or_none(Category.id == id)) # TODO filter by user_id
     return category
 
 
-async def create_category(user_id: int, name: str, type: CategoryType):
+async def create_category(user_id: int, name: str, type: CategoryType) -> Category:
     now = datetime.now(UTC)
     category = Category(user_id=user_id, name=name, type=type, created_at=now, updated_at=now)
     await db.run(category.save)
+    return category
 
 
-async def update_category(category: Category):
+async def update_category(category: Category) -> Category:
     now = datetime.now(UTC)
     category.updated_at = now
     await db.run(category.save)
+    return category
 
 
 async def delete_category(category: Category):
@@ -55,6 +57,10 @@ async def delete_category(category: Category):
 async def delete_category_by_id(category_id: int):
     """Delete a category"""
     await db.run(lambda: Category.delete_by_id(category_id))
+
+async def delete_category_by_id_and_user_id(user_id: int, category_id: int):
+    """Delete a category"""
+    await db.run(lambda: Category.delete().where((Category.id == category_id) & (Category.user_id == user_id)).execute())
 
 
 async def create_default_categories(user_id: int):
