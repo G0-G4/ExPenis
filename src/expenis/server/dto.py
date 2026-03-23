@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, field_validator
@@ -9,10 +10,19 @@ from src.expenis.core.utils.currency_codes import CODES
 class Transaction(BaseModel):
     id: int
     account: str
+    account_id: int
     type: Literal["income", "expense"]
     category: str
+    category_id: int
     amount: float
     description: str | None
+
+class TransactionCreateRequest(BaseModel):
+    account_id: int
+    category_id: int
+    amount: float
+    description: str | None
+    created_at: datetime | None
 
 
 class TransactionsResponse(BaseModel):

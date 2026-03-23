@@ -19,6 +19,7 @@ async def get_transactions_for_period(user_id: int, start_date: date, end_date: 
     return transactions
 
 
+# TODO deprecated use get_transaction_by_id_and_user_id
 async def get_transaction_by_id(transaction_id: int) -> Transaction | None:
     """Get a transaction by its ID"""
     transaction = await db.run(lambda: Transaction
@@ -27,17 +28,27 @@ async def get_transaction_by_id(transaction_id: int) -> Transaction | None:
                                .prefetch(Account, Category))
     return transaction[0] if len(transaction) > 0 else None
 
+async def get_transaction_by_id_and_user_id(user_id: int, transaction_id: int) -> Transaction | None:
+    """Get a transaction by its ID"""
+    transaction = await db.run(lambda: Transaction
+                               .select()
+                               .where((Transaction.id == transaction_id) & (Transaction.user_id == user_id))
+                               .prefetch(Account, Category))
+    return transaction[0] if len(transaction) > 0 else None
 
-async def save_transaction(transaction: Transaction):
+
+async def save_transaction(transaction: Transaction) -> Transaction:
     """Update an existing transaction"""
     now = datetime.now(UTC)
     transaction.created_at = now if transaction.created_at is None else transaction.created_at
     transaction.updated_at = now if transaction.updated_at is None else transaction.updated_at
     await db.run(transaction.save)
+    return transaction
 
-async def update_transaction(transaction: Transaction):
+async def update_transaction(transaction: Transaction) -> Transaction:
     """Update an existing transaction"""
     await db.run(transaction.save)
+    return transaction
 
 async def delete_transaction(transaction: Transaction):
     """Delete a transaction"""
@@ -47,3 +58,6 @@ async def delete_transaction_by_id(transaction_id: int):
     """Delete a transaction"""
     await db.run(lambda: Transaction.delete_by_id(transaction_id))
 
+async def delete_transaction_by_id_and_user_id(user_id: int, transaction_id: int):
+    """Delete a transaction"""
+    await db.run(lambda: Transaction.delete().where((Transaction.id == transaction_id) & (Transaction.user_id == user_id)).execute())
