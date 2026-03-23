@@ -21,11 +21,11 @@ from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, SECR
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
 from ..core.service import clear_old_sessions, create_account, create_category, create_default_categories, \
     create_session, \
-    delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction, \
-    delete_transaction_by_id_and_user_id, get_account_by_id, \
+    delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction_by_id_and_user_id, \
+    get_account_by_id, \
     get_category_by_id, \
     get_session, \
-    get_transaction_by_id, get_transaction_by_id_and_user_id, get_transactions_for_period, \
+    get_transaction_by_id_and_user_id, get_transactions_for_period, \
     get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, save_transaction, \
     update_account, update_category, update_transaction
 from ..core.service.exchage_rate_service import get_currency_exchange_rate
@@ -64,7 +64,7 @@ if DEV:
     )
 config = AuthXConfig(
     JWT_SECRET_KEY=SECRET,
-    JWT_TOKEN_LOCATION=["cookies"],
+    JWT_TOKEN_LOCATION=["cookies", "headers"],
     JWT_ACCESS_COOKIE_NAME="access_token",
     JWT_COOKIE_DOMAIN=COOKIE_DOMAIN,
     JWT_COOKIE_SAMESITE="strict",
