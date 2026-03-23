@@ -1,7 +1,7 @@
 from tuican import Application
 
 from ..config import TOKEN
-from .components import MainScreen, CategoriesMain, AccountMain
+from .components import MainScreen, CategoriesMain, AccountMain, CommandHandlerScreen
 from ..core.models import db
 
 async def post_init(application):
@@ -15,6 +15,7 @@ async def post_shutdown(application):
 def main():
     app = Application(TOKEN, {
         'start': MainScreen,
+        'mobile_token': CommandHandlerScreen,
         'accounts': AccountMain,
         'categories': CategoriesMain
     }).post_init(post_init).post_shutdown(post_shutdown)

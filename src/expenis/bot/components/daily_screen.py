@@ -12,6 +12,7 @@ from ...core.helpers import format_amount
 from ...core.models import Transaction
 from ...core.service import confirm_session
 from ...core.service.transaction_service import get_transactions_for_period
+from ...server.application import auth
 
 
 def get_message(transactions: list[Transaction], dt: date) -> str:
@@ -26,6 +27,23 @@ def get_message(transactions: list[Transaction], dt: date) -> str:
 <code>{separator}</code>
 <code>📊 Итого   {f'{format_amount(total)} ₽':>{padding_width}}</code>
 """
+
+
+class CommandHandlerScreen(Screen):
+    description: ClassVar[str] = "CommandHandlerScreen"
+
+    def __init__(self):
+        super().__init__([])
+
+    async def get_layout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Sequence[
+        Sequence[InlineKeyboardButton]]:
+        return [[]]
+
+    async def command_handler(self, args: list[str], update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if len(args) == 1 and args[0] == 'mobile_token':
+            token = auth.create_access_token(uid=str(get_user_id(update)))
+            chat_id = update.effective_chat.id
+            await context.bot.send_message(chat_id=chat_id, text=str(token))
 
 
 class DailyScreen(Screen):

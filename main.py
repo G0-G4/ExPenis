@@ -1,10 +1,9 @@
-import asyncio
 import os
 
 from dotenv import load_dotenv
 from tuican import Application
 
-from src.expenis.bot.components import AccountMain, CategoriesMain, MainScreen
+from src.expenis.bot.components import AccountMain, CategoriesMain, MainScreen, CommandHandlerScreen
 from src.expenis.core.models import db
 
 load_dotenv()
@@ -23,6 +22,7 @@ async def post_shutdown(application):
 def main():
     app = Application(token, {
         'start': MainScreen,
+        'mobile_token': CommandHandlerScreen,
         'accounts': AccountMain,
         'categories': CategoriesMain
     }).post_init(post_init).post_shutdown(post_shutdown)
