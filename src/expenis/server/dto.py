@@ -15,7 +15,9 @@ class Transaction(BaseModel):
     category: str
     category_id: int
     amount: float
+    amount_rubles: float
     description: str | None
+    currency_code: str
 
 class TransactionCreateRequest(BaseModel):
     account_id: int
@@ -27,6 +29,7 @@ class TransactionCreateRequest(BaseModel):
 
 class TransactionsResponse(BaseModel):
     transactions: list[Transaction]
+    total_amount_rubles: float
 
 
 class SessionStatusResponse(BaseModel):
@@ -44,16 +47,17 @@ class AccountDto(BaseModel):
     user_id: int
     name: str
     amount: float
+    amount_rubles: float
     currency_code: str
 
 
 class AccountsResponse(BaseModel):
     accounts: dict[int, AccountDto]
     total: int
+    total_amount_rubles: float
 
 
 class AccountUpdateRequest(BaseModel):
-    id: int
     name: str
     amount: float
 
