@@ -36,3 +36,9 @@ async def get_currency_exchange_rate(currency_code: str) -> float:
     if "Value" not in valute:
         raise RuntimeError(f"exchange rate not found for {currency_code}")
     return valute.get("Value")
+
+async def convert_to_rubles(amount: float, currency_code: str) -> float | None:
+    if amount is None:
+        return amount
+    rate = await get_currency_exchange_rate(currency_code)
+    return amount * rate

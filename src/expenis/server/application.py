@@ -28,7 +28,7 @@ from ..core.service import clear_old_sessions, create_account, create_category, 
     get_transaction_by_id_and_user_id, get_transactions_for_period, \
     get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, save_transaction, \
     update_account, update_category, update_transaction
-from ..core.service.exchage_rate_service import get_currency_exchange_rate
+from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
 from ..core.utils.currency_codes import CODES
 
 
@@ -83,7 +83,10 @@ async def get_user_transactions(
 ) -> \
         TransactionsResponse:
     transactions = await get_transactions_for_period(int(payload.sub), date_from, date_to)
-    return TransactionsResponse(transactions=[convert_transaction_to_dto(tx) for tx in transactions])
+    converted_transactions = [convert_transaction_to_dto(tx) for tx in transactions]
+    return TransactionsResponse(transactions=converted_transactions, total_amount_rubles=sum([
+        amount.amount_rubles for amount in converted_transactions if amount.amount_rubles is not None
+    ]))
 
 @app.get("/api/transactions/{transaction_id}")
 async def get_transaction(
@@ -176,8 +179,13 @@ async def get_user_accounts(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountsResponse:
     accounts = await get_user_accounts_with_balance(int(payload.sub))
-    return AccountsResponse(accounts={acc.id: convert_account_with_balance_to_dto(acc, am) for acc, am in accounts},
-                            total=len(accounts))
+    account_map = {acc.id: (await convert_account_with_balance_to_dto(acc, am)) for acc, am in accounts}
+    return AccountsResponse(
+        accounts=account_map,
+        total=len(accounts),
+        total_amount_rubles=sum(
+            [account.amount_rubles for account in account_map.values() if account.amount_rubles is not None])
+    )
 
 @app.get("/api/accounts/account/{account_id}")
 async def get_user_accounts(
@@ -185,7 +193,7 @@ async def get_user_accounts(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
     account, balance = await get_user_account_with_balance(int(payload.sub), account_id)
-    return convert_account_with_balance_to_dto(account, balance)
+    return await convert_account_with_balance_to_dto(account, balance)
 
 @app.put("/api/accounts/account/{account_id}")
 async def update_account_endpoint(
@@ -196,7 +204,7 @@ async def update_account_endpoint(
     account, balance = await get_user_account_with_balance(int(payload.sub), account_id)
     account.name = update_request.name
     updated_account = await update_account(int(payload.sub), account, update_request.amount)
-    return convert_account_with_balance_to_dto(updated_account, update_request.amount)
+    return await convert_account_with_balance_to_dto(updated_account, update_request.amount)
 
 @app.delete("/api/accounts/account/{account_id}")
 async def update_account_endpoint(
@@ -211,7 +219,7 @@ async def create_account_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
     account = await create_account(int(payload.sub), create_request.name, create_request.amount, create_request.currency_code)
-    return convert_account_with_balance_to_dto(account, create_request.amount)
+    return await convert_account_with_balance_to_dto(account, create_request.amount)
 
 @app.get("/api/currency/codes")
 async def update_account_endpoint() -> CurrencyCodes:
@@ -269,12 +277,13 @@ async def create_category_endpoint(
 ):
     await delete_category_by_id_and_user_id(int(payload.sub), category_id)
 
-def convert_account_with_balance_to_dto(account: Account, balance: float):
+async def convert_account_with_balance_to_dto(account: Account, balance: float):
     return AccountDto(
         id=account.id,
         user_id=account.user_id,
         name=account.name,
         amount=balance,
+        amount_rubles=await convert_to_rubles(balance, account.currency_code),
         currency_code=account.currency_code
     )
 
@@ -287,8 +296,10 @@ def convert_transaction_to_dto(transaction: ModelTransaction) -> Transaction:
         type=transaction.category.type,
         category=transaction.category.name,
         category_id=transaction.category.id,
-        amount=transaction.amount * transaction.exchange_rate,
-        description=transaction.description
+        amount=transaction.amount,
+        amount_rubles=transaction.amount * transaction.exchange_rate,
+        description=transaction.description,
+        currency_code=transaction.account.currency_code
     )
 
 def convert_category_to_dto(category: Category) -> CategoryDto:
