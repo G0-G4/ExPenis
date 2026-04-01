@@ -126,7 +126,8 @@ class _TransactionScreenState extends State<TransactionScreen> {
               final result = await Navigator.push<bool>(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const EditTransactionScreen(),
+                  builder: (context) =>
+                      EditTransactionScreen(initialDate: _selectedDate),
                 ),
               );
               if (!mounted) return;

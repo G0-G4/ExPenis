@@ -11,6 +11,7 @@ class Transaction {
   final String? description;
   final int accountId;
   final int categoryId;
+  final DateTime? createdAt;
 
   Transaction({
     required this.id,
@@ -23,6 +24,7 @@ class Transaction {
     required this.description,
     required this.accountId,
     required this.categoryId,
+    required this.createdAt,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
@@ -48,6 +50,9 @@ class Transaction {
       description: json['description'],
       accountId: json['account_id'],
       categoryId: json['category_id'],
+      createdAt: json['created_at'] == null
+          ? null
+          : DateTime.tryParse(json['created_at'] as String),
     );
   }
 
@@ -60,6 +65,7 @@ class Transaction {
     'amount_rubles': amountRubles,
     'currency_code': currencyCode,
     'description': description,
+    'created_at': createdAt?.toIso8601String(),
   };
 
   @override
@@ -103,6 +109,7 @@ class Transaction {
     String? description,
     int? accountId,
     int? categoryId,
+    DateTime? createdAt,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -115,6 +122,7 @@ class Transaction {
       description: description ?? this.description,
       accountId: accountId ?? this.accountId,
       categoryId: categoryId ?? this.categoryId,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

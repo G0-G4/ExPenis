@@ -13,8 +13,13 @@ import 'package:expenis_mobile/widgets/delete_dialog.dart';
 
 class EditTransactionScreen extends StatefulWidget {
   final int? transactionId;
+  final DateTime? initialDate;
 
-  const EditTransactionScreen({super.key, this.transactionId});
+  const EditTransactionScreen({
+    super.key,
+    this.transactionId,
+    this.initialDate,
+  });
 
   @override
   State<EditTransactionScreen> createState() => _EditTransactionScreenState();
@@ -30,7 +35,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   CategoryType _transactionType = CategoryType.expense;
   int? _selectedAccountId;
   int? _selectedCategoryId;
@@ -50,6 +55,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedDate = _initialDateForCreate(widget.initialDate ?? DateTime.now());
     _futureAccounts = _accountService.fetchAccounts();
     _futureCategories = _categoryService.fetchCategories();
 
@@ -66,10 +72,18 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
               : CategoryType.expense;
           _selectedAccountId = transaction.accountId;
           _selectedCategoryId = transaction.categoryId;
-          _selectedDate = DateTime.now(); // API doesn't return created_at
+          _selectedDate = transaction.createdAt ?? _selectedDate;
         });
       });
     }
+  }
+
+  DateTime _initialDateForCreate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(date.year, date.month, date.day);
+    if (selected == today) return now;
+    return selected;
   }
 
   String _formatDate(DateTime date) {
@@ -98,7 +112,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
       lastDate: DateTime(2100),
     );
     if (pickedDate != null) {
-      setState(() => _selectedDate = pickedDate);
+      setState(() => _selectedDate = _initialDateForCreate(pickedDate));
     }
   }
 

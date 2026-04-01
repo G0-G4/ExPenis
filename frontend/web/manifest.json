@@ -1,6 +1,6 @@
 {
-    "name": "expenis_mobile",
-    "short_name": "expenis_mobile",
+    "name": "MyPennies",
+    "short_name": "MyPennies",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
