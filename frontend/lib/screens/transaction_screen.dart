@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:expenis_mobile/models/transaction.dart';
 import 'package:expenis_mobile/screens/edit_transaction_screen.dart';
+import 'package:expenis_mobile/screens/transaction_stats_screen.dart';
 import 'package:expenis_mobile/service/transaction_service.dart';
 import 'package:expenis_mobile/theme.dart';
 import 'package:expenis_mobile/utils/format.dart';
@@ -199,7 +200,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
     return ListView(
       padding: AppTheme.screenPadding,
       children: [
-        _DailySummaryCard(incomeTotal: incomeTotal, expenseTotal: expenseTotal),
+        _DailySummaryCard(
+          incomeTotal: incomeTotal,
+          expenseTotal: expenseTotal,
+          onTap: _openStats,
+        ),
         const SizedBox(height: AppTheme.space16),
         if (income.isNotEmpty) ...[
           _SectionHeader(
@@ -249,6 +254,16 @@ class _TransactionScreenState extends State<TransactionScreen> {
     );
     if (!mounted) return;
     if (result == true) _refresh();
+  }
+
+  Future<void> _openStats() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            TransactionStatsScreen(initialEndDate: _selectedDate),
+      ),
+    );
   }
 }
 
@@ -330,10 +345,12 @@ class _DailySummaryCard extends StatelessWidget {
   const _DailySummaryCard({
     required this.incomeTotal,
     required this.expenseTotal,
+    required this.onTap,
   });
 
   final double incomeTotal;
   final double expenseTotal;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -343,57 +360,61 @@ class _DailySummaryCard extends StatelessWidget {
     final isPositive = net >= 0;
 
     return Card(
-      child: Padding(
-        padding: AppTheme.cardPadding,
-        child: Column(
-          children: [
-            Row(
-              children: [
-                _SummaryItem(
-                  label: 'Income',
-                  amount: incomeTotal,
-                  color: AppTheme.incomeColor,
-                  bgColor: AppTheme.incomeColorLight,
-                  icon: Icons.arrow_downward_rounded,
-                ),
-                Container(
-                  width: 1,
-                  height: 48,
-                  color: colorScheme.outlineVariant,
-                ),
-                _SummaryItem(
-                  label: 'Expenses',
-                  amount: expenseTotal,
-                  color: AppTheme.expenseColor,
-                  bgColor: AppTheme.expenseColorLight,
-                  icon: Icons.arrow_upward_rounded,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTheme.space12),
-            Divider(color: colorScheme.outlineVariant),
-            const SizedBox(height: AppTheme.space8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Net',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppTheme.borderRadiusMedium,
+        child: Padding(
+          padding: AppTheme.cardPadding,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  _SummaryItem(
+                    label: 'Income',
+                    amount: incomeTotal,
+                    color: AppTheme.incomeColor,
+                    bgColor: AppTheme.incomeColorLight,
+                    icon: Icons.arrow_downward_rounded,
                   ),
-                ),
-                Text(
-                  '${isPositive ? '+' : ''}${formatAmount(net.abs())} ₽',
-                  style: textTheme.titleMedium?.copyWith(
-                    color: isPositive
-                        ? AppTheme.incomeColor
-                        : AppTheme.expenseColor,
-                    fontWeight: FontWeight.w700,
+                  Container(
+                    width: 1,
+                    height: 48,
+                    color: colorScheme.outlineVariant,
                   ),
-                ),
-              ],
-            ),
-          ],
+                  _SummaryItem(
+                    label: 'Expenses',
+                    amount: expenseTotal,
+                    color: AppTheme.expenseColor,
+                    bgColor: AppTheme.expenseColorLight,
+                    icon: Icons.arrow_upward_rounded,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.space12),
+              Divider(color: colorScheme.outlineVariant),
+              const SizedBox(height: AppTheme.space8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Net',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    '${isPositive ? '+' : ''}${formatAmount(net.abs())} ₽',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: isPositive
+                          ? AppTheme.incomeColor
+                          : AppTheme.expenseColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
