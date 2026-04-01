@@ -18,6 +18,7 @@ class Transaction(BaseModel):
     amount_rubles: float
     description: str | None
     currency_code: str
+    created_at: datetime
 
 class TransactionCreateRequest(BaseModel):
     account_id: int
