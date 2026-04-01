@@ -299,7 +299,8 @@ def convert_transaction_to_dto(transaction: ModelTransaction) -> Transaction:
         amount=transaction.amount,
         amount_rubles=transaction.amount * transaction.exchange_rate,
         description=transaction.description,
-        currency_code=transaction.account.currency_code
+        currency_code=transaction.account.currency_code,
+        created_at=transaction.created_at
     )
 
 def convert_category_to_dto(category: Category) -> CategoryDto:
@@ -322,3 +323,7 @@ def convert_transaction_create_to_model(user_id: int, transaction_create: Transa
         updated_at=datetime.now(UTC),
         exchange_rate=exchange_rate
     )
+
+
+if __name__ == "__main__":
+    print(auth.create_access_token(uid="433289417"))
