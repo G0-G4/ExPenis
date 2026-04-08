@@ -7,7 +7,10 @@ from src.expenis.core.models import Account, Category, Transaction, db
 from src.expenis.core.service import update_transaction
 from src.expenis.core.service.transaction_service import (delete_transaction,
                                                           delete_transaction_by_id, get_transaction_by_id,
+                                                          get_transaction_tags_by_transaction_ids,
                                                           get_transactions_for_period,
+                                                          get_user_tags,
+                                                          set_transaction_tags,
                                                           save_transaction)
 
 
@@ -124,3 +127,66 @@ async def test_get_transactions_for_period(test_account, test_category):
 
         transactions = await get_transactions_for_period(user_id, tomorrow, tomorrow)
         assert len(transactions) == 0
+
+
+@pytest.mark.asyncio
+async def test_set_transaction_tags_creates_reuses_and_replaces(test_account, test_category):
+    async with db:
+        transaction = Transaction(
+            user_id=1,
+            account=test_account,
+            category=test_category,
+            amount=100.0,
+            description="tx"
+        )
+        await save_transaction(transaction)
+
+        tags = await set_transaction_tags(1, transaction.id, [" groceries ", "home", "home"])
+        assert tags == ["groceries", "home"]
+
+        by_tx = await get_transaction_tags_by_transaction_ids(1, [transaction.id])
+        assert by_tx[transaction.id] == ["groceries", "home"]
+
+        all_tags = await get_user_tags(1)
+        assert all_tags == ["groceries", "home"]
+
+        replaced = await set_transaction_tags(1, transaction.id, ["travel"])
+        assert replaced == ["travel"]
+
+        by_tx = await get_transaction_tags_by_transaction_ids(1, [transaction.id])
+        assert by_tx[transaction.id] == ["travel"]
+
+        all_tags = await get_user_tags(1)
+        assert all_tags == ["groceries", "home", "travel"]
+
+
+@pytest.mark.asyncio
+async def test_get_user_tags_is_scoped_by_user(test_account, test_category):
+    async with db:
+        tx_user_1 = Transaction(
+            user_id=1,
+            account=test_account,
+            category=test_category,
+            amount=100.0,
+            description="tx1"
+        )
+        await save_transaction(tx_user_1)
+
+        account_user_2 = Account(user_id=2, name="User2")
+        category_user_2 = Category(user_id=2, name="Other", type="expense")
+        await db.run(account_user_2.save)
+        await db.run(category_user_2.save)
+        tx_user_2 = Transaction(
+            user_id=2,
+            account=account_user_2,
+            category=category_user_2,
+            amount=50.0,
+            description="tx2"
+        )
+        await save_transaction(tx_user_2)
+
+        await set_transaction_tags(1, tx_user_1.id, ["food"])
+        await set_transaction_tags(2, tx_user_2.id, ["food", "transport"])
+
+        assert await get_user_tags(1) == ["food"]
+        assert await get_user_tags(2) == ["food", "transport"]

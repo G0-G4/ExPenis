@@ -17,6 +17,7 @@ class Transaction(BaseModel):
     amount: float
     amount_rubles: float
     description: str | None
+    tags: list[str]
     currency_code: str
     created_at: datetime
 
@@ -25,12 +26,17 @@ class TransactionCreateRequest(BaseModel):
     category_id: int
     amount: float
     description: str | None
+    tags: list[str] | None = None
     created_at: datetime | None
 
 
 class TransactionsResponse(BaseModel):
     transactions: list[Transaction]
     total_amount_rubles: float
+
+
+class UserTagsResponse(BaseModel):
+    tags: list[str]
 
 
 class SessionStatusResponse(BaseModel):

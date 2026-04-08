@@ -1,6 +1,19 @@
 from datetime import UTC, date, datetime
 
-from ..models import Account, Category, Transaction, db
+from ..models import Account, Category, Tag, Transaction, TransactionTag, db
+
+
+def normalize_tags(tags: list[str] | None) -> list[str]:
+    if tags is None:
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for tag in tags:
+        clean_tag = tag.strip()
+        if clean_tag and clean_tag not in seen:
+            normalized.append(clean_tag)
+            seen.add(clean_tag)
+    return normalized
 
 
 async def get_transactions_for_period(user_id: int, start_date: date, end_date: date) -> list[Transaction]:
@@ -61,3 +74,67 @@ async def delete_transaction_by_id(transaction_id: int):
 async def delete_transaction_by_id_and_user_id(user_id: int, transaction_id: int):
     """Delete a transaction"""
     await db.run(lambda: Transaction.delete().where((Transaction.id == transaction_id) & (Transaction.user_id == user_id)).execute())
+
+
+async def set_transaction_tags(user_id: int, transaction_id: int, tags: list[str] | None) -> list[str]:
+    normalized_tags = normalize_tags(tags)
+
+    async with db.atomic():
+        await db.run(
+            lambda: TransactionTag.delete().where(TransactionTag.transaction_id == transaction_id).execute()
+        )
+
+        if not normalized_tags:
+            return []
+
+        existing_tags = await db.list(
+            Tag.select().where((Tag.user_id == user_id) & (Tag.name.in_(normalized_tags)))
+        )
+        existing_names = {tag.name for tag in existing_tags}
+
+        now = datetime.now(UTC)
+        new_tags = [
+            Tag(user_id=user_id, name=tag_name, created_at=now, updated_at=now)
+            for tag_name in normalized_tags
+            if tag_name not in existing_names
+        ]
+        if new_tags:
+            await db.run(lambda: Tag.bulk_create(new_tags))
+
+        all_tags = await db.list(
+            Tag.select().where((Tag.user_id == user_id) & (Tag.name.in_(normalized_tags)))
+        )
+        tags_by_name = {tag.name: tag for tag in all_tags}
+
+        await db.run(
+            lambda: TransactionTag.bulk_create([
+                TransactionTag(transaction=transaction_id, tag=tags_by_name[tag_name].id)
+                for tag_name in normalized_tags
+            ])
+        )
+
+    return normalized_tags
+
+
+async def get_transaction_tags_by_transaction_ids(user_id: int, transaction_ids: list[int]) -> dict[int, list[str]]:
+    if not transaction_ids:
+        return {}
+
+    transaction_tags = await db.list(
+        TransactionTag.select(TransactionTag, Tag)
+        .join(Tag)
+        .where((Tag.user_id == user_id) & (TransactionTag.transaction_id.in_(transaction_ids)))
+        .order_by(Tag.name)
+    )
+
+    tags_by_transaction_id: dict[int, list[str]] = {transaction_id: [] for transaction_id in transaction_ids}
+    for transaction_tag in transaction_tags:
+        tags_by_transaction_id[transaction_tag.transaction_id].append(transaction_tag.tag.name)
+    return tags_by_transaction_id
+
+
+async def get_user_tags(user_id: int) -> list[str]:
+    tags = await db.list(
+        Tag.select().where(Tag.user_id == user_id).order_by(Tag.name)
+    )
+    return [tag.name for tag in tags]
