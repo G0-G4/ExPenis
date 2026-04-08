@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 
 import 'package:expenis_mobile/models/account.dart';
 import 'package:expenis_mobile/models/category.dart';
@@ -35,10 +36,13 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _tagController = TextEditingController();
   late DateTime _selectedDate;
   CategoryType _transactionType = CategoryType.expense;
   int? _selectedAccountId;
   int? _selectedCategoryId;
+  List<String> _allTags = [];
+  List<String> _selectedTags = [];
   bool _isSaving = false;
 
   bool get _isEditing => widget.transactionId != null;
@@ -58,6 +62,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
     _selectedDate = _initialDateForCreate(widget.initialDate ?? DateTime.now());
     _futureAccounts = _accountService.fetchAccounts();
     _futureCategories = _categoryService.fetchCategories();
+    _loadTags();
 
     if (_isEditing) {
       _transactionService.fetchTransaction(widget.transactionId!).then((
@@ -73,9 +78,52 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
           _selectedAccountId = transaction.accountId;
           _selectedCategoryId = transaction.categoryId;
           _selectedDate = transaction.createdAt ?? _selectedDate;
+          _selectedTags = List<String>.from(transaction.tags);
         });
       });
     }
+  }
+
+  Future<void> _loadTags() async {
+    try {
+      final tags = await _transactionService.fetchTags();
+      if (!mounted) return;
+      setState(() {
+        _allTags = tags;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to load tags')));
+    }
+  }
+
+  String _normalizeTag(String tag) => tag.trim().toLowerCase();
+
+  bool _isTagSelected(String tag) {
+    final normalized = _normalizeTag(tag);
+    return _selectedTags.any(
+      (selected) => _normalizeTag(selected) == normalized,
+    );
+  }
+
+  void _addTag(String rawTag) {
+    final tag = rawTag.trim();
+    if (tag.isEmpty || _isTagSelected(tag)) {
+      _tagController.clear();
+      return;
+    }
+    setState(() {
+      _selectedTags = [..._selectedTags, tag];
+      _tagController.clear();
+    });
+  }
+
+  void _commitPendingTag() {
+    final pendingTag = _tagController.text.trim();
+    if (pendingTag.isEmpty) return;
+    _addTag(pendingTag);
   }
 
   DateTime _initialDateForCreate(DateTime date) {
@@ -118,6 +166,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
 
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate()) return;
+    _commitPendingTag();
     if (_selectedAccountId == null || _selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an account and category')),
@@ -134,6 +183,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
+        tags: _selectedTags.isEmpty ? null : _selectedTags,
         createdAt: _selectedDate,
       );
 
@@ -180,6 +230,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   void dispose() {
     _descriptionController.dispose();
     _amountController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -268,6 +319,60 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
+            const SizedBox(height: AppTheme.space16),
+
+            TypeAheadField<String>(
+              controller: _tagController,
+              builder: (context, controller, focusNode) {
+                return TextFormField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Tags (optional)',
+                    prefixIcon: const Icon(Icons.sell_outlined),
+                    hintText: 'Type tag and press enter',
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: () => _addTag(controller.text),
+                    ),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: _addTag,
+                );
+              },
+              suggestionsCallback: (pattern) {
+                final normalizedPattern = _normalizeTag(pattern);
+                if (normalizedPattern.isEmpty) return const <String>[];
+                return _allTags.where((tag) {
+                  final normalizedTag = _normalizeTag(tag);
+                  return normalizedTag.contains(normalizedPattern) &&
+                      !_isTagSelected(tag);
+                }).toList();
+              },
+              itemBuilder: (context, suggestion) {
+                return ListTile(title: Text(suggestion));
+              },
+              onSelected: _addTag,
+            ),
+            if (_selectedTags.isNotEmpty) ...[
+              const SizedBox(height: AppTheme.space8),
+              Wrap(
+                spacing: AppTheme.space8,
+                runSpacing: AppTheme.space8,
+                children: _selectedTags
+                    .map(
+                      (tag) => InputChip(
+                        label: Text(tag),
+                        onDeleted: () {
+                          setState(() {
+                            _selectedTags.remove(tag);
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
             const SizedBox(height: AppTheme.space16),
 
             // ── Date ──────────────────────────────────────────────────

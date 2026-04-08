@@ -3,6 +3,22 @@ import 'package:expenis_mobile/models/transaction.dart';
 import 'package:expenis_mobile/service/base_service.dart';
 
 class TransactionService extends BaseService {
+  Future<List<String>> fetchTags() async {
+    try {
+      final response = await dio.get('$baseUrl/api/tags');
+      if (response.statusCode == 200) {
+        return (response.data['tags'] as List<dynamic>)
+            .map((tag) => tag as String)
+            .toList();
+      }
+      throw Exception(
+        'Failed to load tags with status: ${response.statusCode}',
+      );
+    } on DioException catch (e) {
+      throw Exception('Failed to load tags: ${e.message}');
+    }
+  }
+
   String _formatDate(DateTime date) {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');

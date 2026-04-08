@@ -32,10 +32,18 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   List<Category> _categories = [];
   Set<int> _selectedIncomeCategoryIds = {};
   Set<int> _selectedExpenseCategoryIds = {};
+  Map<String, String> _availableIncomeTagsByNormalized = {};
+  Map<String, String> _availableExpenseTagsByNormalized = {};
+  Set<String> _selectedIncomeTagKeys = {};
+  Set<String> _selectedExpenseTagKeys = {};
   bool _hasInitializedSelections = false;
+  bool _hasInitializedIncomeTagSelections = false;
+  bool _hasInitializedExpenseTagSelections = false;
   bool _isFirstLoad = true;
   bool _isLoading = false;
   String? _loadError;
+
+  String _normalizeTag(String tag) => tag.trim().toLowerCase();
 
   @override
   void initState() {
@@ -67,15 +75,41 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       if (!mounted) return;
       final transactions = results[0] as List<Transaction>;
       final categories = results[1] as List<Category>;
+      final incomeTagsByNormalized = <String, String>{};
+      final expenseTagsByNormalized = <String, String>{};
+
+      final usedIncomeCategoryIds = <int>{};
+      final usedExpenseCategoryIds = <int>{};
+
+      for (final transaction in transactions) {
+        if (transaction.type == TransactionType.income) {
+          usedIncomeCategoryIds.add(transaction.categoryId);
+        } else {
+          usedExpenseCategoryIds.add(transaction.categoryId);
+        }
+
+        for (final tag in transaction.tags) {
+          final cleanedTag = tag.trim();
+          if (cleanedTag.isEmpty) continue;
+          final normalized = _normalizeTag(cleanedTag);
+          if (transaction.type == TransactionType.income) {
+            incomeTagsByNormalized.putIfAbsent(normalized, () => cleanedTag);
+          } else {
+            expenseTagsByNormalized.putIfAbsent(normalized, () => cleanedTag);
+          }
+        }
+      }
 
       final incomeIds = categories
           .where((c) => c.type == CategoryType.income)
           .map((c) => c.id)
-          .toSet();
+          .toSet()
+          .intersection(usedIncomeCategoryIds);
       final expenseIds = categories
           .where((c) => c.type == CategoryType.expense)
           .map((c) => c.id)
-          .toSet();
+          .toSet()
+          .intersection(usedExpenseCategoryIds);
 
       setState(() {
         _transactions = transactions;
@@ -85,12 +119,42 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
           _selectedExpenseCategoryIds = expenseIds;
           _hasInitializedSelections = true;
         } else {
-          _selectedIncomeCategoryIds = _selectedIncomeCategoryIds.intersection(
+          final nextIncomeSelection = _selectedIncomeCategoryIds.intersection(
             incomeIds,
           );
-          _selectedExpenseCategoryIds = _selectedExpenseCategoryIds
-              .intersection(expenseIds);
+          final nextExpenseSelection = _selectedExpenseCategoryIds.intersection(
+            expenseIds,
+          );
+
+          _selectedIncomeCategoryIds = nextIncomeSelection.isEmpty
+              ? incomeIds
+              : nextIncomeSelection;
+          _selectedExpenseCategoryIds = nextExpenseSelection.isEmpty
+              ? expenseIds
+              : nextExpenseSelection;
         }
+
+        _availableIncomeTagsByNormalized = incomeTagsByNormalized;
+        _availableExpenseTagsByNormalized = expenseTagsByNormalized;
+
+        if (!_hasInitializedIncomeTagSelections) {
+          _selectedIncomeTagKeys = <String>{};
+          _hasInitializedIncomeTagSelections = true;
+        } else {
+          _selectedIncomeTagKeys = _selectedIncomeTagKeys.intersection(
+            incomeTagsByNormalized.keys.toSet(),
+          );
+        }
+
+        if (!_hasInitializedExpenseTagSelections) {
+          _selectedExpenseTagKeys = <String>{};
+          _hasInitializedExpenseTagSelections = true;
+        } else {
+          _selectedExpenseTagKeys = _selectedExpenseTagKeys.intersection(
+            expenseTagsByNormalized.keys.toSet(),
+          );
+        }
+
         _isLoading = false;
         _isFirstLoad = false;
       });
@@ -115,6 +179,7 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     setState(() {
       _startDate = picked;
     });
+    _resetFiltersForReload();
     _loadData();
   }
 
@@ -129,7 +194,18 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     setState(() {
       _endDate = picked;
     });
+    _resetFiltersForReload();
     _loadData();
+  }
+
+  void _resetFiltersForReload() {
+    _hasInitializedSelections = false;
+    _hasInitializedIncomeTagSelections = false;
+    _hasInitializedExpenseTagSelections = false;
+    _selectedIncomeCategoryIds = {};
+    _selectedExpenseCategoryIds = {};
+    _selectedIncomeTagKeys = {};
+    _selectedExpenseTagKeys = {};
   }
 
   void _toggleIncomeCategory(int id) {
@@ -152,6 +228,60 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     });
   }
 
+  void _setIncomeCategorySelection(Set<int> ids) {
+    setState(() {
+      _selectedIncomeCategoryIds = ids;
+    });
+  }
+
+  void _setExpenseCategorySelection(Set<int> ids) {
+    setState(() {
+      _selectedExpenseCategoryIds = ids;
+    });
+  }
+
+  void _toggleIncomeTag(String tagKey) {
+    setState(() {
+      if (_selectedIncomeTagKeys.contains(tagKey)) {
+        _selectedIncomeTagKeys.remove(tagKey);
+      } else {
+        _selectedIncomeTagKeys.add(tagKey);
+      }
+    });
+  }
+
+  void _toggleExpenseTag(String tagKey) {
+    setState(() {
+      if (_selectedExpenseTagKeys.contains(tagKey)) {
+        _selectedExpenseTagKeys.remove(tagKey);
+      } else {
+        _selectedExpenseTagKeys.add(tagKey);
+      }
+    });
+  }
+
+  void _setIncomeTagSelection(Set<String> keys) {
+    setState(() {
+      _selectedIncomeTagKeys = keys;
+    });
+  }
+
+  void _setExpenseTagSelection(Set<String> keys) {
+    setState(() {
+      _selectedExpenseTagKeys = keys;
+    });
+  }
+
+  bool _matchesTagFilter(Transaction transaction, Set<String> selectedTagKeys) {
+    if (selectedTagKeys.isEmpty) return true;
+    for (final tag in transaction.tags) {
+      if (selectedTagKeys.contains(_normalizeTag(tag))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _openEdit(Transaction transaction) async {
     final result = await Navigator.push<bool>(
       context,
@@ -161,7 +291,10 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       ),
     );
     if (!mounted) return;
-    if (result == true) _loadData();
+    if (result == true) {
+      _resetFiltersForReload();
+      _loadData();
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -249,10 +382,43 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     final income = _transactions
         .where((t) => t.type == TransactionType.income)
         .where((t) => _selectedIncomeCategoryIds.contains(t.categoryId))
+        .where((t) => _matchesTagFilter(t, _selectedIncomeTagKeys))
         .toList();
     final expense = _transactions
         .where((t) => t.type == TransactionType.expense)
         .where((t) => _selectedExpenseCategoryIds.contains(t.categoryId))
+        .where((t) => _matchesTagFilter(t, _selectedExpenseTagKeys))
+        .toList();
+
+    final sortedIncomeTagKeys = _availableIncomeTagsByNormalized.keys.toList()
+      ..sort(
+        (a, b) => _availableIncomeTagsByNormalized[a]!.toLowerCase().compareTo(
+          _availableIncomeTagsByNormalized[b]!.toLowerCase(),
+        ),
+      );
+    final sortedExpenseTagKeys = _availableExpenseTagsByNormalized.keys.toList()
+      ..sort(
+        (a, b) => _availableExpenseTagsByNormalized[a]!.toLowerCase().compareTo(
+          _availableExpenseTagsByNormalized[b]!.toLowerCase(),
+        ),
+      );
+
+    final incomeCategories = _categories
+        .where((c) => c.type == CategoryType.income)
+        .where(
+          (c) => _transactions.any(
+            (t) => t.type == TransactionType.income && t.categoryId == c.id,
+          ),
+        )
+        .toList();
+
+    final expenseCategories = _categories
+        .where((c) => c.type == CategoryType.expense)
+        .where(
+          (c) => _transactions.any(
+            (t) => t.type == TransactionType.expense && t.categoryId == c.id,
+          ),
+        )
         .toList();
 
     final incomeTotal = income.fold<double>(0, (s, t) => s + t.amountRubles);
@@ -285,13 +451,21 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     color: AppTheme.incomeColor,
                     icon: Icons.arrow_downward_rounded,
                     palette: _PieColors.incomePalette,
-                    categories: _categories
-                        .where((c) => c.type == CategoryType.income)
-                        .toList(),
-                    selectedIds: _selectedIncomeCategoryIds,
-                    onToggle: _toggleIncomeCategory,
                     chartData: _buildCategoryTotals(income),
                     emptyLabel: "No income in selected categories",
+                  ),
+                  const SizedBox(height: AppTheme.space24),
+                  _FiltersAccordion(
+                    accentColor: AppTheme.incomeColor,
+                    categories: incomeCategories,
+                    selectedCategoryIds: _selectedIncomeCategoryIds,
+                    onToggleCategory: _toggleIncomeCategory,
+                    onSetCategorySelection: _setIncomeCategorySelection,
+                    availableTagKeys: sortedIncomeTagKeys,
+                    tagLabelsByKey: _availableIncomeTagsByNormalized,
+                    selectedTagKeys: _selectedIncomeTagKeys,
+                    onToggleTag: _toggleIncomeTag,
+                    onSetTagSelection: _setIncomeTagSelection,
                   ),
                   const SizedBox(height: AppTheme.space24),
                   _TransactionsSection(
@@ -311,13 +485,21 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     color: AppTheme.expenseColor,
                     icon: Icons.arrow_upward_rounded,
                     palette: _PieColors.expensePalette,
-                    categories: _categories
-                        .where((c) => c.type == CategoryType.expense)
-                        .toList(),
-                    selectedIds: _selectedExpenseCategoryIds,
-                    onToggle: _toggleExpenseCategory,
                     chartData: _buildCategoryTotals(expense),
                     emptyLabel: "No expenses in selected categories",
+                  ),
+                  const SizedBox(height: AppTheme.space24),
+                  _FiltersAccordion(
+                    accentColor: AppTheme.expenseColor,
+                    categories: expenseCategories,
+                    selectedCategoryIds: _selectedExpenseCategoryIds,
+                    onToggleCategory: _toggleExpenseCategory,
+                    onSetCategorySelection: _setExpenseCategorySelection,
+                    availableTagKeys: sortedExpenseTagKeys,
+                    tagLabelsByKey: _availableExpenseTagsByNormalized,
+                    selectedTagKeys: _selectedExpenseTagKeys,
+                    onToggleTag: _toggleExpenseTag,
+                    onSetTagSelection: _setExpenseTagSelection,
                   ),
                   const SizedBox(height: AppTheme.space24),
                   _TransactionsSection(
@@ -632,9 +814,6 @@ class _CategorySection extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.palette,
-    required this.categories,
-    required this.selectedIds,
-    required this.onToggle,
     required this.chartData,
     required this.emptyLabel,
   });
@@ -643,62 +822,255 @@ class _CategorySection extends StatelessWidget {
   final Color color;
   final IconData icon;
   final List<Color> palette;
-  final List<Category> categories;
-  final Set<int> selectedIds;
-  final ValueChanged<int> onToggle;
   final List<_CategoryTotal> chartData;
   final String emptyLabel;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(label: title, color: color, icon: icon),
-        const SizedBox(height: AppTheme.space8),
-        if (categories.isEmpty)
-          Text(
-            "No categories",
-            style: textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          )
-        else
-          Wrap(
-            spacing: AppTheme.space8,
-            runSpacing: AppTheme.space8,
-            children: categories
-                .map(
-                  (category) => FilterChip(
-                    label: Text(category.name),
-                    selected: selectedIds.contains(category.id),
-                    onSelected: (_) => onToggle(category.id),
-                    selectedColor: color.withAlpha(30),
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerLow,
-                    checkmarkColor: color,
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                    labelStyle: textTheme.labelMedium?.copyWith(
-                      color: selectedIds.contains(category.id)
-                          ? color
-                          : Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
         const SizedBox(height: AppTheme.space16),
         _PieChartCard(
           baseColor: color,
           palette: palette,
           data: chartData,
           emptyLabel: emptyLabel,
+        ),
+      ],
+    );
+  }
+}
+
+class _FiltersAccordion extends StatelessWidget {
+  const _FiltersAccordion({
+    required this.accentColor,
+    required this.categories,
+    required this.selectedCategoryIds,
+    required this.onToggleCategory,
+    required this.onSetCategorySelection,
+    required this.availableTagKeys,
+    required this.tagLabelsByKey,
+    required this.selectedTagKeys,
+    required this.onToggleTag,
+    required this.onSetTagSelection,
+  });
+
+  final Color accentColor;
+  final List<Category> categories;
+  final Set<int> selectedCategoryIds;
+  final ValueChanged<int> onToggleCategory;
+  final ValueChanged<Set<int>> onSetCategorySelection;
+  final List<String> availableTagKeys;
+  final Map<String, String> tagLabelsByKey;
+  final Set<String> selectedTagKeys;
+  final ValueChanged<String> onToggleTag;
+  final ValueChanged<Set<String>> onSetTagSelection;
+
+  static const double _maxChipAreaHeight = 156;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final categorySummary =
+        "${selectedCategoryIds.length}/${categories.length} selected";
+    final tagSummary =
+        "${selectedTagKeys.length}/${availableTagKeys.length} selected";
+
+    return Card(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space16,
+              AppTheme.space12,
+              AppTheme.space16,
+              AppTheme.space4,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.tune_rounded, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: AppTheme.space8),
+                Text(
+                  "Filters",
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: colorScheme.outlineVariant),
+          ExpansionTile(
+            leading: Icon(Icons.folder_outlined, color: accentColor),
+            title: const Text("Category filter"),
+            subtitle: Text(categorySummary),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              AppTheme.space16,
+              0,
+              AppTheme.space16,
+              AppTheme.space16,
+            ),
+            children: [
+              _FilterActions(
+                onSelectAll: categories.isEmpty
+                    ? null
+                    : () => onSetCategorySelection(
+                        categories.map((category) => category.id).toSet(),
+                      ),
+                onClearAll: selectedCategoryIds.isEmpty
+                    ? null
+                    : () => onSetCategorySelection(<int>{}),
+              ),
+              const SizedBox(height: AppTheme.space8),
+              if (categories.isEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "No categories",
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                _buildScrollableChipArea(
+                  child: Wrap(
+                    spacing: AppTheme.space8,
+                    runSpacing: AppTheme.space8,
+                    children: categories
+                        .map(
+                          (category) => FilterChip(
+                            label: Text(category.name),
+                            selected: selectedCategoryIds.contains(category.id),
+                            onSelected: (_) => onToggleCategory(category.id),
+                            showCheckmark: false,
+                            selectedColor: accentColor.withAlpha(30),
+                            backgroundColor: colorScheme.surfaceContainerLow,
+                            checkmarkColor: accentColor,
+                            side: BorderSide(color: colorScheme.outlineVariant),
+                            labelStyle: textTheme.labelMedium?.copyWith(
+                              color: selectedCategoryIds.contains(category.id)
+                                  ? accentColor
+                                  : colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+            ],
+          ),
+          Divider(height: 1, color: colorScheme.outlineVariant),
+          ExpansionTile(
+            leading: Icon(Icons.sell_outlined, color: accentColor),
+            title: const Text("Tag filter"),
+            subtitle: Text(tagSummary),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              AppTheme.space16,
+              0,
+              AppTheme.space16,
+              AppTheme.space16,
+            ),
+            children: [
+              _FilterActions(
+                onSelectAll: availableTagKeys.isEmpty
+                    ? null
+                    : () => onSetTagSelection(availableTagKeys.toSet()),
+                onClearAll: selectedTagKeys.isEmpty
+                    ? null
+                    : () => onSetTagSelection(<String>{}),
+              ),
+              const SizedBox(height: AppTheme.space8),
+              if (availableTagKeys.isEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "No tags in selected range",
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                _buildScrollableChipArea(
+                  child: Wrap(
+                    spacing: AppTheme.space8,
+                    runSpacing: AppTheme.space8,
+                    children: availableTagKeys
+                        .map(
+                          (tagKey) => FilterChip(
+                            label: Text(tagLabelsByKey[tagKey] ?? tagKey),
+                            selected: selectedTagKeys.contains(tagKey),
+                            onSelected: (_) => onToggleTag(tagKey),
+                            showCheckmark: false,
+                            selectedColor: accentColor.withAlpha(30),
+                            backgroundColor: colorScheme.surfaceContainerLow,
+                            checkmarkColor: accentColor,
+                            side: BorderSide(color: colorScheme.outlineVariant),
+                            labelStyle: textTheme.labelMedium?.copyWith(
+                              color: selectedTagKeys.contains(tagKey)
+                                  ? accentColor
+                                  : colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollableChipArea({required Widget child}) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: _maxChipAreaHeight),
+      child: Scrollbar(
+        child: SingleChildScrollView(
+          child: Align(alignment: Alignment.topLeft, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterActions extends StatelessWidget {
+  const _FilterActions({required this.onSelectAll, required this.onClearAll});
+
+  final VoidCallback? onSelectAll;
+  final VoidCallback? onClearAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        TextButton.icon(
+          onPressed: onSelectAll,
+          icon: const Icon(
+            Icons.done_all_rounded,
+            size: AppTheme.iconSizeSmall,
+          ),
+          label: const Text("Select all"),
+        ),
+        const SizedBox(width: AppTheme.space4),
+        TextButton.icon(
+          onPressed: onClearAll,
+          icon: const Icon(
+            Icons.clear_all_rounded,
+            size: AppTheme.iconSizeSmall,
+          ),
+          label: const Text("Clear all"),
         ),
       ],
     );
@@ -714,6 +1086,9 @@ class _PieChartCard extends StatelessWidget {
   });
 
   static const double _minSlicePercent = 1;
+  static const double _chartHeight = 220;
+  static const double _legendHeight = 172;
+  static const double _bodyHeight = 420;
 
   final Color baseColor;
   final List<Color> palette;
@@ -728,49 +1103,68 @@ class _PieChartCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: AppTheme.cardPadding,
-        child: data.isEmpty
-            ? Column(
-                children: [
-                  Icon(
-                    Icons.pie_chart_outline_rounded,
-                    color: colorScheme.onSurfaceVariant,
-                    size: 32,
+        child: SizedBox(
+          height: _bodyHeight,
+          child: data.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.pie_chart_outline_rounded,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 32,
+                      ),
+                      const SizedBox(height: AppTheme.space8),
+                      Text(
+                        emptyLabel,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: AppTheme.space8),
-                  Text(
-                    emptyLabel,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              )
-            : Column(
-                children: [
-                  SizedBox(
-                    height: 220,
-                    child: PieChart(
-                      PieChartData(
-                        sections: _buildSections(data),
-                        centerSpaceRadius: 52,
-                        sectionsSpace: 2,
+                )
+              : Column(
+                  children: [
+                    SizedBox(
+                      height: _chartHeight,
+                      child: PieChart(
+                        PieChartData(
+                          sections: _buildSections(data),
+                          centerSpaceRadius: 52,
+                          sectionsSpace: 2,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: AppTheme.space16),
-                  ...data.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppTheme.space8),
-                      child: _LegendRow(
-                        color: item.color,
-                        label: item.name,
-                        value: "${formatAmount(item.total)} ₽",
+                    const SizedBox(height: AppTheme.space16),
+                    SizedBox(
+                      height: _legendHeight,
+                      child: Scrollbar(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: data
+                                .map(
+                                  (item) => Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppTheme.space8,
+                                    ),
+                                    child: _LegendRow(
+                                      color: item.color,
+                                      label: item.name,
+                                      value: "${formatAmount(item.total)} ₽",
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }
