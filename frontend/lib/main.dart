@@ -4,6 +4,7 @@ import 'package:expenis_mobile/screens/account_screen.dart';
 import 'package:expenis_mobile/screens/category_screen.dart';
 import 'package:expenis_mobile/screens/settings_screen.dart';
 import 'package:expenis_mobile/screens/transaction_screen.dart';
+import 'package:expenis_mobile/screens/transaction_stats_screen.dart';
 import 'package:expenis_mobile/theme.dart';
 
 void main() {
@@ -71,6 +72,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.insights_outlined),
+              title: const Text('Monthly analytics'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TransactionStatsScreen(
+                      initialEndDate: DateTime.now(),
+                      initialGroupByMonth: true,
+                    ),
+                  ),
+                );
+              },
             ),
             ListTile(
               leading: const Icon(Icons.settings_outlined),

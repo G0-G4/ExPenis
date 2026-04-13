@@ -8,14 +8,24 @@ import 'package:expenis_mobile/screens/edit_transaction_screen.dart';
 import 'package:expenis_mobile/service/category_service.dart';
 import 'package:expenis_mobile/service/transaction_service.dart';
 import 'package:expenis_mobile/theme.dart';
+import 'package:expenis_mobile/utils/date_labels.dart';
 import 'package:expenis_mobile/utils/format.dart';
+import 'package:expenis_mobile/utils/selection_utils.dart';
+import 'package:expenis_mobile/utils/tag_utils.dart';
+import 'package:expenis_mobile/widgets/analytics_filters_card.dart';
 import 'package:expenis_mobile/widgets/app_empty_state.dart';
 import 'package:expenis_mobile/widgets/app_error_state.dart';
+import 'package:expenis_mobile/widgets/month_picker_bottom_sheet.dart';
 
 class TransactionStatsScreen extends StatefulWidget {
-  const TransactionStatsScreen({super.key, required this.initialEndDate});
+  const TransactionStatsScreen({
+    super.key,
+    required this.initialEndDate,
+    this.initialGroupByMonth = false,
+  });
 
   final DateTime initialEndDate;
+  final bool initialGroupByMonth;
 
   @override
   State<TransactionStatsScreen> createState() => _TransactionStatsScreenState();
@@ -30,6 +40,10 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
 
   List<Transaction> _transactions = [];
   List<Category> _categories = [];
+  List<DateTime> _months = [];
+
+  Set<int> _availableIncomeCategoryIds = {};
+  Set<int> _availableExpenseCategoryIds = {};
   Set<int> _selectedIncomeCategoryIds = {};
   Set<int> _selectedExpenseCategoryIds = {};
   Map<String, String> _availableIncomeTagsByNormalized = {};
@@ -41,19 +55,180 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   bool _hasInitializedExpenseTagSelections = false;
   bool _isFirstLoad = true;
   bool _isLoading = false;
+  bool _groupByMonth = false;
   String? _loadError;
 
-  String _normalizeTag(String tag) => tag.trim().toLowerCase();
+  bool _isCurrentMonth(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month;
+  }
+
+  DateTime _firstDayOfMonth(DateTime date) {
+    return DateTime(date.year, date.month, 1);
+  }
+
+  DateTime _lastDayOfMonth(DateTime date) {
+    return DateTime(date.year, date.month + 1, 0);
+  }
+
+  DateTime get _startMonth => DateTime(_startDate.year, _startDate.month, 1);
+
+  DateTime get _endMonth => DateTime(_endDate.year, _endDate.month, 1);
+
+  void _initializeGroupedRange() {
+    final now = DateTime.now();
+    _startDate = DateTime(now.year, now.month - 11, 1);
+    _endDate = DateTime(now.year, now.month, now.day);
+    _rebuildMonths();
+  }
+
+  void _rebuildMonths() {
+    final months = <DateTime>[];
+    var cursor = _startMonth;
+    while (!cursor.isAfter(_endMonth)) {
+      months.add(cursor);
+      cursor = DateTime(cursor.year, cursor.month + 1, 1);
+    }
+    _months = months;
+  }
+
+  DateTime _groupedRangeEndDate() {
+    final now = DateTime.now();
+    if (_endMonth.year == now.year && _endMonth.month == now.month) {
+      return DateTime(now.year, now.month, now.day);
+    }
+    return DateTime(_endMonth.year, _endMonth.month + 1, 0);
+  }
+
+  bool _isMonthInRange(DateTime date) {
+    final normalized = DateTime(date.year, date.month, 1);
+    return !normalized.isBefore(_startMonth) && !normalized.isAfter(_endMonth);
+  }
+
+  void _toggleGroupByMonth(bool value) {
+    if (value == _groupByMonth) return;
+
+    setState(() {
+      _groupByMonth = value;
+      if (_groupByMonth) {
+        _initializeGroupedRange();
+      } else {
+        final pivot = _endDate;
+        final monthStart = DateTime(pivot.year, pivot.month, 1);
+        final monthEnd = _isCurrentMonth(pivot)
+            ? DateTime.now()
+            : DateTime(pivot.year, pivot.month + 1, 0);
+        _startDate = monthStart;
+        _endDate = DateTime(monthEnd.year, monthEnd.month, monthEnd.day);
+      }
+    });
+    _resetFiltersForReload();
+    _loadData();
+  }
+
+  void _applyMonthRange(DateTime monthDate) {
+    final monthStart = _firstDayOfMonth(monthDate);
+    final monthEnd = _isCurrentMonth(monthDate)
+        ? DateTime.now()
+        : _lastDayOfMonth(monthDate);
+    setState(() {
+      _startDate = monthStart;
+      _endDate = DateTime(monthEnd.year, monthEnd.month, monthEnd.day);
+    });
+    _resetFiltersForReload();
+    _loadData();
+  }
+
+  void _goToPreviousMonth() {
+    _applyMonthRange(DateTime(_startDate.year, _startDate.month - 1, 1));
+  }
+
+  void _goToNextMonth() {
+    if (_isCurrentMonth(_startDate)) return;
+    final nextMonth = DateTime(_startDate.year, _startDate.month + 1, 1);
+    final now = DateTime.now();
+    final currentMonthStart = DateTime(now.year, now.month, 1);
+    if (nextMonth.isAfter(currentMonthStart)) return;
+    _applyMonthRange(nextMonth);
+  }
+
+  void _selectCurrentMonth() {
+    _applyMonthRange(DateTime.now());
+  }
+
+  Future<void> _showMonthPickerSheet() async {
+    final picked = await showMonthPickerBottomSheet(
+      context: context,
+      initialMonth: _startDate,
+      titlePrefix: monthShortLabel(_startDate.month),
+    );
+    if (picked == null || !mounted) return;
+    _applyMonthRange(DateTime(picked.year, picked.month, 1));
+  }
+
+  Future<void> _pickStartMonth() async {
+    final picked = await _showGroupedMonthPicker(initialMonth: _startMonth);
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _startDate = picked;
+      if (_startMonth.isAfter(_endMonth)) {
+        final adjustedEnd = _isCurrentMonth(picked)
+            ? DateTime.now()
+            : DateTime(picked.year, picked.month + 1, 0);
+        _endDate = DateTime(
+          adjustedEnd.year,
+          adjustedEnd.month,
+          adjustedEnd.day,
+        );
+      }
+      _rebuildMonths();
+    });
+    _resetFiltersForReload();
+    _loadData();
+  }
+
+  Future<void> _pickEndMonth() async {
+    final picked = await _showGroupedMonthPicker(initialMonth: _endMonth);
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      final adjustedEnd = _isCurrentMonth(picked)
+          ? DateTime.now()
+          : DateTime(picked.year, picked.month + 1, 0);
+      _endDate = DateTime(adjustedEnd.year, adjustedEnd.month, adjustedEnd.day);
+      if (_endMonth.isBefore(_startMonth)) {
+        _startDate = picked;
+      }
+      _rebuildMonths();
+    });
+    _resetFiltersForReload();
+    _loadData();
+  }
+
+  Future<DateTime?> _showGroupedMonthPicker({
+    required DateTime initialMonth,
+  }) async {
+    return showMonthPickerBottomSheet(
+      context: context,
+      initialMonth: initialMonth,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _endDate = DateTime(
-      widget.initialEndDate.year,
-      widget.initialEndDate.month,
-      widget.initialEndDate.day,
-    );
-    _startDate = DateTime(_endDate.year, _endDate.month, 1);
+    _groupByMonth = widget.initialGroupByMonth;
+    if (_groupByMonth) {
+      _initializeGroupedRange();
+    } else {
+      _endDate = DateTime(
+        widget.initialEndDate.year,
+        widget.initialEndDate.month,
+        widget.initialEndDate.day,
+      );
+      _startDate = DateTime(_endDate.year, _endDate.month, 1);
+    }
     _loadData();
   }
 
@@ -66,8 +241,8 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     try {
       final results = await Future.wait([
         _transactionService.fetchTransactions(
-          dateFrom: _startDate,
-          dateTo: _endDate,
+          dateFrom: _groupByMonth ? _startMonth : _startDate,
+          dateTo: _groupByMonth ? _groupedRangeEndDate() : _endDate,
         ),
         _categoryService.fetchCategories(),
       ]);
@@ -91,7 +266,7 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         for (final tag in transaction.tags) {
           final cleanedTag = tag.trim();
           if (cleanedTag.isEmpty) continue;
-          final normalized = _normalizeTag(cleanedTag);
+          final normalized = normalizeTagKey(cleanedTag);
           if (transaction.type == TransactionType.income) {
             incomeTagsByNormalized.putIfAbsent(normalized, () => cleanedTag);
           } else {
@@ -114,24 +289,21 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       setState(() {
         _transactions = transactions;
         _categories = categories;
+        _availableIncomeCategoryIds = incomeIds;
+        _availableExpenseCategoryIds = expenseIds;
         if (!_hasInitializedSelections) {
           _selectedIncomeCategoryIds = incomeIds;
           _selectedExpenseCategoryIds = expenseIds;
           _hasInitializedSelections = true;
         } else {
-          final nextIncomeSelection = _selectedIncomeCategoryIds.intersection(
+          _selectedIncomeCategoryIds = intersectOrAll(
+            _selectedIncomeCategoryIds,
             incomeIds,
           );
-          final nextExpenseSelection = _selectedExpenseCategoryIds.intersection(
+          _selectedExpenseCategoryIds = intersectOrAll(
+            _selectedExpenseCategoryIds,
             expenseIds,
           );
-
-          _selectedIncomeCategoryIds = nextIncomeSelection.isEmpty
-              ? incomeIds
-              : nextIncomeSelection;
-          _selectedExpenseCategoryIds = nextExpenseSelection.isEmpty
-              ? expenseIds
-              : nextExpenseSelection;
         }
 
         _availableIncomeTagsByNormalized = incomeTagsByNormalized;
@@ -210,21 +382,19 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
 
   void _toggleIncomeCategory(int id) {
     setState(() {
-      if (_selectedIncomeCategoryIds.contains(id)) {
-        _selectedIncomeCategoryIds.remove(id);
-      } else {
-        _selectedIncomeCategoryIds.add(id);
-      }
+      _selectedIncomeCategoryIds = toggledSetValue(
+        _selectedIncomeCategoryIds,
+        id,
+      );
     });
   }
 
   void _toggleExpenseCategory(int id) {
     setState(() {
-      if (_selectedExpenseCategoryIds.contains(id)) {
-        _selectedExpenseCategoryIds.remove(id);
-      } else {
-        _selectedExpenseCategoryIds.add(id);
-      }
+      _selectedExpenseCategoryIds = toggledSetValue(
+        _selectedExpenseCategoryIds,
+        id,
+      );
     });
   }
 
@@ -242,21 +412,16 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
 
   void _toggleIncomeTag(String tagKey) {
     setState(() {
-      if (_selectedIncomeTagKeys.contains(tagKey)) {
-        _selectedIncomeTagKeys.remove(tagKey);
-      } else {
-        _selectedIncomeTagKeys.add(tagKey);
-      }
+      _selectedIncomeTagKeys = toggledSetValue(_selectedIncomeTagKeys, tagKey);
     });
   }
 
   void _toggleExpenseTag(String tagKey) {
     setState(() {
-      if (_selectedExpenseTagKeys.contains(tagKey)) {
-        _selectedExpenseTagKeys.remove(tagKey);
-      } else {
-        _selectedExpenseTagKeys.add(tagKey);
-      }
+      _selectedExpenseTagKeys = toggledSetValue(
+        _selectedExpenseTagKeys,
+        tagKey,
+      );
     });
   }
 
@@ -275,7 +440,7 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   bool _matchesTagFilter(Transaction transaction, Set<String> selectedTagKeys) {
     if (selectedTagKeys.isEmpty) return true;
     for (final tag in transaction.tags) {
-      if (selectedTagKeys.contains(_normalizeTag(tag))) {
+      if (selectedTagKeys.contains(normalizeTagKey(tag))) {
         return true;
       }
     }
@@ -297,24 +462,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     }
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return "${date.day} ${months[date.month - 1]} ${date.year}";
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -329,11 +476,31 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
           bottom: true,
           child: Column(
             children: [
-              _DateRangeBar(
-                startDateLabel: _formatDate(_startDate),
-                endDateLabel: _formatDate(_endDate),
-                onStartTap: _selectStartDate,
-                onEndTap: _selectEndDate,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.space16,
+                  AppTheme.space8,
+                  AppTheme.space16,
+                  AppTheme.space8,
+                ),
+                child: _StatsHeaderControls(
+                  groupByMonth: _groupByMonth,
+                  onGroupByMonthChanged: _toggleGroupByMonth,
+                  monthLabel: formatMonthYearLabel(_startDate),
+                  startDateLabel: formatDayMonthYearLabel(_startDate),
+                  endDateLabel: formatDayMonthYearLabel(_endDate),
+                  startMonthLabel: formatMonthYearLabel(_startMonth),
+                  endMonthLabel: formatMonthYearLabel(_endMonth),
+                  isOnCurrentMonth: _isCurrentMonth(_startDate),
+                  onPreviousMonth: _goToPreviousMonth,
+                  onNextMonth: _goToNextMonth,
+                  onCurrentMonth: _selectCurrentMonth,
+                  onMonthTap: _showMonthPickerSheet,
+                  onStartTap: _selectStartDate,
+                  onEndTap: _selectEndDate,
+                  onPickStartMonth: _pickStartMonth,
+                  onPickEndMonth: _pickEndMonth,
+                ),
               ),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
@@ -371,6 +538,14 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       return AppErrorState(message: _loadError!, onRetry: _loadData);
     }
 
+    if (_groupByMonth) {
+      return _buildGroupedContent();
+    }
+
+    return _buildDetailedContent();
+  }
+
+  Widget _buildDetailedContent() {
     if (_transactions.isEmpty) {
       return const AppEmptyState(
         icon: Icons.pie_chart_outline_rounded,
@@ -390,36 +565,8 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         .where((t) => _matchesTagFilter(t, _selectedExpenseTagKeys))
         .toList();
 
-    final sortedIncomeTagKeys = _availableIncomeTagsByNormalized.keys.toList()
-      ..sort(
-        (a, b) => _availableIncomeTagsByNormalized[a]!.toLowerCase().compareTo(
-          _availableIncomeTagsByNormalized[b]!.toLowerCase(),
-        ),
-      );
-    final sortedExpenseTagKeys = _availableExpenseTagsByNormalized.keys.toList()
-      ..sort(
-        (a, b) => _availableExpenseTagsByNormalized[a]!.toLowerCase().compareTo(
-          _availableExpenseTagsByNormalized[b]!.toLowerCase(),
-        ),
-      );
-
-    final incomeCategories = _categories
-        .where((c) => c.type == CategoryType.income)
-        .where(
-          (c) => _transactions.any(
-            (t) => t.type == TransactionType.income && t.categoryId == c.id,
-          ),
-        )
-        .toList();
-
-    final expenseCategories = _categories
-        .where((c) => c.type == CategoryType.expense)
-        .where(
-          (c) => _transactions.any(
-            (t) => t.type == TransactionType.expense && t.categoryId == c.id,
-          ),
-        )
-        .toList();
+    final incomeCategories = _incomeCategories;
+    final expenseCategories = _expenseCategories;
 
     final incomeTotal = income.fold<double>(0, (s, t) => s + t.amountRubles);
     final expenseTotal = expense.fold<double>(0, (s, t) => s + t.amountRubles);
@@ -455,13 +602,12 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     emptyLabel: "No income in selected categories",
                   ),
                   const SizedBox(height: AppTheme.space24),
-                  _FiltersAccordion(
+                  AnalyticsFiltersCard(
                     accentColor: AppTheme.incomeColor,
                     categories: incomeCategories,
                     selectedCategoryIds: _selectedIncomeCategoryIds,
                     onToggleCategory: _toggleIncomeCategory,
                     onSetCategorySelection: _setIncomeCategorySelection,
-                    availableTagKeys: sortedIncomeTagKeys,
                     tagLabelsByKey: _availableIncomeTagsByNormalized,
                     selectedTagKeys: _selectedIncomeTagKeys,
                     onToggleTag: _toggleIncomeTag,
@@ -489,13 +635,12 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     emptyLabel: "No expenses in selected categories",
                   ),
                   const SizedBox(height: AppTheme.space24),
-                  _FiltersAccordion(
+                  AnalyticsFiltersCard(
                     accentColor: AppTheme.expenseColor,
                     categories: expenseCategories,
                     selectedCategoryIds: _selectedExpenseCategoryIds,
                     onToggleCategory: _toggleExpenseCategory,
                     onSetCategorySelection: _setExpenseCategorySelection,
-                    availableTagKeys: sortedExpenseTagKeys,
                     tagLabelsByKey: _availableExpenseTagsByNormalized,
                     selectedTagKeys: _selectedExpenseTagKeys,
                     onToggleTag: _toggleExpenseTag,
@@ -516,6 +661,199 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildGroupedContent() {
+    final monthPoints = _buildMonthPoints();
+    final incomeStacked = _buildStackedMonthlyData(TransactionType.income);
+    final expenseStacked = _buildStackedMonthlyData(TransactionType.expense);
+
+    return TabBarView(
+      children: [
+        ListView(
+          padding: AppTheme.screenPadding,
+          children: [
+            _MonthTrendCard(points: monthPoints),
+            const SizedBox(height: AppTheme.space12),
+            _StackedMonthlyBarCard(
+              title: "Income by category",
+              rows: incomeStacked.rows,
+              legend: incomeStacked.legend,
+              emptyLabel: "No income in selected range",
+            ),
+            const SizedBox(height: AppTheme.space12),
+            AnalyticsFiltersCard(
+              title: "Income filters",
+              accentColor: AppTheme.incomeColor,
+              categories: _incomeCategories,
+              selectedCategoryIds: _selectedIncomeCategoryIds,
+              onToggleCategory: _toggleIncomeCategory,
+              onSetCategorySelection: _setIncomeCategorySelection,
+              tagLabelsByKey: _availableIncomeTagsByNormalized,
+              selectedTagKeys: _selectedIncomeTagKeys,
+              onToggleTag: _toggleIncomeTag,
+              onSetTagSelection: _setIncomeTagSelection,
+            ),
+          ],
+        ),
+        ListView(
+          padding: AppTheme.screenPadding,
+          children: [
+            _MonthTrendCard(points: monthPoints),
+            const SizedBox(height: AppTheme.space12),
+            _StackedMonthlyBarCard(
+              title: "Expenses by category",
+              rows: expenseStacked.rows,
+              legend: expenseStacked.legend,
+              emptyLabel: "No expenses in selected range",
+            ),
+            const SizedBox(height: AppTheme.space12),
+            AnalyticsFiltersCard(
+              title: "Expense filters",
+              accentColor: AppTheme.expenseColor,
+              categories: _expenseCategories,
+              selectedCategoryIds: _selectedExpenseCategoryIds,
+              onToggleCategory: _toggleExpenseCategory,
+              onSetCategorySelection: _setExpenseCategorySelection,
+              tagLabelsByKey: _availableExpenseTagsByNormalized,
+              selectedTagKeys: _selectedExpenseTagKeys,
+              onToggleTag: _toggleExpenseTag,
+              onSetTagSelection: _setExpenseTagSelection,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  bool _matchesFilters(Transaction transaction) {
+    if (_groupByMonth) {
+      final createdAt = transaction.createdAt;
+      if (createdAt == null || !_isMonthInRange(createdAt)) return false;
+    }
+
+    final isIncome = transaction.type == TransactionType.income;
+    final selectedCategoryIds = isIncome
+        ? _selectedIncomeCategoryIds
+        : _selectedExpenseCategoryIds;
+    if (!selectedCategoryIds.contains(transaction.categoryId)) return false;
+
+    final selectedTagKeys = isIncome
+        ? _selectedIncomeTagKeys
+        : _selectedExpenseTagKeys;
+    return _matchesTagFilter(transaction, selectedTagKeys);
+  }
+
+  List<Transaction> get _filteredTransactions {
+    return _transactions.where(_matchesFilters).toList();
+  }
+
+  List<_MonthPoint> _buildMonthPoints() {
+    return _months.map((month) {
+      double income = 0;
+      double expense = 0;
+      for (final transaction in _filteredTransactions) {
+        final createdAt = transaction.createdAt;
+        if (createdAt == null) continue;
+        if (createdAt.year != month.year || createdAt.month != month.month) {
+          continue;
+        }
+        if (transaction.type == TransactionType.income) {
+          income += transaction.amountRubles;
+        } else {
+          expense += transaction.amountRubles;
+        }
+      }
+      return _MonthPoint(month: month, income: income, expense: expense);
+    }).toList();
+  }
+
+  _StackedChartData _buildStackedMonthlyData(TransactionType type) {
+    final monthBuckets = <DateTime, Map<String, double>>{};
+    final labelsByKey = <String, String>{};
+    final totalByKey = <String, double>{};
+
+    for (final month in _months) {
+      monthBuckets[month] = <String, double>{};
+    }
+
+    for (final transaction in _filteredTransactions) {
+      if (transaction.type != type) continue;
+
+      final createdAt = transaction.createdAt;
+      if (createdAt == null) continue;
+      final month = DateTime(createdAt.year, createdAt.month, 1);
+      if (!monthBuckets.containsKey(month)) continue;
+
+      final key = transaction.categoryId.toString();
+      labelsByKey.putIfAbsent(key, () => transaction.category);
+      monthBuckets[month]![key] =
+          (monthBuckets[month]![key] ?? 0) + transaction.amountRubles;
+      totalByKey[key] = (totalByKey[key] ?? 0) + transaction.amountRubles;
+    }
+
+    final rankedKeys = totalByKey.keys.toList()
+      ..sort((a, b) => (totalByKey[b] ?? 0).compareTo(totalByKey[a] ?? 0));
+
+    final rows = _months.map((month) {
+      final values = monthBuckets[month] ?? const <String, double>{};
+      final segments = <_StackSegment>[];
+
+      for (final key in rankedKeys) {
+        final value = values[key] ?? 0;
+        if (value > 0) {
+          segments.add(
+            _StackSegment(
+              key: key,
+              label: labelsByKey[key] ?? key,
+              amount: value,
+            ),
+          );
+        }
+      }
+
+      return _MonthlyStackedRow(month: month, segments: segments);
+    }).toList();
+
+    final legend = <_LegendEntry>[];
+    final colorPalette = type == TransactionType.income
+        ? _ChartPalette.income
+        : _ChartPalette.expense;
+
+    for (var i = 0; i < rankedKeys.length; i++) {
+      final key = rankedKeys[i];
+      legend.add(
+        _LegendEntry(
+          key: key,
+          label: labelsByKey[key] ?? key,
+          color: colorPalette[i % colorPalette.length],
+        ),
+      );
+    }
+
+    return _StackedChartData(rows: rows, legend: legend);
+  }
+
+  List<Category> get _incomeCategories {
+    final categories = _categories
+        .where((category) => category.type == CategoryType.income)
+        .where((category) => _availableIncomeCategoryIds.contains(category.id))
+        .toList();
+    categories.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return categories;
+  }
+
+  List<Category> get _expenseCategories {
+    final categories = _categories
+        .where((category) => category.type == CategoryType.expense)
+        .where((category) => _availableExpenseCategoryIds.contains(category.id))
+        .toList();
+    categories.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return categories;
   }
 
   List<_CategoryTotal> _buildCategoryTotals(List<Transaction> items) {
@@ -542,74 +880,223 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   }
 }
 
-class _DateRangeBar extends StatelessWidget {
-  const _DateRangeBar({
+class _StatsHeaderControls extends StatelessWidget {
+  const _StatsHeaderControls({
+    required this.groupByMonth,
+    required this.onGroupByMonthChanged,
+    required this.monthLabel,
     required this.startDateLabel,
     required this.endDateLabel,
+    required this.startMonthLabel,
+    required this.endMonthLabel,
+    required this.isOnCurrentMonth,
+    required this.onPreviousMonth,
+    required this.onNextMonth,
+    required this.onCurrentMonth,
+    required this.onMonthTap,
     required this.onStartTap,
     required this.onEndTap,
+    required this.onPickStartMonth,
+    required this.onPickEndMonth,
   });
 
+  final bool groupByMonth;
+  final ValueChanged<bool> onGroupByMonthChanged;
+  final String monthLabel;
   final String startDateLabel;
   final String endDateLabel;
+  final String startMonthLabel;
+  final String endMonthLabel;
+  final bool isOnCurrentMonth;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
+  final VoidCallback onCurrentMonth;
+  final VoidCallback onMonthTap;
   final VoidCallback onStartTap;
   final VoidCallback onEndTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      color: colorScheme.surface,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.space16,
-        vertical: AppTheme.space12,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _DateChip(
-              label: "From",
-              value: startDateLabel,
-              onTap: onStartTap,
-            ),
-          ),
-          const SizedBox(width: AppTheme.space12),
-          Icon(
-            Icons.arrow_forward_rounded,
-            size: AppTheme.iconSizeMedium,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: AppTheme.space12),
-          Expanded(
-            child: _DateChip(label: "To", value: endDateLabel, onTap: onEndTap),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DateChip extends StatelessWidget {
-  const _DateChip({
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final VoidCallback onTap;
+  final VoidCallback onPickStartMonth;
+  final VoidCallback onPickEndMonth;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.space12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  "View",
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: AppTheme.space8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      style: const ButtonStyle(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: false,
+                          icon: Icon(Icons.calendar_view_month_rounded),
+                          label: Text("Month"),
+                        ),
+                        ButtonSegment<bool>(
+                          value: true,
+                          icon: Icon(Icons.stacked_line_chart_rounded),
+                          label: Text("Range"),
+                        ),
+                      ],
+                      selected: {groupByMonth},
+                      onSelectionChanged: (selection) {
+                        if (selection.isEmpty) return;
+                        onGroupByMonthChanged(selection.first);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.space8),
+            if (groupByMonth)
+              Row(
+                children: [
+                  Expanded(
+                    child: _HeaderActionChip(
+                      icon: Icons.calendar_month_rounded,
+                      label: "From: $startMonthLabel",
+                      onTap: onPickStartMonth,
+                      expand: true,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.space8),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: AppTheme.iconSizeMedium,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppTheme.space8),
+                  Expanded(
+                    child: _HeaderActionChip(
+                      icon: Icons.calendar_month_rounded,
+                      label: "To: $endMonthLabel",
+                      onTap: onPickEndMonth,
+                      expand: true,
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: AppTheme.space4,
+                    runSpacing: AppTheme.space4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: onPreviousMonth,
+                        tooltip: "Previous month",
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
+                        icon: const Icon(Icons.chevron_left_rounded),
+                      ),
+                      _HeaderActionChip(
+                        icon: Icons.calendar_month_rounded,
+                        label: monthLabel,
+                        onTap: onMonthTap,
+                      ),
+                      IconButton(
+                        onPressed: isOnCurrentMonth ? null : onNextMonth,
+                        tooltip: "Next month",
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
+                        icon: const Icon(Icons.chevron_right_rounded),
+                      ),
+                      IconButton(
+                        onPressed: isOnCurrentMonth ? null : onCurrentMonth,
+                        tooltip: "Current month",
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
+                        icon: const Icon(Icons.today_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTheme.space8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _HeaderActionChip(
+                          label: "From: $startDateLabel",
+                          onTap: onStartTap,
+                          expand: true,
+                        ),
+                      ),
+                      const SizedBox(width: AppTheme.space8),
+                      Expanded(
+                        child: _HeaderActionChip(
+                          label: "To: $endDateLabel",
+                          onTap: onEndTap,
+                          expand: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderActionChip extends StatelessWidget {
+  const _HeaderActionChip({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.expand = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool expand;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return InkWell(
       onTap: onTap,
       borderRadius: AppTheme.borderRadiusSmall,
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.space12,
+          horizontal: AppTheme.space8,
           vertical: AppTheme.space8,
         ),
         decoration: BoxDecoration(
@@ -617,20 +1104,22 @@ class _DateChip extends StatelessWidget {
           borderRadius: AppTheme.borderRadiusSmall,
           border: Border.all(color: colorScheme.outlineVariant),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        width: expand ? double.infinity : null,
+        child: Row(
+          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppTheme.space4),
-            Text(
-              value,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+            if (icon != null) ...[
+              Icon(icon, size: AppTheme.iconSizeSmall),
+              const SizedBox(width: AppTheme.space4),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -638,6 +1127,521 @@ class _DateChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MonthPoint {
+  const _MonthPoint({
+    required this.month,
+    required this.income,
+    required this.expense,
+  });
+
+  final DateTime month;
+  final double income;
+  final double expense;
+
+  double get net => income - expense;
+}
+
+class _StackSegment {
+  const _StackSegment({
+    required this.key,
+    required this.label,
+    required this.amount,
+  });
+
+  final String key;
+  final String label;
+  final double amount;
+}
+
+class _MonthlyStackedRow {
+  const _MonthlyStackedRow({required this.month, required this.segments});
+
+  final DateTime month;
+  final List<_StackSegment> segments;
+
+  double get total =>
+      segments.fold<double>(0, (sum, segment) => sum + segment.amount);
+}
+
+class _LegendEntry {
+  const _LegendEntry({
+    required this.key,
+    required this.label,
+    required this.color,
+  });
+
+  final String key;
+  final String label;
+  final Color color;
+}
+
+class _StackedChartData {
+  const _StackedChartData({required this.rows, required this.legend});
+
+  final List<_MonthlyStackedRow> rows;
+  final List<_LegendEntry> legend;
+}
+
+class _MonthTrendCard extends StatelessWidget {
+  const _MonthTrendCard({required this.points});
+
+  final List<_MonthPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: AppTheme.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Net, income and expenses by month",
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppTheme.space12),
+            SizedBox(
+              height: 260,
+              child: LineChart(
+                LineChartData(
+                  minY: _minY(points),
+                  maxY: _maxY(points),
+                  minX: 0,
+                  maxX: (points.length - 1).toDouble(),
+                  gridData: FlGridData(
+                    show: true,
+                    horizontalInterval: _gridInterval(points),
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: colorScheme.outlineVariant.withAlpha(120),
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      left: BorderSide(color: colorScheme.outlineVariant),
+                      bottom: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                  ),
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) =>
+                          _ChartTooltipStyle.backgroundColor,
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final label = switch (spot.barIndex) {
+                            0 => "Income",
+                            1 => "Expenses",
+                            2 => "Net",
+                            _ => "Value",
+                          };
+                          return LineTooltipItem(
+                            "$label: ${formatAmount(spot.y)} ₽",
+                            textTheme.labelMedium?.copyWith(
+                                  color: Colors.white,
+                                ) ??
+                                const TextStyle(color: Colors.white),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 48,
+                        interval: _gridInterval(points),
+                        getTitlesWidget: (value, meta) =>
+                            Text(_compact(value), style: textTheme.labelSmall),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.round();
+                          if (index < 0 || index >= points.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              top: AppTheme.space8,
+                            ),
+                            child: Text(
+                              _shortMonth(points[index].month),
+                              style: textTheme.labelSmall,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineBarsData: [
+                    _line(points, (item) => item.income, AppTheme.incomeColor),
+                    _line(
+                      points,
+                      (item) => item.expense,
+                      AppTheme.expenseColor,
+                    ),
+                    _line(points, (item) => item.net, colorScheme.primary),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppTheme.space12),
+            _LegendWrap(
+              entries: [
+                _LegendEntry(
+                  key: "income",
+                  label: "Income",
+                  color: AppTheme.incomeColor,
+                ),
+                _LegendEntry(
+                  key: "expense",
+                  label: "Expenses",
+                  color: AppTheme.expenseColor,
+                ),
+                _LegendEntry(
+                  key: "net",
+                  label: "Net",
+                  color: colorScheme.primary,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _shortMonth(DateTime date) {
+    const months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+    return months[date.month - 1];
+  }
+
+  static String _compact(double value) {
+    final absolute = value.abs();
+    if (absolute >= 1000000) {
+      return "${(value / 1000000).toStringAsFixed(1)}M";
+    }
+    if (absolute >= 1000) {
+      return "${(value / 1000).toStringAsFixed(0)}k";
+    }
+    return value.toStringAsFixed(0);
+  }
+
+  static double _gridInterval(List<_MonthPoint> points) {
+    final span = (_maxY(points) - _minY(points)).abs();
+    if (span <= 0) return 1;
+    return (span / 4).clamp(1, double.infinity);
+  }
+
+  static LineChartBarData _line(
+    List<_MonthPoint> points,
+    double Function(_MonthPoint point) valueOf,
+    Color color,
+  ) {
+    return LineChartBarData(
+      spots: points
+          .asMap()
+          .entries
+          .map((entry) => FlSpot(entry.key.toDouble(), valueOf(entry.value)))
+          .toList(),
+      isCurved: true,
+      color: color,
+      barWidth: 2,
+      belowBarData: BarAreaData(show: false),
+      dotData: FlDotData(show: false),
+    );
+  }
+
+  static double _maxY(List<_MonthPoint> points) {
+    final maxValue = points.fold<double>(0, (max, point) {
+      final local = [
+        point.expense,
+        point.income,
+        point.net,
+      ].reduce((a, b) => a > b ? a : b);
+      return local > max ? local : max;
+    });
+    if (maxValue <= 0) return 1;
+    return maxValue * 1.2;
+  }
+
+  static double _minY(List<_MonthPoint> points) {
+    final minValue = points.fold<double>(0, (min, point) {
+      final local = [
+        point.expense,
+        point.income,
+        point.net,
+      ].reduce((a, b) => a < b ? a : b);
+      return local < min ? local : min;
+    });
+    if (minValue >= 0) return 0;
+    return minValue * 1.2;
+  }
+}
+
+class _StackedMonthlyBarCard extends StatelessWidget {
+  const _StackedMonthlyBarCard({
+    required this.title,
+    required this.rows,
+    required this.legend,
+    required this.emptyLabel,
+  });
+
+  final String title;
+  final List<_MonthlyStackedRow> rows;
+  final List<_LegendEntry> legend;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final maxTotal = rows.fold<double>(
+      0,
+      (max, row) => row.total > max ? row.total : max,
+    );
+    final hasData = maxTotal > 0;
+    final colorByKey = {for (final item in legend) item.key: item.color};
+
+    return Card(
+      child: Padding(
+        padding: AppTheme.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppTheme.space12),
+            if (!hasData)
+              Text(
+                emptyLabel,
+                style: textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              )
+            else
+              SizedBox(
+                height: 300,
+                child: BarChart(
+                  BarChartData(
+                    minY: 0,
+                    maxY: maxTotal * 1.2,
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: (maxTotal / 4).clamp(
+                        1,
+                        double.infinity,
+                      ),
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withAlpha(120),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        left: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    titlesData: FlTitlesData(
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 48,
+                          getTitlesWidget: (value, meta) => Text(
+                            _MonthTrendCard._compact(value),
+                            style: textTheme.labelSmall,
+                          ),
+                        ),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 38,
+                          interval: 1,
+                          getTitlesWidget: (value, meta) {
+                            final index = value.round();
+                            if (index < 0 || index >= rows.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final month = rows[index].month;
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                top: AppTheme.space8,
+                              ),
+                              child: Text(
+                                "${_MonthTrendCard._shortMonth(month)}\n${month.year % 100}",
+                                textAlign: TextAlign.center,
+                                style: textTheme.labelSmall,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    barTouchData: BarTouchData(
+                      enabled: true,
+                      touchTooltipData: BarTouchTooltipData(
+                        getTooltipColor: (_) =>
+                            _ChartTooltipStyle.backgroundColor,
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          final row = rows[group.x.toInt()];
+                          final monthTitle =
+                              "${row.month.month.toString().padLeft(2, "0")}.${row.month.year}";
+                          final visibleSegments = row.segments
+                              .where((segment) => segment.amount > 0)
+                              .toList();
+                          return BarTooltipItem(
+                            "$monthTitle\nTotal: ${formatAmount(row.total)} ₽",
+                            textTheme.labelMedium?.copyWith(
+                                  color: Colors.white,
+                                ) ??
+                                const TextStyle(color: Colors.white),
+                            children: visibleSegments
+                                .map(
+                                  (segment) => TextSpan(
+                                    text:
+                                        "\n${segment.label}: ${formatAmount(segment.amount)} ₽",
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        },
+                      ),
+                    ),
+                    barGroups: rows.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final row = entry.value;
+                      var cursor = 0.0;
+                      final stacks = <BarChartRodStackItem>[];
+                      for (final segment in row.segments) {
+                        final from = cursor;
+                        final to = cursor + segment.amount;
+                        final color =
+                            colorByKey[segment.key] ?? const Color(0xFF90A4AE);
+                        stacks.add(BarChartRodStackItem(from, to, color));
+                        cursor = to;
+                      }
+
+                      return BarChartGroupData(
+                        x: index,
+                        barRods: [
+                          BarChartRodData(
+                            toY: row.total,
+                            rodStackItems: stacks,
+                            width: 18,
+                            borderRadius: AppTheme.borderRadiusSmall,
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            if (hasData) ...[
+              const SizedBox(height: AppTheme.space12),
+              _LegendWrap(entries: legend),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendWrap extends StatelessWidget {
+  const _LegendWrap({required this.entries});
+
+  final List<_LegendEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Wrap(
+      spacing: AppTheme.space12,
+      runSpacing: AppTheme.space8,
+      children: entries
+          .map(
+            (entry) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: entry.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppTheme.space4),
+                Text(entry.label, style: textTheme.labelMedium),
+              ],
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _ChartPalette {
+  static const List<Color> income = [
+    Color(0xFF2E7D32),
+    Color(0xFF00897B),
+    Color(0xFF0097A7),
+    Color(0xFF1976D2),
+    Color(0xFF43A047),
+    Color(0xFF26A69A),
+  ];
+
+  static const List<Color> expense = [
+    Color(0xFFC62828),
+    Color(0xFFD32F2F),
+    Color(0xFFF4511E),
+    Color(0xFFFF7043),
+    Color(0xFF8E24AA),
+    Color(0xFFEC407A),
+  ];
+}
+
+class _ChartTooltipStyle {
+  static const Color backgroundColor = Color(0xCC1F2937);
 }
 
 class _TotalSummaryCard extends StatelessWidget {
@@ -843,241 +1847,7 @@ class _CategorySection extends StatelessWidget {
   }
 }
 
-class _FiltersAccordion extends StatelessWidget {
-  const _FiltersAccordion({
-    required this.accentColor,
-    required this.categories,
-    required this.selectedCategoryIds,
-    required this.onToggleCategory,
-    required this.onSetCategorySelection,
-    required this.availableTagKeys,
-    required this.tagLabelsByKey,
-    required this.selectedTagKeys,
-    required this.onToggleTag,
-    required this.onSetTagSelection,
-  });
-
-  final Color accentColor;
-  final List<Category> categories;
-  final Set<int> selectedCategoryIds;
-  final ValueChanged<int> onToggleCategory;
-  final ValueChanged<Set<int>> onSetCategorySelection;
-  final List<String> availableTagKeys;
-  final Map<String, String> tagLabelsByKey;
-  final Set<String> selectedTagKeys;
-  final ValueChanged<String> onToggleTag;
-  final ValueChanged<Set<String>> onSetTagSelection;
-
-  static const double _maxChipAreaHeight = 156;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final categorySummary =
-        "${selectedCategoryIds.length}/${categories.length} selected";
-    final tagSummary =
-        "${selectedTagKeys.length}/${availableTagKeys.length} selected";
-
-    return Card(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.space16,
-              AppTheme.space12,
-              AppTheme.space16,
-              AppTheme.space4,
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.tune_rounded, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: AppTheme.space8),
-                Text(
-                  "Filters",
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: colorScheme.outlineVariant),
-          ExpansionTile(
-            leading: Icon(Icons.folder_outlined, color: accentColor),
-            title: const Text("Category filter"),
-            subtitle: Text(categorySummary),
-            shape: const Border(),
-            collapsedShape: const Border(),
-            childrenPadding: const EdgeInsets.fromLTRB(
-              AppTheme.space16,
-              0,
-              AppTheme.space16,
-              AppTheme.space16,
-            ),
-            children: [
-              _FilterActions(
-                onSelectAll: categories.isEmpty
-                    ? null
-                    : () => onSetCategorySelection(
-                        categories.map((category) => category.id).toSet(),
-                      ),
-                onClearAll: selectedCategoryIds.isEmpty
-                    ? null
-                    : () => onSetCategorySelection(<int>{}),
-              ),
-              const SizedBox(height: AppTheme.space8),
-              if (categories.isEmpty)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "No categories",
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                )
-              else
-                _buildScrollableChipArea(
-                  child: Wrap(
-                    spacing: AppTheme.space8,
-                    runSpacing: AppTheme.space8,
-                    children: categories
-                        .map(
-                          (category) => FilterChip(
-                            label: Text(category.name),
-                            selected: selectedCategoryIds.contains(category.id),
-                            onSelected: (_) => onToggleCategory(category.id),
-                            showCheckmark: false,
-                            selectedColor: accentColor.withAlpha(30),
-                            backgroundColor: colorScheme.surfaceContainerLow,
-                            checkmarkColor: accentColor,
-                            side: BorderSide(color: colorScheme.outlineVariant),
-                            labelStyle: textTheme.labelMedium?.copyWith(
-                              color: selectedCategoryIds.contains(category.id)
-                                  ? accentColor
-                                  : colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-            ],
-          ),
-          Divider(height: 1, color: colorScheme.outlineVariant),
-          ExpansionTile(
-            leading: Icon(Icons.sell_outlined, color: accentColor),
-            title: const Text("Tag filter"),
-            subtitle: Text(tagSummary),
-            shape: const Border(),
-            collapsedShape: const Border(),
-            childrenPadding: const EdgeInsets.fromLTRB(
-              AppTheme.space16,
-              0,
-              AppTheme.space16,
-              AppTheme.space16,
-            ),
-            children: [
-              _FilterActions(
-                onSelectAll: availableTagKeys.isEmpty
-                    ? null
-                    : () => onSetTagSelection(availableTagKeys.toSet()),
-                onClearAll: selectedTagKeys.isEmpty
-                    ? null
-                    : () => onSetTagSelection(<String>{}),
-              ),
-              const SizedBox(height: AppTheme.space8),
-              if (availableTagKeys.isEmpty)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "No tags in selected range",
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                )
-              else
-                _buildScrollableChipArea(
-                  child: Wrap(
-                    spacing: AppTheme.space8,
-                    runSpacing: AppTheme.space8,
-                    children: availableTagKeys
-                        .map(
-                          (tagKey) => FilterChip(
-                            label: Text(tagLabelsByKey[tagKey] ?? tagKey),
-                            selected: selectedTagKeys.contains(tagKey),
-                            onSelected: (_) => onToggleTag(tagKey),
-                            showCheckmark: false,
-                            selectedColor: accentColor.withAlpha(30),
-                            backgroundColor: colorScheme.surfaceContainerLow,
-                            checkmarkColor: accentColor,
-                            side: BorderSide(color: colorScheme.outlineVariant),
-                            labelStyle: textTheme.labelMedium?.copyWith(
-                              color: selectedTagKeys.contains(tagKey)
-                                  ? accentColor
-                                  : colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScrollableChipArea({required Widget child}) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: _maxChipAreaHeight),
-      child: Scrollbar(
-        child: SingleChildScrollView(
-          child: Align(alignment: Alignment.topLeft, child: child),
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterActions extends StatelessWidget {
-  const _FilterActions({required this.onSelectAll, required this.onClearAll});
-
-  final VoidCallback? onSelectAll;
-  final VoidCallback? onClearAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        TextButton.icon(
-          onPressed: onSelectAll,
-          icon: const Icon(
-            Icons.done_all_rounded,
-            size: AppTheme.iconSizeSmall,
-          ),
-          label: const Text("Select all"),
-        ),
-        const SizedBox(width: AppTheme.space4),
-        TextButton.icon(
-          onPressed: onClearAll,
-          icon: const Icon(
-            Icons.clear_all_rounded,
-            size: AppTheme.iconSizeSmall,
-          ),
-          label: const Text("Clear all"),
-        ),
-      ],
-    );
-  }
-}
-
-class _PieChartCard extends StatelessWidget {
+class _PieChartCard extends StatefulWidget {
   const _PieChartCard({
     required this.baseColor,
     required this.palette,
@@ -1087,8 +1857,9 @@ class _PieChartCard extends StatelessWidget {
 
   static const double _minSlicePercent = 1;
   static const double _chartHeight = 220;
-  static const double _legendHeight = 172;
-  static const double _bodyHeight = 420;
+  static const double _minLegendHeight = 56;
+  static const double _maxLegendHeight = 172;
+  static const double _legendRowHeight = 30;
 
   final Color baseColor;
   final List<Color> palette;
@@ -1096,17 +1867,34 @@ class _PieChartCard extends StatelessWidget {
   final String emptyLabel;
 
   @override
+  State<_PieChartCard> createState() => _PieChartCardState();
+}
+
+class _PieChartCardState extends State<_PieChartCard> {
+  int? _touchedSectionIndex;
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final sliceTotals = _buildSliceTotals(widget.data);
+    final sections = _buildSections(sliceTotals);
+    final legendHeight = _legendHeightForCount(widget.data.length);
+    final touchedIndex = _touchedSectionIndex;
+    final touchedItem =
+        touchedIndex != null &&
+            touchedIndex >= 0 &&
+            touchedIndex < sliceTotals.length
+        ? sliceTotals[touchedIndex]
+        : null;
 
     return Card(
       child: Padding(
         padding: AppTheme.cardPadding,
-        child: SizedBox(
-          height: _bodyHeight,
-          child: data.isEmpty
-              ? Center(
+        child: widget.data.isEmpty
+            ? SizedBox(
+                height: _PieChartCard._chartHeight,
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1117,7 +1905,7 @@ class _PieChartCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppTheme.space8),
                       Text(
-                        emptyLabel,
+                        widget.emptyLabel,
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1125,26 +1913,86 @@ class _PieChartCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                )
-              : Column(
-                  children: [
-                    SizedBox(
-                      height: _chartHeight,
-                      child: PieChart(
-                        PieChartData(
-                          sections: _buildSections(data),
-                          centerSpaceRadius: 52,
-                          sectionsSpace: 2,
+                ),
+              )
+            : Column(
+                children: [
+                  SizedBox(
+                    height: _PieChartCard._chartHeight,
+                    child: Stack(
+                      children: [
+                        PieChart(
+                          PieChartData(
+                            sections: sections,
+                            centerSpaceRadius: 52,
+                            sectionsSpace: 2,
+                            pieTouchData: PieTouchData(
+                              enabled: true,
+                              touchCallback: (event, response) {
+                                final touchedSection = response?.touchedSection;
+                                if (!event.isInterestedForInteractions ||
+                                    touchedSection == null) {
+                                  if (_touchedSectionIndex != null) {
+                                    setState(() {
+                                      _touchedSectionIndex = null;
+                                    });
+                                  }
+                                  return;
+                                }
+
+                                final index =
+                                    touchedSection.touchedSectionIndex;
+                                if (index < 0 || index >= sliceTotals.length) {
+                                  if (_touchedSectionIndex != null) {
+                                    setState(() {
+                                      _touchedSectionIndex = null;
+                                    });
+                                  }
+                                  return;
+                                }
+                                if (_touchedSectionIndex != index) {
+                                  setState(() {
+                                    _touchedSectionIndex = index;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 120),
+                              child: touchedItem == null
+                                  ? const SizedBox.shrink()
+                                  : _PieTouchTooltip(
+                                      key: ValueKey<int>(
+                                        touchedItem.categoryId,
+                                      ),
+                                      label: touchedItem.name,
+                                      value:
+                                          "${formatAmount(touchedItem.total)} ₽",
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppTheme.space16),
-                    SizedBox(
-                      height: _legendHeight,
+                  ),
+                  const SizedBox(height: AppTheme.space16),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      height: legendHeight,
                       child: Scrollbar(
                         child: SingleChildScrollView(
                           child: Column(
-                            children: data
+                            children: widget.data
                                 .map(
                                   (item) => Padding(
                                     padding: const EdgeInsets.only(
@@ -1162,32 +2010,54 @@ class _PieChartCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ],
-                ),
-        ),
+                  ),
+                ],
+              ),
       ),
     );
   }
 
-  List<PieChartSectionData> _buildSections(List<_CategoryTotal> totals) {
-    final totalValue = totals.fold<double>(0, (sum, item) => sum + item.total);
-    if (totalValue == 0) return [];
+  double _legendHeightForCount(int count) {
+    if (count <= 0) return _PieChartCard._minLegendHeight;
+    final desired = count * _PieChartCard._legendRowHeight;
+    return desired
+        .clamp(_PieChartCard._minLegendHeight, _PieChartCard._maxLegendHeight)
+        .toDouble();
+  }
 
-    final colors = totals.length > 1 ? palette : [baseColor];
+  List<_CategoryTotal> _buildSliceTotals(List<_CategoryTotal> totals) {
+    final totalValue = totals.fold<double>(0, (sum, item) => sum + item.total);
+    if (totalValue == 0) return <_CategoryTotal>[];
+
+    final colors = totals.length > 1 ? widget.palette : [widget.baseColor];
     final visibleTotals = totals
-        .where((item) => item.total / totalValue * 100 >= _minSlicePercent)
+        .where(
+          (item) =>
+              item.total / totalValue * 100 >= _PieChartCard._minSlicePercent,
+        )
         .toList();
     final sliceTotals = visibleTotals.isEmpty ? totals : visibleTotals;
 
+    for (var i = 0; i < sliceTotals.length; i++) {
+      sliceTotals[i].color = colors[i % colors.length];
+    }
+
+    return sliceTotals;
+  }
+
+  List<PieChartSectionData> _buildSections(List<_CategoryTotal> sliceTotals) {
+    final totalValue = sliceTotals.fold<double>(
+      0,
+      (sum, item) => sum + item.total,
+    );
+    if (totalValue == 0) return [];
+
     return sliceTotals.asMap().entries.map((entry) {
-      final index = entry.key;
       final item = entry.value;
-      final color = colors[index % colors.length];
-      item.color = color;
       final value = item.total;
       final percentage = value / totalValue * 100;
       return PieChartSectionData(
-        color: color,
+        color: item.color,
         value: value,
         radius: 72,
         title: "${percentage.toStringAsFixed(0)}%",
@@ -1198,6 +2068,36 @@ class _PieChartCard extends StatelessWidget {
         ),
       );
     }).toList();
+  }
+}
+
+class _PieTouchTooltip extends StatelessWidget {
+  const _PieTouchTooltip({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.space8,
+        vertical: AppTheme.space4,
+      ),
+      decoration: BoxDecoration(
+        color: _ChartTooltipStyle.backgroundColor,
+        borderRadius: AppTheme.borderRadiusSmall,
+      ),
+      child: Text(
+        "$label\n$value",
+        textAlign: TextAlign.center,
+        style:
+            textTheme.labelMedium?.copyWith(color: Colors.white) ??
+            const TextStyle(color: Colors.white),
+      ),
+    );
   }
 }
 
@@ -1395,21 +2295,7 @@ class _TransactionsSection extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     if (date == today) return "Today";
     if (date == today.subtract(const Duration(days: 1))) return "Yesterday";
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return "${date.day} ${months[date.month - 1]} ${date.year}";
+    return formatDayMonthYearLabel(date);
   }
 }
 
