@@ -1,3 +1,4 @@
+import logging
 from cmath import acos
 from datetime import UTC, datetime
 
@@ -6,6 +7,8 @@ from peewee import JOIN, fn
 from ..models import Account, Category, Transaction, db
 from ..utils.currency_codes import CODES
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 
 async def get_user_accounts(user_id: int) -> list[Account]:
@@ -46,11 +49,13 @@ async def get_user_account_with_balance(user_id: int, account_id) -> tuple[Accou
 
 async def create_account(user_id: int, name: str, adjustment_amount: float, currency_code="RUB"):
     if currency_code not in CODES:
+        logger.warning("unknown currency code: %s", currency_code)
         raise HTTPException(status_code=400, detail="Unknown currency code")
     now = datetime.now(UTC)
     account = Account(user_id=user_id, name=name, adjustment_amount=adjustment_amount, currency_code=currency_code,
                       created_at=now, updated_at=now)
     await db.run(account.save)
+    logger.info("account created: id=%d user_id=%d name=%s currency=%s", account.id, user_id, name, currency_code)
     return account
 
 
@@ -62,6 +67,7 @@ async def update_account(user_id: int, account: Account, new_balance: float | No
             account.adjustment_amount = new_balance - balance + account.adjustment_amount
         account.updated_at = now
         await db.run(account.save)
+    logger.info("account updated: id=%d user_id=%d", account.id, user_id)
     return account
 
 async def delete_account_by_id(account_id: int):
@@ -69,6 +75,6 @@ async def delete_account_by_id(account_id: int):
     await db.run(lambda: Account.delete_by_id(account_id))
 
 async def delete_account_by_id_and_user_id(user_id: int, account_id: int):
-    """Delete a category"""
     account = await get_account_by_id(user_id, account_id)
+    logger.info("account deleted: id=%d user_id=%d", account_id, user_id)
     await db.run(account.delete_instance)

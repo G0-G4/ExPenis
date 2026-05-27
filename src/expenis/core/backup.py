@@ -1,13 +1,15 @@
 import sqlite3
 import datetime
+import logging
 from pathlib import Path
 from typing import Optional
 
+logger = logging.getLogger(__name__)
+
 
 def _log_backup_progress(status, remaining, total):
-    """Callback function to log backup progress"""
     percent = (total - remaining) / total * 100
-    print(f"Database backup progress: {percent:.1f}% complete ({remaining} pages remaining)")
+    logger.info("database backup progress: %.1f%% complete (%d pages remaining)", percent, remaining)
 
 def backup_database(
     source_db_path: str = "./data/expenis.db",
@@ -43,7 +45,7 @@ def backup_database(
         # Create backup with progress logging
         with backup_conn:
             source_conn.backup(backup_conn, pages=100, progress=_log_backup_progress)
-            print("Database backup completed successfully")
+            logger.info("database backup completed successfully")
         
         # Rotate old backups if max_backups is set
         if max_backups is not None and max_backups > 0:
@@ -54,6 +56,7 @@ def backup_database(
         return str(backup_path)
         
     except sqlite3.Error as e:
+        logger.error("database backup failed: %s", e)
         raise RuntimeError(f"Database backup failed: {e}")
     finally:
         if 'source_conn' in locals():

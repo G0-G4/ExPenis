@@ -1,6 +1,9 @@
+import logging
 from datetime import UTC, date, datetime
 
 from ..models import Account, Category, Tag, Transaction, TransactionTag, db
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_tags(tags: list[str] | None) -> list[str]:
@@ -51,16 +54,16 @@ async def get_transaction_by_id_and_user_id(user_id: int, transaction_id: int) -
 
 
 async def save_transaction(transaction: Transaction) -> Transaction:
-    """Update an existing transaction"""
     now = datetime.now(UTC)
     transaction.created_at = now if transaction.created_at is None else transaction.created_at
     transaction.updated_at = now if transaction.updated_at is None else transaction.updated_at
     await db.run(transaction.save)
+    logger.info("transaction saved: id=%d user_id=%d amount=%s", transaction.id, transaction.user_id, transaction.amount)
     return transaction
 
 async def update_transaction(transaction: Transaction) -> Transaction:
-    """Update an existing transaction"""
     await db.run(transaction.save)
+    logger.info("transaction updated: id=%d user_id=%d", transaction.id, transaction.user_id)
     return transaction
 
 async def delete_transaction(transaction: Transaction):
@@ -72,7 +75,7 @@ async def delete_transaction_by_id(transaction_id: int):
     await db.run(lambda: Transaction.delete_by_id(transaction_id))
 
 async def delete_transaction_by_id_and_user_id(user_id: int, transaction_id: int):
-    """Delete a transaction"""
+    logger.info("transaction deleted: id=%d user_id=%d", transaction_id, user_id)
     await db.run(lambda: Transaction.delete().where((Transaction.id == transaction_id) & (Transaction.user_id == user_id)).execute())
 
 
