@@ -1,5 +1,6 @@
 import base64
 import io
+import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from typing import Annotated
@@ -31,9 +32,11 @@ from ..core.service import clear_old_sessions, create_account, create_category, 
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
 from ..core.utils.currency_codes import CODES
 
+logger = logging.getLogger(__name__)
+
 
 async def clear_job():
-    print("clearing sessions")
+    logger.info("clearing old sessions")
     await clear_old_sessions()
 
 

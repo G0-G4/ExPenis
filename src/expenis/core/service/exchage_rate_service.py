@@ -1,9 +1,12 @@
 import asyncio
+import logging
 
 import httpx
 
 from .. import cache
 from ...config import ALPHAVANTAGE_KEY
+
+logger = logging.getLogger(__name__)
 
 crypto_list = ['BTC', 'ETH']
 
@@ -15,16 +18,19 @@ async def get_course():
     async with httpx.AsyncClient() as client:
         res = await client.get(url)
         if res.status_code != 200:
+            logger.error("CBR API request failed with status %d", res.status_code)
             raise RuntimeError(f"request ended with code {res.status_code}")
         rates = res.json()
         for crypto in crypto_list:
             res = await client.get(crypto_url, params={'apikey': ALPHAVANTAGE_KEY, 'function': 'CURRENCY_EXCHANGE_RATE',
                                           'from_currency': crypto, 'to_currency': 'USD'})
             if res.status_code != 200:
-                raise RuntimeError(f"request ended with code {rates.status_code}")
+                logger.error("alphavantage API request failed for %s with status %d", crypto, res.status_code)
+                raise RuntimeError(f"request ended with code {res.status_code}")
             rate = float(res.json().get("Realtime Currency Exchange Rate").get("5. Exchange Rate")) * rates.get('Valute').get('USD').get('Value')
             rates['Valute'][crypto] = {'Value': rate}
             await asyncio.sleep(1)
+        logger.info("exchange rates fetched successfully")
         return rates
 
 
