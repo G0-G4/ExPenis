@@ -9,8 +9,13 @@ import qrcode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from authx import AuthX, AuthXConfig, TokenPayload
+from authx import exceptions as authx_exceptions
 from fastapi import Depends, FastAPI, Query, Response
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, CategoriesResponse, \
     CategoryCreateRequest, CategoryDto, CurrencyCode, \
@@ -29,6 +34,7 @@ from ..core.service import clear_old_sessions, create_account, create_category, 
     get_transaction_by_id_and_user_id, get_transaction_tags_by_transaction_ids, get_transactions_for_period, \
     get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, save_transaction, \
     set_transaction_tags, update_account, update_category, update_transaction, get_user_tags
+from ..core.errors import NotFoundException
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
 from ..core.utils.currency_codes import CODES
 
@@ -76,6 +82,63 @@ config = AuthXConfig(
 )
 auth = AuthX(config)
 auth.handle_errors(app)
+
+
+@app.exception_handler(authx_exceptions.JWTDecodeError)
+async def jwt_decode_error_handler(request: Request, exc: authx_exceptions.JWTDecodeError) -> JSONResponse:
+    logger.error(
+        "auth failure (invalid/expired token): %s | method=%s path=%s query=%s client=%s",
+        exc,
+        request.method,
+        request.url.path,
+        request.url.query,
+        getattr(request.client, "host", None),
+    )
+    logging.getLogger("uvicorn.error").error(
+        "auth failure (invalid/expired token): %s | method=%s path=%s query=%s client=%s",
+        exc,
+        request.method,
+        request.url.path,
+        request.url.query,
+        getattr(request.client, "host", None),
+    )
+    # Return 401 (correct semantics for bad/expired credentials) instead of authx's 422.
+    # Preserves the payload shape so clients see error_type/message.
+    return JSONResponse(
+        status_code=401,
+        content={"message": str(exc), "error_type": exc.__class__.__name__},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    logger.error(
+        "request validation error: path=%s query=%s client=%s errors=%s",
+        request.url.path,
+        request.url.query,
+        getattr(request.client, "host", None),
+        exc.errors(),
+    )
+    logging.getLogger("uvicorn.error").error(
+        "request validation error: path=%s query=%s client=%s errors=%s",
+        request.url.path,
+        request.url.query,
+        getattr(request.client, "host", None),
+        exc.errors(),
+    )
+    return await request_validation_exception_handler(request, exc)
+
+
+@app.exception_handler(NotFoundException)
+async def not_found_handler(request: Request, exc: NotFoundException) -> JSONResponse:
+    logger.warning("resource not found: %s | path=%s", exc, request.url.path)
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("unhandled exception: method=%s path=%s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/api/transactions")

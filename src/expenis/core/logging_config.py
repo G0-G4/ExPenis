@@ -76,6 +76,10 @@ def setup_logging() -> dict:
                 "level": log_level_str,
                 "propagate": False,
             },
+            "src.expenis": {
+                "level": log_level_str,
+                "propagate": True,
+            },
         },
         "root": {
             "handlers": ["file", "console"],
