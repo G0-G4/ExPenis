@@ -5,6 +5,7 @@ from typing import Literal
 
 from ..errors import NotFoundException
 from ..models import db, Session
+from .auth_service import get_or_create_user_by_telegram_id
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +24,19 @@ async def create_session() -> str:
     logger.info("session created: %s", session_id)
     return session_id
 
-async def confirm_session(user_id: int, session_id: str) -> Session:
+async def confirm_session(telegram_id: int, session_id: str) -> Session:
     now = datetime.now(UTC)
     session = await db.run(lambda:
                      Session.get_or_none(Session.id == session_id))
     if session is None:
         logger.warning("session not found for confirmation: %s", session_id)
         raise NotFoundException(f"session {session_id} not found")
+    user = await get_or_create_user_by_telegram_id(telegram_id)
     session.status = 'confirmed'
-    session.user_id = user_id
+    session.user_id = user.id
     session.updated_at = now
     await db.run(session.save)
-    logger.info("session confirmed: %s user_id=%d", session_id, user_id)
+    logger.info("session confirmed: %s user_id=%d (telegram_id=%d)", session_id, user.id, telegram_id)
     return session
 
 async def get_session(session_id: str) -> Session:
