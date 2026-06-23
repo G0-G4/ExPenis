@@ -4,4 +4,5 @@ from .tag import Tag
 from .transaction import Transaction
 from .transaction_tag import TransactionTag
 from .session import Session
+from .user import User
 from .database import db

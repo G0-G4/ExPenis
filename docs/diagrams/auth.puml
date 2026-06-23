@@ -1,16 +1,16 @@
 @startuml
-title Упрощенная схема авторизации через Deep Link
+title Схема авторизации: Deep Link (Telegram) + Login (username/password)
 
 actor "Пользователь" as User
-participant "Веб-сайт" as Site
+participant "Веб-сайт / Моб.приложение" as Site
 participant "Сервер" as Server
 participant "Telegram Bot" as Bot
 database "Хранилище" as Storage
 
-== Основной поток ==
+== Поток 1: авторизация через Deep Link (Telegram) ==
 
 User -> Site: Открывает сайт
-Site -> Server: Запрос на начало авторизации
+Site -> Server: POST /api/create-session
 Server -> Storage: Создает сессию (id=ABC123, status=pending)
 Server -> Site: Возвращает deep link: tg://...start=ABC123
 Site -> User: Перенаправляет в Telegram
@@ -21,28 +21,54 @@ Server -> Bot: "Запрос на подтверждение"
 
 Bot -> User: "Разрешить вход с Chrome на Windows?"
 User -> Bot: Нажимает "Разрешить"
-Bot -> Server: "Подтверждаю сессию ABC123, user_id=123"
-Server -> Storage: Обновляет сессию (status=confirmed, user_id=123)
-Server -> Storage: Создает долгосрочный токен (24h)
-Server -> Bot: "Готово, токен создан"
+Bot -> Server: confirm_session(telegram_id, ABC123)
+Server -> Storage: get_or_create_user_by_telegram_id(telegram_id)
+Server -> Storage: Обновляет сессию (status=confirmed, user_id=users.id)
 
 Bot -> User: "Возвращайтесь на сайт"
 User -> Site: Возвращается на сайт
 
-Site -> Server: "Каков статус сессии ABC123?"
+Site -> Server: GET /api/auth/ABC123
 Server -> Storage: Проверяет статус ABC123
-Storage -> Server: "Сессия подтверждена, токен XYZ"
-Server -> Site: "Сессия подтверждена, используйте токен XYZ"
+Storage -> Server: "Сессия подтверждена"
+Server -> Server: Создает access + refresh JWT (uid=users.id)
+Server -> Site: Ставит access/refresh cookies (веб-фронтенд)
 Site -> User: "Вы авторизованы!"
 
-== Поток истечения сессии ==
+== Поток 2: регистрация без Telegram ==
 
-User -> Site: Использует сайт через 25 часов
-Site -> Server: Запрос с токеном XYZ
-Server -> Storage: Проверяет токен XYZ
-Storage -> Server: "Токен истек 1 час назад"
-Server -> Site: "Токен недействителен"
-Site -> User: "Войдите снова"
-User -> Site: Начинает процесс заново
+User -> Site: Вводит username + password
+Site -> Server: POST /api/register
+Server -> Storage: register_user(username, password) -> User(id, username, password_hash, telegram_id=NULL)
+Server -> Server: Создает access + refresh JWT (uid=users.id)
+Server -> Site: {access_token, refresh_token} (JSON body; ?cookie=true -> cookies)
+Site -> User: "Вы авторизованы!"
+
+== Поток 3: вход по логину/паролю ==
+
+User -> Site: Вводит username + password
+Site -> Server: POST /api/login
+Server -> Storage: authenticate_user(username, password)
+Server -> Server: Создает access + refresh JWT (uid=users.id)
+Server -> Site: {access_token, refresh_token}
+Site -> User: "Вы авторизованы!"
+
+== Поток 4: обновление токена (refresh) ==
+
+Site -> Server: POST /api/refresh с refresh-токеном (cookie или заголовок)
+Server -> Server: Проверяет refresh JWT, создает новую пару access+refresh
+Server -> Site: {access_token, refresh_token}
+
+== Поток 5: выход ==
+
+Site -> Server: POST /api/logout
+Server -> Site: Очищает access/refresh cookies
+
+== Поток истечения access-токена ==
+
+User -> Site: Использует сайт, access токен истек
+Site -> Server: POST /api/refresh с refresh-токеном
+Server -> Site: Новая пара access+refresh
+Site -> User: Продолжает работу без повторного логина
 
 @enduml

@@ -10,7 +10,7 @@ from ..service.transaction_service import calculate_transaction_stats, get_trans
 from ...bot.components.transaction_screen import TransactionCreate, TransactionEdit
 from ...core.helpers import format_amount
 from ...core.models import Transaction
-from ...core.service import confirm_session
+from ...core.service import confirm_session, get_or_create_user_by_telegram_id
 from ...core.service.transaction_service import get_transactions_for_period
 from ...server.application import auth
 
@@ -41,7 +41,8 @@ class CommandHandlerScreen(Screen):
 
     async def command_handler(self, args: list[str], update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(args) == 1 and args[0] == 'mobile_token':
-            token = auth.create_access_token(uid=str(get_user_id(update)))
+            user = await get_or_create_user_by_telegram_id(get_user_id(update))
+            token = auth.create_access_token(uid=str(user.id))
             chat_id = update.effective_chat.id
             await context.bot.send_message(chat_id=chat_id, text=str(token))
 

@@ -10,30 +10,32 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from authx import AuthX, AuthXConfig, TokenPayload
 from authx import exceptions as authx_exceptions
-from fastapi import Depends, FastAPI, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, CategoriesResponse, \
-    CategoryCreateRequest, CategoryDto, CurrencyCode, \
+from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, AuthResponse, \
+    CategoriesResponse, CategoryCreateRequest, CategoryDto, CurrencyCode, \
     CurrencyCodes, \
-    QRCodeResponse, \
-    SessionStatusResponse, Transaction, \
+    LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, QRCodeResponse, \
+    RegisterRequest, SessionStatusResponse, Transaction, \
     TransactionCreateRequest, TransactionsResponse, UserTagsResponse
-from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, SECRET
+from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
-from ..core.service import clear_old_sessions, create_account, create_category, create_default_categories, \
+from ..core.service import authenticate_user, change_password, clear_old_sessions, create_account, create_category, \
+    create_default_categories, \
     create_session, \
     delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction_by_id_and_user_id, \
     get_account_by_id, \
     get_category_by_id, \
     get_session, \
     get_transaction_by_id_and_user_id, get_transaction_tags_by_transaction_ids, get_transactions_for_period, \
-    get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, save_transaction, \
-    set_transaction_tags, update_account, update_category, update_transaction, get_user_tags
+    get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, get_user_by_id, register_user, \
+    save_transaction, set_transaction_tags, update_account, update_category, update_transaction, get_user_tags
+from ..core.service.auth_service import InvalidPasswordError, UsernameTakenError
 from ..core.errors import NotFoundException
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
 from ..core.utils.currency_codes import CODES
@@ -75,10 +77,12 @@ config = AuthXConfig(
     JWT_SECRET_KEY=SECRET,
     JWT_TOKEN_LOCATION=["cookies", "headers"],
     JWT_ACCESS_COOKIE_NAME="access_token",
+    JWT_REFRESH_COOKIE_NAME="refresh_token",
     JWT_COOKIE_DOMAIN=COOKIE_DOMAIN,
     JWT_COOKIE_SAMESITE="strict",
     JWT_ACCESS_TOKEN_EXPIRES=EXPIRATION_TIME_SECONDS,
-    JWT_COOKIE_CSRF_PROTECT=False
+    JWT_REFRESH_TOKEN_EXPIRES=REFRESH_TIME_SECONDS,
+    JWT_COOKIE_CSRF_PROTECT=False,
 )
 auth = AuthX(config)
 auth.handle_errors(app)
@@ -253,9 +257,95 @@ async def create_session_route() -> QRCodeResponse:
 async def auth_user(session_id: str, response: Response) -> SessionStatusResponse:
     session = await get_session(session_id)
     if session.status == 'confirmed':
-        token = auth.create_access_token(uid=str(session.user_id))
-        auth.set_access_cookies(token, response, EXPIRATION_TIME_SECONDS)
+        access_token = auth.create_access_token(uid=str(session.user_id))
+        refresh_token = auth.create_refresh_token(uid=str(session.user_id))
+        auth.set_access_cookies(access_token, response, EXPIRATION_TIME_SECONDS)
+        auth.set_refresh_cookies(refresh_token, response, REFRESH_TIME_SECONDS)
     return SessionStatusResponse(status=session.status, session_id=session_id)
+
+
+def _issue_token_pair(user_id: int) -> tuple[str, str]:
+    uid = str(user_id)
+    return auth.create_access_token(uid=uid), auth.create_refresh_token(uid=uid)
+
+
+def _deliver_tokens(access_token: str, refresh_token: str, response: Response, cookie: bool) -> AuthResponse:
+    if cookie:
+        auth.set_access_cookies(access_token, response, EXPIRATION_TIME_SECONDS)
+        auth.set_refresh_cookies(refresh_token, response, REFRESH_TIME_SECONDS)
+        return AuthResponse(access_token=access_token, refresh_token=refresh_token, expires_in=EXPIRATION_TIME_SECONDS)
+    return AuthResponse(access_token=access_token, refresh_token=refresh_token, expires_in=EXPIRATION_TIME_SECONDS)
+
+
+@app.post("/api/register")
+async def register_endpoint(
+        body: RegisterRequest,
+        response: Response,
+        cookie: Annotated[bool, Query()] = False,
+) -> AuthResponse:
+    try:
+        user = await register_user(body.username, body.password)
+    except UsernameTakenError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    access_token, refresh_token = _issue_token_pair(user.id)
+    logger.info("tokens issued for registered user: id=%d username=%s cookie=%s", user.id, body.username, cookie)
+    return _deliver_tokens(access_token, refresh_token, response, cookie)
+
+
+@app.post("/api/login")
+async def login_endpoint(
+        body: LoginRequest,
+        response: Response,
+        cookie: Annotated[bool, Query()] = False,
+) -> AuthResponse:
+    user = await authenticate_user(body.username, body.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    access_token, refresh_token = _issue_token_pair(user.id)
+    logger.info("tokens issued for login: id=%d username=%s cookie=%s", user.id, body.username, cookie)
+    return _deliver_tokens(access_token, refresh_token, response, cookie)
+
+
+@app.post("/api/refresh")
+async def refresh_endpoint(
+        response: Response,
+        payload: TokenPayload = Depends(auth.refresh_token_required),
+        cookie: Annotated[bool, Query()] = False,
+) -> AuthResponse:
+    user_id = int(payload.sub)
+    access_token, refresh_token = _issue_token_pair(user_id)
+    logger.info("tokens refreshed for user_id=%d cookie=%s", user_id, cookie)
+    return _deliver_tokens(access_token, refresh_token, response, cookie)
+
+
+@app.post("/api/logout")
+async def logout_endpoint(response: Response) -> LogoutResponse:
+    auth.unset_access_cookies(response)
+    auth.unset_refresh_cookies(response)
+    return LogoutResponse()
+
+
+@app.get("/api/me")
+async def me_endpoint(
+        payload: TokenPayload = Depends(auth.access_token_required)
+) -> MeResponse:
+    user = await get_user_by_id(int(payload.sub))
+    return MeResponse(id=user.id, username=user.username, telegram_id=user.telegram_id)
+
+
+@app.put("/api/me/password")
+async def change_password_endpoint(
+        body: PasswordChangeRequest,
+        payload: TokenPayload = Depends(auth.access_token_required)
+) -> MeResponse:
+    try:
+        user = await change_password(int(payload.sub), body.old_password, body.new_password)
+    except InvalidPasswordError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    logger.info("password changed via api: user_id=%d", user.id)
+    return MeResponse(id=user.id, username=user.username, telegram_id=user.telegram_id)
 
 
 @app.get("/api/accounts")
@@ -408,7 +498,3 @@ def convert_transaction_create_to_model(user_id: int, transaction_create: Transa
         updated_at=datetime.now(UTC),
         exchange_rate=exchange_rate
     )
-
-
-if __name__ == "__main__":
-    print(auth.create_access_token(uid="433289417"))

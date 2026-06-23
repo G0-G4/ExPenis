@@ -103,3 +103,78 @@ class CategoriesResponse(BaseModel):
 class CategoryCreateRequest(BaseModel):
     type: Literal['income', 'expense']
     name: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+    @field_validator("username")
+    @classmethod
+    def username_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("username must not be empty")
+        return v.strip()
+
+    @field_validator("password")
+    @classmethod
+    def password_non_empty(cls, v: str) -> str:
+        if not v:
+            raise ValueError("password must not be empty")
+        return v
+
+class RegisterRequest(LoginRequest):
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("password must be at least 6 characters")
+        return v
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+
+class RefreshResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+
+class LogoutResponse(BaseModel):
+    detail: str = "logged out"
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+    @field_validator("old_password")
+    @classmethod
+    def old_password_non_empty(cls, v: str) -> str:
+        if not v:
+            raise ValueError("old_password must not be empty")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_non_empty(cls, v: str) -> str:
+        if not v:
+            raise ValueError("new_password must not be empty")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_min_length(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("password must be at least 6 characters")
+        return v
+
+
+class MeResponse(BaseModel):
+    id: int
+    username: str | None
+    telegram_id: int | None
