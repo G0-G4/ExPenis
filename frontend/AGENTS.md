@@ -68,12 +68,17 @@ lib/
 │   ├── edit_account_screen.dart
 │   ├── edit_category_screen.dart
 │   ├── edit_transaction_screen.dart  # Handles both create and edit
-│   └── settings_screen.dart
+│   ├── settings_screen.dart          # Account profile, change password entry, logout
+│   ├── login_screen.dart             # Login by username + password
+│   ├── register_screen.dart          # Registration by username + password
+│   └── change_password_screen.dart   # Change current account password
 ├── service/                   # HTTP service layer
-│   ├── base_service.dart      # Dio setup, baseUrl resolution, auth interceptor
+│   ├── base_service.dart      # Dio setup, baseUrl resolution, auth interceptor (Bearer + auto-refresh on 401)
 │   ├── account_service.dart   # Also contains AccountsResult helper class
 │   ├── category_service.dart
-│   ├── settings_service.dart  # Singleton, uses shared_preferences
+│   ├── auth_service.dart      # login/register/refresh/logout/me/changePassword
+│   ├── navigator_service.dart # Global GlobalKey<NavigatorState> for auth-gate redirects
+│   ├── settings_service.dart  # Singleton, uses shared_preferences (access/refresh tokens + username)
 │   └── transaction_service.dart
 ├── utils/
 │   └── format.dart            # formatAmount() — number formatting via intl
@@ -86,13 +91,21 @@ lib/
 
 ### Navigation
 
+- App entry uses `MaterialApp.routes` with named routes: `/boot` (auth gate),
+  `/login`, `/register`, `/home`, `/settings`, `/change-password`.
+- `_AuthGate` (in `main.dart`) checks `SettingsService.hasAccessToken()` at
+  startup and `pushReplacementNamed` to either `/login` or `/home`.
+- `MaterialApp.navigatorKey` is `appNavigatorKey` (see `navigator_service.dart`)
+  so the auth interceptor can force-redirect to `/login` when the refresh token
+  is dead (see Auth section).
 - `HomeScreen` uses a `PageView` + `NavigationBar` (Material 3) with **3 tabs**.
 - Default tab index is **1** (Transactions).
 - Tab order: Accounts (0), Transactions (1), Categories (2).
 - **Settings** is not a tab — it is accessed via a `Drawer` (hamburger icon in
-  the `AppBar`) that pushes `SettingsScreen` with `Navigator.push`.
+  the `AppBar`) that pushes `/settings` via `Navigator.pushNamed`.
 - Page swiping is disabled (`NeverScrollableScrollPhysics`); use `animateToPage`.
-- Sub-screens use `Navigator.push` with `MaterialPageRoute`.
+- Sub-screens use `Navigator.push` with `MaterialPageRoute` (resource CRUD) or
+  named routes (auth / settings branches).
 
 ### Platform Base URLs
 
@@ -230,6 +243,12 @@ team agreement.
 
 | Method           | Path                          | Description                                       |
 |------------------|-------------------------------|---------------------------------------------------|
+| `POST`           | `/api/register`               | Register by username + password → `AuthResponse`  |
+| `POST`           | `/api/login`                  | Login by username + password → `AuthResponse`      |
+| `POST`           | `/api/refresh`                | Issue new token pair using the refresh token       |
+| `POST`           | `/api/logout`                 | Unset auth cookies server-side (no-op for bearer)  |
+| `GET`            | `/api/me`                     | Current user profile (`{id, username, telegram_id}`) |
+| `PUT`            | `/api/me/password`            | Change password (`{old_password, new_password}`)    |
 | `GET`            | `/api/transactions`           | List transactions (`date_from`, `date_to` params) |
 | `POST`           | `/api/transactions`           | Create transaction                                |
 | `GET`            | `/api/transactions/{id}`      | Get transaction                                   |
@@ -245,8 +264,20 @@ team agreement.
 | `GET/PUT/DELETE` | `/api/categories/{id}`        | Individual category ops                           |
 
 - Date params use `yyyy-MM-dd` format.
-- Authentication: API key sent as raw value in the `Authorization` header
-  (not Bearer). Managed by `SettingsService` (singleton, `shared_preferences`).
+- Authentication: JWT pair (access + refresh) issued by `/api/login` or
+  `/api/register`. The access token is sent as `Authorization: Bearer <token>`
+  on every authenticated request. Tokens are stored in `SettingsService`
+  (singleton, `shared_preferences`): keys `access_token`, `refresh_token`,
+  `username`.
+- `BaseService` uses a `QueuedInterceptorsWrapper`. On `401` it transparently
+  calls `AuthService.refresh()` using the stored refresh token, persists the
+  new pair, and retries the original request once (guarded by
+  `requestOptions.extra["retried"]`). If refresh fails, it clears auth state
+  and pushes `/login` via `appNavigatorKey`. Requests that set their own
+  `Authorization` header (refresh, logout, me, changePassword) mark
+  `Options.extra["skipAuth"] = true` so the interceptor doesn't overwrite it.
+- Password rules: minimum 6 characters, maximum 72 bytes (bcrypt limit).
+  Enforced both server-side and in the register/change-password forms.
 - Dio is configured with `validateStatus` accepting all responses with status
   200–499 as non-exceptions. Services must check `response.statusCode` manually
   for non-200 responses rather than relying on Dio to throw.

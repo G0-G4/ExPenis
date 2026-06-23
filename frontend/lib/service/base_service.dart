@@ -1,8 +1,9 @@
-import "dart:io";
 import "package:dio/dio.dart";
 import "package:flutter/foundation.dart";
 import "package:expenis_mobile/service/auth_service.dart";
 import "package:expenis_mobile/service/navigator_service.dart";
+import "package:expenis_mobile/service/platform_config.dart"
+    if (dart.library.io) "package:expenis_mobile/service/platform_config_io.dart";
 import "package:expenis_mobile/service/settings_service.dart";
 
 abstract class BaseService {
@@ -94,10 +95,6 @@ abstract class BaseService {
     if (kReleaseMode) {
       return "https://expenis.g0g4.ru";
     }
-    return kIsWeb
-        ? "http://localhost:8000"
-        : Platform.isAndroid
-        ? "http://10.0.2.2:8000"
-        : "http://192.168.1.5:8000";
+    return debugBaseUrl;
   }
 }
