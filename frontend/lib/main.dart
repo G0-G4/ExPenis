@@ -1,11 +1,16 @@
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
 
-import 'package:expenis_mobile/screens/account_screen.dart';
-import 'package:expenis_mobile/screens/category_screen.dart';
-import 'package:expenis_mobile/screens/settings_screen.dart';
-import 'package:expenis_mobile/screens/transaction_screen.dart';
-import 'package:expenis_mobile/screens/transaction_stats_screen.dart';
-import 'package:expenis_mobile/theme.dart';
+import "package:expenis_mobile/screens/account_screen.dart";
+import "package:expenis_mobile/screens/category_screen.dart";
+import "package:expenis_mobile/screens/change_password_screen.dart";
+import "package:expenis_mobile/screens/login_screen.dart";
+import "package:expenis_mobile/screens/register_screen.dart";
+import "package:expenis_mobile/screens/settings_screen.dart";
+import "package:expenis_mobile/screens/transaction_screen.dart";
+import "package:expenis_mobile/screens/transaction_stats_screen.dart";
+import "package:expenis_mobile/service/navigator_service.dart";
+import "package:expenis_mobile/service/settings_service.dart";
+import "package:expenis_mobile/theme.dart";
 
 void main() {
   runApp(const MyApp());
@@ -17,10 +22,47 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'My Pennies',
+      title: "My Pennies",
       theme: AppTheme.light,
-      home: const HomeScreen(),
+      navigatorKey: appNavigatorKey,
+      initialRoute: "/boot",
+      routes: {
+        "/boot": (_) => const _AuthGate(),
+        "/login": (_) => const LoginScreen(),
+        "/register": (_) => const RegisterScreen(),
+        "/home": (_) => const HomeScreen(),
+        "/settings": (_) => const SettingsScreen(),
+        "/change-password": (_) => const ChangePasswordScreen(),
+      },
     );
+  }
+}
+
+class _AuthGate extends StatefulWidget {
+  const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  @override
+  void initState() {
+    super.initState();
+    _decide();
+  }
+
+  Future<void> _decide() async {
+    final settingsService = await SettingsService.getInstance();
+    final hasToken = await settingsService.hasAccessToken();
+    final routeName = hasToken ? "/home" : "/login";
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed(routeName);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 
@@ -66,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               child: Text(
-                'My Pennies',
+                "My Pennies",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.w700,
@@ -75,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.insights_outlined),
-              title: const Text('Monthly analytics'),
+              title: const Text("Monthly analytics"),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -91,15 +133,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.settings_outlined),
-              title: const Text('Settings'),
+              title: const Text("Settings"),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SettingsScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, "/settings");
               },
             ),
           ],
@@ -122,17 +159,17 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.account_balance_outlined),
             selectedIcon: Icon(Icons.account_balance),
-            label: 'Accounts',
+            label: "Accounts",
           ),
           NavigationDestination(
             icon: Icon(Icons.swap_horiz_outlined),
             selectedIcon: Icon(Icons.swap_horiz),
-            label: 'Transactions',
+            label: "Transactions",
           ),
           NavigationDestination(
             icon: Icon(Icons.folder_outlined),
             selectedIcon: Icon(Icons.folder),
-            label: 'Categories',
+            label: "Categories",
           ),
         ],
       ),

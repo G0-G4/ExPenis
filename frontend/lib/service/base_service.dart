@@ -1,7 +1,9 @@
-import 'dart:io';
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
-import 'package:expenis_mobile/service/settings_service.dart';
+import "dart:io";
+import "package:dio/dio.dart";
+import "package:flutter/foundation.dart";
+import "package:expenis_mobile/service/auth_service.dart";
+import "package:expenis_mobile/service/navigator_service.dart";
+import "package:expenis_mobile/service/settings_service.dart";
 
 abstract class BaseService {
   late final Dio _dio;
@@ -16,32 +18,86 @@ abstract class BaseService {
     );
 
     _dio.interceptors.add(
-      InterceptorsWrapper(
+      QueuedInterceptorsWrapper(
         onRequest: (options, handler) async {
-          final settingsService = await SettingsService.getInstance();
-          final apiKey = await settingsService.getApiKey();
-
-          if (apiKey != null && apiKey.isNotEmpty) {
-            options.headers['Authorization'] = apiKey;
+          if (options.extra["skipAuth"] == true) {
+            handler.next(options);
+            return;
           }
-
+          final settingsService = await SettingsService.getInstance();
+          final accessToken = await settingsService.getAccessToken();
+          if (accessToken != null && accessToken.isNotEmpty) {
+            options.headers["Authorization"] = "Bearer $accessToken";
+          }
           handler.next(options);
+        },
+        onError: (error, handler) async {
+          final request = error.requestOptions;
+          if (request.extra["skipAuth"] == true ||
+              request.extra["retried"] == true ||
+              error.response?.statusCode != 401) {
+            handler.next(error);
+            return;
+          }
+          final refreshed = await _tryRefresh();
+          if (!refreshed) {
+            await _forceLogout();
+            handler.next(error);
+            return;
+          }
+          try {
+            request.extra["retried"] = true;
+            final settingsService = await SettingsService.getInstance();
+            final accessToken = await settingsService.getAccessToken();
+            if (accessToken != null && accessToken.isNotEmpty) {
+              request.headers["Authorization"] = "Bearer $accessToken";
+            }
+            final response = await _dio.fetch(request);
+            handler.resolve(response);
+          } on DioException catch (e) {
+            handler.next(e);
+          }
         },
       ),
     );
+  }
+
+  Future<bool> _tryRefresh() async {
+    try {
+      final settingsService = await SettingsService.getInstance();
+      final refreshToken = await settingsService.getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        return false;
+      }
+      final authService = AuthService();
+      final session = await authService.refresh(refreshToken);
+      await settingsService.setAccessToken(session.accessToken);
+      await settingsService.setRefreshToken(session.refreshToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _forceLogout() async {
+    final settingsService = await SettingsService.getInstance();
+    await settingsService.clearAuth();
+    final navigator = appNavigatorKey.currentState;
+    if (navigator != null) {
+      navigator.pushNamedAndRemoveUntil("/login", (_) => false);
+    }
   }
 
   Dio get dio => _dio;
 
   String get baseUrl {
     if (kReleaseMode) {
-      return 'https://expenis.g0g4.ru';
+      return "https://expenis.g0g4.ru";
     }
-
     return kIsWeb
-        ? 'http://localhost:8000'
+        ? "http://localhost:8000"
         : Platform.isAndroid
-        ? 'http://10.0.2.2:8000'
-        : 'http://192.168.1.5:8000';
+        ? "http://10.0.2.2:8000"
+        : "http://192.168.1.5:8000";
   }
 }
