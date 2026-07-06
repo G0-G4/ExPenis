@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from peewee import AutoField, DateTimeField, FloatField, IntegerField, Model, TextField
+from peewee import AutoField, BooleanField, DateTimeField, FloatField, IntegerField, Model, TextField
 
 from .database import db
 
@@ -11,6 +11,8 @@ class Account(Model):
     name = TextField(null=False)
     adjustment_amount = FloatField(null=False, default=0.0)
     currency_code = TextField(null=False, default="RUB")
+    is_deleted = BooleanField(null=False, default=False)
+    deleted_at = DateTimeField(null=True, default=None)
     created_at = DateTimeField(null=False)
     updated_at = DateTimeField(null=False, default=lambda: datetime.now(UTC))
     class Meta:
