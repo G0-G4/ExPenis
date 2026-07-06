@@ -19,7 +19,7 @@ from starlette.responses import JSONResponse
 
 from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, AuthResponse, \
     CategoriesResponse, CategoryCreateRequest, CategoryDto, CurrencyCode, \
-    CurrencyCodes, \
+    CurrencyCodes, DeleteAccountResponse, \
     LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, QRCodeResponse, \
     RegisterRequest, SessionStatusResponse, Transaction, \
     TransactionCreateRequest, TransactionsResponse, UserTagsResponse
@@ -29,7 +29,7 @@ from ..core.service import authenticate_user, change_password, clear_old_session
     create_default_categories, \
     create_session, \
     delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction_by_id_and_user_id, \
-    get_account_by_id, \
+    get_active_account_by_id, \
     get_category_by_id, \
     get_session, \
     get_transaction_by_id_and_user_id, get_transaction_tags_by_transaction_ids, get_transactions_for_period, \
@@ -179,7 +179,9 @@ async def create_transaction_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> Transaction:
     user_id = int(payload.sub)
-    account = await get_account_by_id(user_id, transaction_create.account_id)
+    account = await get_active_account_by_id(user_id, transaction_create.account_id)
+    if account is None:
+        raise HTTPException(status_code=400, detail="account not found or deleted")
     category = await get_category_by_id(user_id, transaction_create.category_id)
     transaction = convert_transaction_create_to_model(user_id, transaction_create, account, category,
                                                       await get_currency_exchange_rate(account.currency_code))
@@ -194,7 +196,9 @@ async def update_transaction_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> Transaction:
     user_id = int(payload.sub)
-    account = await get_account_by_id(user_id, transaction_create.account_id)
+    account = await get_active_account_by_id(user_id, transaction_create.account_id)
+    if account is None:
+        raise HTTPException(status_code=400, detail="account not found or deleted")
     category = await get_category_by_id(user_id, transaction_create.category_id)
     transaction = await get_transaction_by_id_and_user_id(user_id, transaction_id)
     transaction.account = account
@@ -367,6 +371,8 @@ async def get_user_accounts(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
     account, balance = await get_user_account_with_balance(int(payload.sub), account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="account not found")
     return await convert_account_with_balance_to_dto(account, balance)
 
 @app.put("/api/accounts/account/{account_id}")
@@ -376,16 +382,19 @@ async def update_account_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
     account, balance = await get_user_account_with_balance(int(payload.sub), account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="account not found")
     account.name = update_request.name
     updated_account = await update_account(int(payload.sub), account, update_request.amount)
     return await convert_account_with_balance_to_dto(updated_account, update_request.amount)
 
 @app.delete("/api/accounts/account/{account_id}")
-async def update_account_endpoint(
+async def delete_account_endpoint(
         account_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
-):
-    await delete_account_by_id_and_user_id(int(payload.sub), account_id)
+) -> DeleteAccountResponse:
+    delete_type = await delete_account_by_id_and_user_id(int(payload.sub), account_id)
+    return DeleteAccountResponse(delete_type=delete_type)
 
 @app.post("/api/accounts/account")
 async def create_account_endpoint(
@@ -463,9 +472,13 @@ async def convert_account_with_balance_to_dto(account: Account, balance: float):
 
 
 def convert_transaction_to_dto(transaction: ModelTransaction, tags: list[str] | None = None) -> Transaction:
+    # TODO: suffix is a temporary UI marker; replace with a dedicated `is_deleted` field on the DTO when Flutter supports it.
+    name: str = transaction.account.name
+    if transaction.account.is_deleted:
+        name = f"{name} (удалён)"
     return Transaction(
         id=transaction.id,
-        account=transaction.account.name,
+        account=name,
         account_id=transaction.account.id,
         type=transaction.category.type,
         category=transaction.category.name,

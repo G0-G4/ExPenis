@@ -69,6 +69,10 @@ class AccountUpdateRequest(BaseModel):
     amount: float
 
 
+class DeleteAccountResponse(BaseModel):
+    delete_type: Literal["soft", "hard"]
+
+
 class AccountCreateRequest(BaseModel):
     name: str
     amount: float
