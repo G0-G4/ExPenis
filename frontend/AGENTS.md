@@ -45,6 +45,8 @@ flutter clean                # Clean build artifacts and caches
 flutter build apk            # Android APK
 flutter build ios            # iOS (requires macOS + Xcode)
 flutter build web            # Web
+
+just release-tag             # Tag vX.Y.Z from pubspec and push (triggers release CI)
 ```
 
 ---
@@ -79,14 +81,16 @@ lib/
 │   ├── auth_service.dart      # login/register/refresh/logout/me/changePassword
 │   ├── navigator_service.dart # Global GlobalKey<NavigatorState> for auth-gate redirects
 │   ├── settings_service.dart  # Singleton, uses shared_preferences (access/refresh tokens + username)
-│   └── transaction_service.dart
+│   ├── transaction_service.dart
+│   └── update_service.dart    # GitHub release check + APK download/install (auto-update)
 ├── utils/
 │   └── format.dart            # formatAmount() — number formatting via intl
 └── widgets/                   # Shared UI components
     ├── app_empty_state.dart
     ├── app_error_state.dart
     ├── app_loading_spinner.dart
-    └── delete_dialog.dart
+    ├── delete_dialog.dart
+    └── update_dialog.dart       # "Update available" prompt with APK download progress
 ```
 
 ### Navigation
@@ -115,6 +119,22 @@ Resolved in `BaseService.baseUrl`:
 - **Web (debug)**: `http://localhost:8000`
 - **Android emulator (debug)**: `http://10.0.2.2:8000`
 - **iOS simulator (debug)**: `http://192.168.1.5:8000`
+
+### Auto-Update
+
+- On startup in release mode (`kReleaseMode`), `_AuthGate` in `main.dart` calls
+  `UpdateService().checkForUpdate()` and shows `UpdateDialog` via
+  `showUpdateDialog()` if a newer GitHub release exists.
+- Version comparisons use `UpdateService.compareSemver(a, b)` in
+  `lib/service/update_service.dart`. Version source is `pubspec.yaml`,
+  read via `package_info_plus`.
+- On Android, the APK is downloaded to the temp dir and installed via a
+  MethodChannel `expenis/installer` (`installApk(path)`) implemented in
+  `MainActivity.kt`. Requires `REQUEST_INSTALL_PACKAGES` permission and a
+  `FileProvider` (`${applicationId}.fileprovider`, `res/xml/file_paths.xml`).
+- Non-Android: the dialog opens the release `html_url` via `url_launcher`.
+- Releases are created by pushing a git tag `vX.Y.Z` matching the version in
+  `pubspec.yaml`; see root `AGENTS.md` → "Releases and app auto-update".
 
 ### State Management
 

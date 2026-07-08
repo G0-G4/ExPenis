@@ -38,6 +38,38 @@ Run commands from repo root.
 - Follow logs: `just logs`
 ### Lockfile maintenance
 - Rebuild lockfile: `just lock`
+### Releases and app auto-update
+- App version lives in `frontend/pubspec.yaml` (`version: X.Y.Z+build`). The git
+  tag `vX.Y.Z` (semver, no leading `v` in `pubspec`) marks a release and MUST
+  match the `pubspec.yaml` version. The build number (`+build`) is not part of
+  the tag.
+Before publishing a release — REQUIRED:
+1. Bump `version:` in `frontend/pubspec.yaml` (major/minor/patch + build
+   number, e.g. `1.0.0+1` → `1.0.1+2`). This is the single source of truth the
+   app reads via `package_info_plus` on the device.
+2. Commit the version bump.
+3. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git
+   tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version.
+4. The push triggers `.github/workflows/release.yml`: builds a release APK,
+   renames it to `ExPenis-X.Y.Z.apk`, and creates a GitHub Release with the
+   APK attached and auto-generated notes.
+Never forget step 1 — bumping `pubspec.yaml` version before tagging. A tag that
+does not match the installed version breaks semver comparison in `UpdateService`
+and the app will not detect the update.
+Auto-update behavior (Android): on startup in release mode, `UpdateService`
+fetches `/releases/latest` from GitHub and compares semver with the installed
+version; if newer, `UpdateDialog` offers to download the `.apk` asset and
+launches the Android package installer via a MethodChannel. Non-Android
+platforms get an "Open" button that opens the release page via `url_launcher`.
+No GitHub API tokens are used (public repo API, 60 req/hr per IP — sufficient
+for a startup check).
+Key paths:
+- `frontend/lib/service/update_service.dart` — release check + APK download/install
+- `frontend/lib/widgets/update_dialog.dart` — update prompt UI
+- `frontend/android/app/src/main/kotlin/ru/g0g4/expenis/MainActivity.kt` —
+  MethodChannel `expenis/installer` (`installApk` method)
+- `.github/workflows/release.yml` — release CI
+- `justfile` recipe `release-tag`
 ## 3) Test Commands (Use These)
 Pytest settings (from `pyproject.toml`):
 - `asyncio_mode = "auto"`
