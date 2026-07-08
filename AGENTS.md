@@ -9,13 +9,13 @@ This file gives coding agents practical commands and style conventions for this 
   - Async SQLite access via `playhouse.pwasyncio`
   - DTOs with Pydantic
 - Tests: `pytest`, `pytest-asyncio`
-- Infra helpers: `docker-compose`, `Makefile`
+- Infra helpers: `docker-compose`, `just`
 Key paths:
 - `src/expenis/core/` — models, services, helpers, domain errors
 - `src/expenis/server/` — FastAPI app + API DTOs
 - `tests/` — async tests and shared fixtures
 - `pyproject.toml` — dependencies and pytest settings
-- `Makefile` — compose and lockfile commands
+- `justfile` — compose and lockfile commands (run via `just <recipe>`)
 - `migrations/` — schema migrations as numbered SQL files `NNN_description.sql`. When modifying peewee models in `src/expenis/core/models/`, add a new migration file here; do not edit existing migrations.
 - `migration.py` — one-off data migration script (transactions from legacy schema), not used for schema changes.
 ### Clients
@@ -27,13 +27,12 @@ Run commands from repo root.
 ### Local app startup
 - Run FastAPI server: `uv run -m src.expenis.server`
 ### Docker helpers
-- Start services: `make up`
-- Stop services: `make down`
-- Build images: `make build`
-- Follow logs: `make logs`
+- Start services: `just up`
+- Stop services: `just down`
+- Build images: `just build`
+- Follow logs: `just logs`
 ### Lockfile maintenance
-- Rebuild lockfile: `make lock`
-- Equivalent command: `uv pip compile pyproject.toml -o uv.lock`
+- Rebuild lockfile: `just lock`
 ## 3) Test Commands (Use These)
 Pytest settings (from `pyproject.toml`):
 - `asyncio_mode = "auto"`
