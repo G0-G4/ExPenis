@@ -18,12 +18,12 @@ lock:
 logs:
     docker-compose logs -f
 
-# Собрать Flutter web-релиз из sibling-репозитория и скопировать в flutter_web/
+# Собрать Flutter web-релиз в flutter_web/ (локально, не трекается)
 flutter-build:
-    cd ../expenis-mobile/expenis_mobile && flutter build web --release
+    cd frontend && flutter build web --release
     rm -rf flutter_web
     mkdir -p flutter_web
-    cp -R ../expenis-mobile/expenis_mobile/build/web/. flutter_web/
+    cp -R frontend/build/web/. flutter_web/
 
 # Полный деплой: сборка фронта + пересборка контейнера
 flutter-deploy: flutter-build

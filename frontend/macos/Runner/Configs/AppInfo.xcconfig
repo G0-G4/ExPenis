@@ -8,7 +8,7 @@
 PRODUCT_NAME = expenis_mobile
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.expenisMobile
+PRODUCT_BUNDLE_IDENTIFIER = ru.g0g4.expenis
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 ru.g0g4. All rights reserved.
