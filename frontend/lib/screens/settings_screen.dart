@@ -1,4 +1,5 @@
 import "package:flutter/material.dart";
+import "package:package_info_plus/package_info_plus.dart";
 
 import "package:expenis_mobile/service/auth_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
@@ -15,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final AuthService _authService = AuthService();
   UserProfile? _profile;
+  String? _appVersion;
   bool _isLoading = false;
   bool _isLoggingOut = false;
   String? _loadError;
@@ -38,9 +40,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         throw Exception("Not authenticated");
       }
       final profile = await _authService.me(accessToken);
+      final info = await PackageInfo.fromPlatform();
       if (!mounted) return;
       setState(() {
         _profile = profile;
+        _appVersion = "${info.version}+${info.buildNumber}";
         _isLoading = false;
       });
     } catch (e) {
@@ -174,6 +178,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             icon: Icons.cloud_outlined,
                             label: "Server",
                             value: "expenis.g0g4.ru",
+                          ),
+                          const SizedBox(height: AppTheme.space12),
+                          Divider(color: colorScheme.outlineVariant),
+                          const SizedBox(height: AppTheme.space12),
+                          _InfoRow(
+                            icon: Icons.info_outline,
+                            label: "Version",
+                            value: _appVersion ?? "—",
                           ),
                         ],
                       ),
