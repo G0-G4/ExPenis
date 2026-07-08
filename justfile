@@ -32,3 +32,10 @@ flutter-build-android:
 flutter-deploy: flutter-build
     docker-compose build frontend
     docker-compose up -d frontend
+
+# Создать git-тег версии из pubspec.yaml (например v1.2.3) и отправить его,
+# что запустит GitHub Actions workflow сборки релиза с APK.
+release-tag:
+    @version=$(grep '^version:' frontend/pubspec.yaml | awk '{print $$2}' | cut -d '+' -f1); \
+    echo "Creating tag v$$version"; \
+    git tag "v$$version" && git push origin "v$$version"

@@ -1,3 +1,4 @@
+import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 
 import "package:expenis_mobile/screens/account_screen.dart";
@@ -10,7 +11,9 @@ import "package:expenis_mobile/screens/transaction_screen.dart";
 import "package:expenis_mobile/screens/transaction_stats_screen.dart";
 import "package:expenis_mobile/service/navigator_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
+import "package:expenis_mobile/service/update_service.dart";
 import "package:expenis_mobile/theme.dart";
+import "package:expenis_mobile/widgets/update_dialog.dart";
 
 void main() {
   runApp(const MyApp());
@@ -58,6 +61,19 @@ class _AuthGateState extends State<_AuthGate> {
     final routeName = hasToken ? "/home" : "/login";
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(routeName);
+    if (kReleaseMode) {
+      _checkForUpdate();
+    }
+  }
+
+  Future<void> _checkForUpdate() async {
+    final updateInfo = await UpdateService().checkForUpdate();
+    if (updateInfo == null || !updateInfo.hasUpdate) return;
+    final navigatorContext = appNavigatorKey.currentContext;
+    if (navigatorContext == null) return;
+    if (!navigatorContext.mounted) return;
+    // ignore: use_build_context_synchronously
+    await showUpdateDialog(navigatorContext, updateInfo);
   }
 
   @override
