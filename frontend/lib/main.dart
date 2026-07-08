@@ -1,5 +1,6 @@
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
+import "package:package_info_plus/package_info_plus.dart";
 
 import "package:expenis_mobile/screens/account_screen.dart";
 import "package:expenis_mobile/screens/category_screen.dart";
@@ -96,6 +97,21 @@ class _HomeScreenState extends State<HomeScreen> {
     initialPage: _defaultTabIndex,
   );
   int _currentPageIndex = _defaultTabIndex;
+  String? _appVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() {
+      _appVersion = "${info.version}+${info.buildNumber}";
+    });
+  }
 
   @override
   void dispose() {
@@ -123,12 +139,27 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
               ),
-              child: Text(
-                "My Pennies",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    "My Pennies",
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (_appVersion != null)
+                    Text(
+                      _appVersion!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                ],
               ),
             ),
             ListTile(
