@@ -1,11 +1,8 @@
-import base64
-import io
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from typing import Annotated
 
-import qrcode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from authx import AuthX, AuthXConfig, TokenPayload
@@ -20,18 +17,16 @@ from starlette.responses import JSONResponse
 from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, AuthResponse, \
     CategoriesResponse, CategoryCreateRequest, CategoryDto, CurrencyCode, \
     CurrencyCodes, DeleteAccountResponse, \
-    LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, QRCodeResponse, \
-    RegisterRequest, SessionStatusResponse, Transaction, \
+    LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, \
+    RegisterRequest, Transaction, \
     TransactionCreateRequest, TransactionsResponse, UserTagsResponse
-from ..config import BOT_NAME, COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
+from ..config import COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
 from ..core.service import authenticate_user, change_password, clear_old_sessions, create_account, create_category, \
     create_default_categories, \
-    create_session, \
     delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction_by_id_and_user_id, \
     get_active_account_by_id, \
     get_category_by_id, \
-    get_session, \
     get_transaction_by_id_and_user_id, get_transaction_tags_by_transaction_ids, get_transactions_for_period, \
     get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, get_user_by_id, register_user, \
     save_transaction, set_transaction_tags, update_account, update_category, update_transaction, get_user_tags
@@ -227,45 +222,6 @@ async def delete_transaction_endpoint(
 ):
     await delete_transaction_by_id_and_user_id(int(payload.sub), transaction_id)
 
-
-
-@app.post("/api/create-session")
-async def create_session_route() -> QRCodeResponse:
-    session_id = await create_session()
-    deeplink = f'https://t.me/{BOT_NAME}?start={session_id}'
-
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(deeplink)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-
-    # Convert to base64
-    byte_io = io.BytesIO()
-    img.save(byte_io, 'PNG')
-    qr_code_base64 = base64.b64encode(byte_io.getvalue()).decode('utf-8')
-
-    return QRCodeResponse(
-        session_id=session_id,
-        qr_code=f"data:image/png;base64,{qr_code_base64}"
-    )
-
-
-@app.get("/api/auth/{session_id}")
-async def auth_user(session_id: str, response: Response) -> SessionStatusResponse:
-    session = await get_session(session_id)
-    if session.status == 'confirmed':
-        access_token = auth.create_access_token(uid=str(session.user_id))
-        refresh_token = auth.create_refresh_token(uid=str(session.user_id))
-        auth.set_access_cookies(access_token, response, EXPIRATION_TIME_SECONDS)
-        auth.set_refresh_cookies(refresh_token, response, REFRESH_TIME_SECONDS)
-    return SessionStatusResponse(status=session.status, session_id=session_id)
 
 
 def _issue_token_pair(user_id: int) -> tuple[str, str]:

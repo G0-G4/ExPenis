@@ -1,6 +1,6 @@
-# ExPenis - Бот для учета расходов и доходов 💰
+# ExPenis - Сервис для учета расходов и доходов 💰
 
-Попробуйте в Telegram: [@ExPenisBot](https://t.me/ExPenisBot)
+Веб-интерфейс: [expenis.g0g4.ru](https://expenis.g0g4.ru) с авторизацией по логину/паролю
 
 <img src="./images/ExPenis.jpg" width="256">
 
@@ -8,16 +8,11 @@
 - Учет ежедневных расходов и доходов
 - Категоризация транзакций
 - Управление несколькими счетами
-- Просмотр статистики [expenis.g0g4.ru](https://expenis.g0g4.ru) с авторизацией через телеграм
-
-## Демо
-
-![demo](images/expenis.gif)
+- Просмотр статистики [expenis.g0g4.ru](https://expenis.g0g4.ru)
 
 ## Структура проекта
 ```
 src/expenis/
-├── bot/                  # Компоненты Telegram бота
 ├── core/                 # Основная бизнес-логика
 │   ├── models/           # Модели базы данных
 │   ├── service/          # Бизнес-сервисы
@@ -25,9 +20,8 @@ src/expenis/
 ├── server/               # Веб-сервер
 └── config.py             # Конфигурация
 ```
-- Для реализации бота используется библиотека [TUIcan](https://github.com/G0-G4/TUIcan)
 - Сервер реализован с помощью [FastApi](https://fastapi.tiangolo.com/)
-- Фронтенд реализован с помощью [Alpine.js](https://alpinejs.dev/)
+- Фронтенд реализован во внешнем репозитории на Flutter, собранная сборка лежит в `flutter_web/`
 
 ## Требования
 - Python 3.13+
@@ -38,13 +32,7 @@ src/expenis/
 uv sync
 ```
 
-## Запуск бота
-```bash
-uv run -m src.expenis.bot
-```
-
 ## Запуск сервера
 ```bash
 uv run -m src.expenis.server
 ```
-

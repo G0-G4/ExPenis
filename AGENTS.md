@@ -5,7 +5,6 @@ This file gives coding agents practical commands and style conventions for this 
 - Dependency manager: `uv`
 - Main components:
   - FastAPI backend in `src/expenis/server`
-  - Telegram bot in `src/expenis/bot` (TUIcan)
   - Core domain/services in `src/expenis/core`
   - Async SQLite access via `playhouse.pwasyncio`
   - DTOs with Pydantic
@@ -14,7 +13,6 @@ This file gives coding agents practical commands and style conventions for this 
 Key paths:
 - `src/expenis/core/` — models, services, helpers, domain errors
 - `src/expenis/server/` — FastAPI app + API DTOs
-- `src/expenis/bot/` — Telegram screens/components/services
 - `tests/` — async tests and shared fixtures
 - `pyproject.toml` — dependencies and pytest settings
 - `Makefile` — compose and lockfile commands
@@ -22,13 +20,11 @@ Key paths:
 - `migration.py` — one-off data migration script (transactions from legacy schema), not used for schema changes.
 ### Clients
 - Flutter UI lives in a separate repository. This repo only contains the built web bundle in `flutter_web/`.
-- Telegram bot in `src/expenis/bot/` does not support the full UI feature set (e.g. marking soft-deleted accounts in history). Complex UI changes belong to the Flutter repo.
 ## 2) Setup / Build / Run
 Run commands from repo root.
 ### Environment setup
 - Install/sync dependencies: `uv sync`
 ### Local app startup
-- Run Telegram bot: `uv run -m src.expenis.bot`
 - Run FastAPI server: `uv run -m src.expenis.server`
 ### Docker helpers
 - Start services: `make up`
@@ -49,7 +45,7 @@ Pytest settings (from `pyproject.toml`):
 ### Run one test function (most important)
 - `uv run pytest tests/test_account_service.py::test_basic_crud`
 - Examples:
-  - `uv run pytest tests/session_service_test.py::test_confirm_session`
+  - `uv run pytest tests/session_service_test.py::test_create_session`
   - `uv run pytest tests/transaction_service_test.py::test_get_transactions_for_period`
 ### Filter tests by keyword
 - `uv run pytest -k session`

@@ -91,7 +91,6 @@ async def _has_transactions(account_id: int) -> bool:
 
 
 async def delete_account_by_id(account_id: int) -> Literal["soft", "hard"]:
-    # TODO: bot does not pass user_id; lacks ownership scoping. Fix when bot is updated.
     account = await db.run(lambda: Account.get_or_none(Account.id == account_id))
     if account is None:
         raise NotFoundException(f"account {account_id} not found")

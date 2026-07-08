@@ -1,41 +1,12 @@
 @startuml
-title Схема авторизации: Deep Link (Telegram) + Login (username/password)
+title Схема авторизации: регистрация и вход (username/password)
 
 actor "Пользователь" as User
 participant "Веб-сайт / Моб.приложение" as Site
 participant "Сервер" as Server
-participant "Telegram Bot" as Bot
 database "Хранилище" as Storage
 
-== Поток 1: авторизация через Deep Link (Telegram) ==
-
-User -> Site: Открывает сайт
-Site -> Server: POST /api/create-session
-Server -> Storage: Создает сессию (id=ABC123, status=pending)
-Server -> Site: Возвращает deep link: tg://...start=ABC123
-Site -> User: Перенаправляет в Telegram
-
-User -> Bot: Открывает бота через deep link
-Bot -> Server: "Пользователь открыл сессию ABC123"
-Server -> Bot: "Запрос на подтверждение"
-
-Bot -> User: "Разрешить вход с Chrome на Windows?"
-User -> Bot: Нажимает "Разрешить"
-Bot -> Server: confirm_session(telegram_id, ABC123)
-Server -> Storage: get_or_create_user_by_telegram_id(telegram_id)
-Server -> Storage: Обновляет сессию (status=confirmed, user_id=users.id)
-
-Bot -> User: "Возвращайтесь на сайт"
-User -> Site: Возвращается на сайт
-
-Site -> Server: GET /api/auth/ABC123
-Server -> Storage: Проверяет статус ABC123
-Storage -> Server: "Сессия подтверждена"
-Server -> Server: Создает access + refresh JWT (uid=users.id)
-Server -> Site: Ставит access/refresh cookies (веб-фронтенд)
-Site -> User: "Вы авторизованы!"
-
-== Поток 2: регистрация без Telegram ==
+== Поток 1: регистрация ==
 
 User -> Site: Вводит username + password
 Site -> Server: POST /api/register
@@ -44,7 +15,7 @@ Server -> Server: Создает access + refresh JWT (uid=users.id)
 Server -> Site: {access_token, refresh_token} (JSON body; ?cookie=true -> cookies)
 Site -> User: "Вы авторизованы!"
 
-== Поток 3: вход по логину/паролю ==
+== Поток 2: вход по логину/паролю ==
 
 User -> Site: Вводит username + password
 Site -> Server: POST /api/login
@@ -53,13 +24,13 @@ Server -> Server: Создает access + refresh JWT (uid=users.id)
 Server -> Site: {access_token, refresh_token}
 Site -> User: "Вы авторизованы!"
 
-== Поток 4: обновление токена (refresh) ==
+== Поток 3: обновление токена (refresh) ==
 
 Site -> Server: POST /api/refresh с refresh-токеном (cookie или заголовок)
 Server -> Server: Проверяет refresh JWT, создает новую пару access+refresh
 Server -> Site: {access_token, refresh_token}
 
-== Поток 5: выход ==
+== Поток 4: выход ==
 
 Site -> Server: POST /api/logout
 Server -> Site: Очищает access/refresh cookies

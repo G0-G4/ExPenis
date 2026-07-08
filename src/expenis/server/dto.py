@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
-from src.expenis.core.service import SessionStatus
 from src.expenis.core.utils.currency_codes import CODES
 
 
@@ -37,16 +36,6 @@ class TransactionsResponse(BaseModel):
 
 class UserTagsResponse(BaseModel):
     tags: list[str]
-
-
-class SessionStatusResponse(BaseModel):
-    session_id: str
-    status: SessionStatus
-
-
-class QRCodeResponse(BaseModel):
-    session_id: str
-    qr_code: str  # base64 encoded image
 
 
 class AccountDto(BaseModel):
