@@ -5,6 +5,7 @@ import 'package:expenis_mobile/screens/create_account_screen.dart';
 import 'package:expenis_mobile/screens/edit_account_screen.dart';
 import 'package:expenis_mobile/service/account_service.dart'
     show AccountService, AccountsResult;
+import 'package:expenis_mobile/service/settings_service.dart';
 import 'package:expenis_mobile/theme.dart';
 import 'package:expenis_mobile/utils/format.dart';
 import 'package:expenis_mobile/widgets/app_empty_state.dart';
@@ -20,16 +21,45 @@ class AccountScreen extends StatefulWidget {
 class _AccountScreenState extends State<AccountScreen> {
   final AccountService _accountService = AccountService();
   late Future<AccountsResult> _futureAccounts;
+  Set<String> _excludedAccountIds = <String>{};
+  int? _userId;
 
   @override
   void initState() {
     super.initState();
-    _futureAccounts = _accountService.fetchAccounts();
+    _futureAccounts = _loadAccounts();
+  }
+
+  Future<AccountsResult> _loadAccounts() async {
+    final result = await _accountService.fetchAccounts();
+    final userId = result.accounts.isNotEmpty ? result.accounts.first.userId : null;
+    _userId = userId;
+    if (userId != null) {
+      final settings = await SettingsService.getInstance();
+      _excludedAccountIds = await settings.getExcludedAccountIds(userId);
+    }
+    return result;
   }
 
   void _refresh() => setState(() {
-    _futureAccounts = _accountService.fetchAccounts();
+    _futureAccounts = _loadAccounts();
   });
+
+  Future<void> _toggleExclude(int accountId) async {
+    final idStr = accountId.toString();
+    final newSet = Set<String>.from(_excludedAccountIds);
+    if (newSet.contains(idStr)) {
+      newSet.remove(idStr);
+    } else {
+      newSet.add(idStr);
+    }
+    setState(() => _excludedAccountIds = newSet);
+    final userId = _userId;
+    if (userId != null) {
+      final settings = await SettingsService.getInstance();
+      await settings.setExcludedAccountIds(userId, newSet);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,15 +116,21 @@ class _AccountScreenState extends State<AccountScreen> {
             );
           }
 
+          final includedAccounts = accounts
+              .where((a) => !_excludedAccountIds.contains(a.id.toString()))
+              .toList();
           final double total =
-              result?.totalAmountRubles ??
-              accounts.fold(0, (sum, a) => sum + a.amountRubles);
+              includedAccounts.fold(0.0, (sum, a) => sum + a.amountRubles);
+          final int excludedCount = accounts.length - includedAccounts.length;
 
           return ListView(
             padding: AppTheme.screenPadding,
             children: [
               // ── Balance summary card ──────────────────────────────────
-              _BalanceSummaryCard(total: total),
+              _BalanceSummaryCard(
+                total: total,
+                excludedCount: excludedCount,
+              ),
               const SizedBox(height: AppTheme.space16),
 
               // ── Account list ──────────────────────────────────────────
@@ -111,6 +147,9 @@ class _AccountScreenState extends State<AccountScreen> {
                   padding: const EdgeInsets.only(bottom: AppTheme.space8),
                   child: _AccountCard(
                     account: account,
+                    isExcluded:
+                        _excludedAccountIds.contains(account.id.toString()),
+                    onToggleExclude: () => _toggleExclude(account.id),
                     onTap: () async {
                       final result = await Navigator.push<bool>(
                         context,
@@ -136,9 +175,10 @@ class _AccountScreenState extends State<AccountScreen> {
 // ── Balance Summary Card ──────────────────────────────────────────────────────
 
 class _BalanceSummaryCard extends StatelessWidget {
-  const _BalanceSummaryCard({required this.total});
+  const _BalanceSummaryCard({required this.total, this.excludedCount = 0});
 
   final double total;
+  final int excludedCount;
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +217,16 @@ class _BalanceSummaryCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (excludedCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: AppTheme.space4),
+                child: Text(
+                  'Excludes $excludedCount ${excludedCount == 1 ? 'account' : 'accounts'}',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onPrimaryContainer.withAlpha(160),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -187,10 +237,17 @@ class _BalanceSummaryCard extends StatelessWidget {
 // ── Account Card ─────────────────────────────────────────────────────────────
 
 class _AccountCard extends StatelessWidget {
-  const _AccountCard({required this.account, required this.onTap});
+  const _AccountCard({
+    required this.account,
+    required this.onTap,
+    required this.isExcluded,
+    required this.onToggleExclude,
+  });
 
   final Account account;
   final VoidCallback onTap;
+  final bool isExcluded;
+  final VoidCallback onToggleExclude;
 
   @override
   Widget build(BuildContext context) {
@@ -248,30 +305,43 @@ class _AccountCard extends StatelessWidget {
                 ),
               ),
               // Amount (primary: rubles; secondary: native currency if not RUB)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${formatAmount(account.amountRubles)} ₽',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: amountColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (showSecondary)
+              Opacity(
+                opacity: isExcluded ? 0.5 : 1.0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
                     Text(
-                      '${formatAmount(account.amount)} ${account.currencyCode}',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      '${formatAmount(account.amountRubles)} ₽',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: amountColor,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                ],
+                    if (showSecondary)
+                      Text(
+                        '${formatAmount(account.amount)} ${account.currencyCode}',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(width: AppTheme.space4),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colorScheme.outlineVariant,
-                size: AppTheme.iconSizeMedium,
+              IconButton(
+                icon: Icon(
+                  isExcluded
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+                tooltip: isExcluded
+                    ? 'Include in total'
+                    : 'Exclude from total',
+                onPressed: onToggleExclude,
+                visualDensity: VisualDensity.compact,
+                color: isExcluded
+                    ? colorScheme.outlineVariant
+                    : colorScheme.onSurfaceVariant,
               ),
             ],
           ),

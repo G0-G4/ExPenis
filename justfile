@@ -25,6 +25,9 @@ flutter-build:
     mkdir -p flutter_web
     cp -R frontend/build/web/. flutter_web/
 
+flutter-build-android:
+	cd frontend && flutter build apk --release
+
 # Полный деплой: сборка фронта + пересборка контейнера
 flutter-deploy: flutter-build
     docker-compose build frontend

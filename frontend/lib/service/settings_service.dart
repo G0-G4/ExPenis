@@ -4,6 +4,7 @@ class SettingsService {
   static const String _accessTokenKey = "access_token";
   static const String _refreshTokenKey = "refresh_token";
   static const String _usernameKey = "username";
+  static const String _excludedAccountIdsKeyPrefix = "excluded_account_ids_";
 
   static SettingsService? _instance;
   SharedPreferences? _prefs;
@@ -52,5 +53,16 @@ class SettingsService {
     await _prefs?.remove(_accessTokenKey);
     await _prefs?.remove(_refreshTokenKey);
     await _prefs?.remove(_usernameKey);
+  }
+
+  Future<Set<String>> getExcludedAccountIds(int userId) async {
+    final list = _prefs?.getStringList("$_excludedAccountIdsKeyPrefix$userId");
+    return list?.toSet() ?? <String>{};
+  }
+
+  Future<bool> setExcludedAccountIds(int userId, Set<String> ids) async {
+    return await _prefs
+            ?.setStringList("$_excludedAccountIdsKeyPrefix$userId", ids.toList()) ??
+        false;
   }
 }
