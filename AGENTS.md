@@ -23,6 +23,7 @@ Key paths:
 - `migrations/` — schema migrations as numbered SQL files `NNN_description.sql`. When modifying peewee models in `src/expenis/core/models/`, add a new migration file here; do not edit existing migrations.
 - `migration.py` — one-off data migration script (transactions from legacy schema), not used for schema changes.
 - `docs/openapi.json` — generated OpenAPI 3.1 spec (run `just openapi` after API changes). The `info.version` reflects the backend version from `pyproject.toml`.
+- Long-lived tokens for agents: `just generate-agent-token` or `uv run -m src.expenis.server token --username llm-agent --days 365`. The user must already exist (the command will error if the username is not found).
 ### Clients
 - Flutter app lives in `frontend/`. Built web bundle is produced by `just flutter-build` into `flutter_web/` (gitignored) and deployed via `Dockerfile.frontend` + nginx.
 ## 2) Setup / Build / Run

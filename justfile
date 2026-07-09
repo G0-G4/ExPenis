@@ -19,6 +19,14 @@ lock:
 openapi:
 	uv run python generate_openapi.py
 
+# Сгенерировать долгоживущий токен для LLM-агента (или другого сервиса).
+# По умолчанию на 1 год для существующего пользователя "llm-agent".
+# Пользователь должен уже существовать (создан через приложение).
+# Для кастомных параметров используй:
+#   just generate-agent-token --username my-agent --days 90
+generate-agent-token *ARGS:
+	uv run -m src.expenis.server token --username llm-agent --days 365 {{ARGS}}
+
 # Следить за логами сервисов
 logs:
     docker-compose logs -f
