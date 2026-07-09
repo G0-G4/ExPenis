@@ -49,7 +49,24 @@ cd frontend && flutter run
 ```
 
 ## Сборка и деплой web-фронтенда
+
+### Локально (нужен Flutter SDK)
 ```bash
 just flutter-build    # собрать в flutter_web/
 just flutter-deploy   # собрать + пересобрать nginx-контейнер
+```
+
+### С сервера (без Flutter) — артефакт с GitHub Release
+При релизе (`just release-tag`) CI публикует web zip в GitHub Release (в т.ч. стабильное имя `ExPenis-web.zip`).
+На сервере достаточно `curl` + `unzip` (авторизация не нужна, репозиторий публичный):
+```bash
+just flutter-fetch-deploy   # скачать latest zip, распаковать, пересобрать nginx
+```
+Вручную:
+```bash
+curl -fsSL -o /tmp/expenis-web.zip \
+  https://github.com/G0-G4/ExPenis/releases/latest/download/ExPenis-web.zip
+rm -rf flutter_web && mkdir -p flutter_web
+unzip -o /tmp/expenis-web.zip -d flutter_web/
+docker-compose build frontend && docker-compose up -d frontend
 ```

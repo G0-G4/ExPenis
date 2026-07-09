@@ -50,12 +50,29 @@ Before publishing a release — REQUIRED:
 2. Commit the version bump.
 3. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git
    tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version.
-4. The push triggers `.github/workflows/release.yml`: builds a release APK,
-   renames it to `ExPenis-X.Y.Z.apk`, and creates a GitHub Release with the
-   APK attached and auto-generated notes.
+4. The push triggers `.github/workflows/release.yml`: builds a release APK
+   (`ExPenis-X.Y.Z.apk`) and Flutter web zips (`ExPenis-X.Y.Z-web.zip` plus
+   stable `ExPenis-web.zip` for easy latest download), then creates a GitHub
+   Release with those assets and auto-generated notes.
 Never forget step 1 — bumping `pubspec.yaml` version before tagging. A tag that
 does not match the installed version breaks semver comparison in `UpdateService`
 and the app will not detect the update.
+### Deploy web from GitHub Release (server, no Flutter SDK)
+Public repo — no auth. On the server after a release is published:
+```bash
+just flutter-fetch-deploy
+```
+This curls the stable latest asset, unpacks into `flutter_web/`, and
+rebuilds/restarts the nginx frontend container. Equivalent manual steps
+(`curl` + `unzip`):
+```bash
+curl -fsSL -o /tmp/expenis-web.zip \
+  https://github.com/G0-G4/ExPenis/releases/latest/download/ExPenis-web.zip
+rm -rf flutter_web && mkdir -p flutter_web
+unzip -o /tmp/expenis-web.zip -d flutter_web/
+docker-compose build frontend && docker-compose up -d frontend
+```
+Local build remains available: `just flutter-build` / `just flutter-deploy`.
 Auto-update behavior (Android): on startup in release mode, `UpdateService`
 fetches `/releases/latest` from GitHub and compares semver with the installed
 version; if newer, `UpdateDialog` offers to download the `.apk` asset and
@@ -68,8 +85,8 @@ Key paths:
 - `frontend/lib/widgets/update_dialog.dart` — update prompt UI
 - `frontend/android/app/src/main/kotlin/ru/g0g4/expenis/MainActivity.kt` —
   MethodChannel `expenis/installer` (`installApk` method)
-- `.github/workflows/release.yml` — release CI
-- `justfile` recipe `release-tag`
+- `.github/workflows/release.yml` — release CI (APK + web zip)
+- `justfile` recipes `release-tag`, `flutter-fetch-deploy`
 ## 3) Test Commands (Use These)
 Pytest settings (from `pyproject.toml`):
 - `asyncio_mode = "auto"`

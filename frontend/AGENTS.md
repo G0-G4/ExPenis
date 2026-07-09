@@ -46,8 +46,11 @@ flutter build apk            # Android APK
 flutter build ios            # iOS (requires macOS + Xcode)
 flutter build web            # Web
 
-just release-tag             # Tag vX.Y.Z from pubspec and push (triggers release CI)
+just release-tag             # Tag vX.Y.Z from pubspec and push (triggers release CI: APK + web zip)
+just flutter-fetch-deploy    # Server: curl latest ExPenis-web.zip, unpack, restart nginx
 ```
+
+
 
 ---
 
@@ -134,7 +137,10 @@ Resolved in `BaseService.baseUrl`:
   `FileProvider` (`${applicationId}.fileprovider`, `res/xml/file_paths.xml`).
 - Non-Android: the dialog opens the release `html_url` via `url_launcher`.
 - Releases are created by pushing a git tag `vX.Y.Z` matching the version in
-  `pubspec.yaml`; see root `AGENTS.md` → "Releases and app auto-update".
+  `pubspec.yaml`; CI attaches APK plus web zips (`ExPenis-X.Y.Z-web.zip` and
+  stable `ExPenis-web.zip` for curl latest download).
+  See root `AGENTS.md` → "Releases and app auto-update".
+
 
 ### State Management
 
