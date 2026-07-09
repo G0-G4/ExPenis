@@ -1,0 +1,1515 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ExPenis API",
+    "description": "API сервиса для учёта личных доходов и расходов. Поддерживает работу с пользователями, счетами, категориями и транзакциями.",
+    "version": "1.0.3"
+  },
+  "paths": {
+    "/api/transactions": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Получить транзакции за период",
+        "operationId": "listTransactions",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "начальная дата",
+              "description": "Начальная дата в формате yyyy-MM-dd"
+            },
+            "description": "Начальная дата в формате yyyy-MM-dd"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "конечная дата",
+              "description": "Конечная дата в формате yyyy-MM-dd"
+            },
+            "description": "Конечная дата в формате yyyy-MM-dd"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Создать транзакцию",
+        "operationId": "createTransaction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/{transaction_id}": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Получить одну транзакцию",
+        "operationId": "getTransaction",
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Transaction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Обновить транзакцию",
+        "operationId": "updateTransaction",
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Transaction Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Удалить транзакцию",
+        "operationId": "deleteTransaction",
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Transaction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "other"
+        ],
+        "summary": "Получить список тегов пользователя",
+        "operationId": "listUserTags",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserTagsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Зарегистрировать пользователя",
+        "operationId": "register",
+        "parameters": [
+          {
+            "name": "cookie",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cookie"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Войти по логину и паролю",
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "cookie",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cookie"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Обновить пару токенов",
+        "operationId": "refreshToken",
+        "parameters": [
+          {
+            "name": "cookie",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cookie"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Выйти (сбросить куки)",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Получить профиль текущего пользователя",
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/password": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Сменить пароль",
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Получить все счета с балансами",
+        "operationId": "listAccounts",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/account/{account_id}": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Получить счёт по ID",
+        "operationId": "getAccount",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Обновить название или баланс счёта",
+        "operationId": "updateAccount",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Удалить счёт (soft или hard)",
+        "operationId": "deleteAccount",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAccountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/account": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Создать новый счёт",
+        "operationId": "createAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/currency/codes": {
+      "get": {
+        "tags": [
+          "other"
+        ],
+        "summary": "Получить поддерживаемые коды валют",
+        "operationId": "listCurrencyCodes",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrencyCodes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Получить категории пользователя",
+        "operationId": "listCategories",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Создать категорию",
+        "operationId": "createCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories/{category_id}": {
+      "get": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Получить категорию по ID",
+        "operationId": "getCategory",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Category Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Обновить категорию",
+        "operationId": "updateCategory",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Category Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Удалить категорию",
+        "operationId": "deleteCategory",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Category Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "currency_code": {
+            "type": "string",
+            "title": "Currency Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "amount",
+          "currency_code"
+        ],
+        "title": "AccountCreateRequest"
+      },
+      "AccountDto": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "amount_rubles": {
+            "type": "number",
+            "title": "Amount Rubles"
+          },
+          "currency_code": {
+            "type": "string",
+            "title": "Currency Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "name",
+          "amount",
+          "amount_rubles",
+          "currency_code"
+        ],
+        "title": "AccountDto"
+      },
+      "AccountUpdateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "amount"
+        ],
+        "title": "AccountUpdateRequest"
+      },
+      "AccountsResponse": {
+        "properties": {
+          "accounts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AccountDto"
+            },
+            "type": "object",
+            "title": "Accounts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "total_amount_rubles": {
+            "type": "number",
+            "title": "Total Amount Rubles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accounts",
+          "total",
+          "total_amount_rubles"
+        ],
+        "title": "AccountsResponse"
+      },
+      "AuthResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "AuthResponse"
+      },
+      "CategoriesResponse": {
+        "properties": {
+          "categories": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CategoryDto"
+            },
+            "type": "object",
+            "title": "Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories"
+        ],
+        "title": "CategoriesResponse"
+      },
+      "CategoryCreateRequest": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "name"
+        ],
+        "title": "CategoryCreateRequest"
+      },
+      "CategoryDto": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "name"
+        ],
+        "title": "CategoryDto"
+      },
+      "CurrencyCode": {
+        "properties": {
+          "num_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Code"
+          },
+          "char_code": {
+            "type": "string",
+            "title": "Char Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_code",
+          "char_code"
+        ],
+        "title": "CurrencyCode"
+      },
+      "CurrencyCodes": {
+        "properties": {
+          "codes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CurrencyCode"
+            },
+            "type": "object",
+            "title": "Codes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codes"
+        ],
+        "title": "CurrencyCodes"
+      },
+      "DeleteAccountResponse": {
+        "properties": {
+          "delete_type": {
+            "type": "string",
+            "enum": [
+              "soft",
+              "hard"
+            ],
+            "title": "Delete Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delete_type"
+        ],
+        "title": "DeleteAccountResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LogoutResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": "logged out"
+          }
+        },
+        "type": "object",
+        "title": "LogoutResponse"
+      },
+      "MeResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "telegram_id"
+        ],
+        "title": "MeResponse"
+      },
+      "PasswordChangeRequest": {
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "title": "Old Password"
+          },
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_password",
+          "new_password"
+        ],
+        "title": "PasswordChangeRequest"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "Transaction": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "account_id": {
+            "type": "integer",
+            "title": "Account Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Type"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "category_id": {
+            "type": "integer",
+            "title": "Category Id"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "amount_rubles": {
+            "type": "number",
+            "title": "Amount Rubles"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "currency_code": {
+            "type": "string",
+            "title": "Currency Code"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "account",
+          "account_id",
+          "type",
+          "category",
+          "category_id",
+          "amount",
+          "amount_rubles",
+          "description",
+          "tags",
+          "currency_code",
+          "created_at"
+        ],
+        "title": "Transaction"
+      },
+      "TransactionCreateRequest": {
+        "properties": {
+          "account_id": {
+            "type": "integer",
+            "title": "Account Id"
+          },
+          "category_id": {
+            "type": "integer",
+            "title": "Category Id"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account_id",
+          "category_id",
+          "amount",
+          "description",
+          "created_at"
+        ],
+        "title": "TransactionCreateRequest"
+      },
+      "TransactionsResponse": {
+        "properties": {
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "title": "Transactions"
+          },
+          "total_amount_rubles": {
+            "type": "number",
+            "title": "Total Amount Rubles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transactions",
+          "total_amount_rubles"
+        ],
+        "title": "TransactionsResponse"
+      },
+      "UserTagsResponse": {
+        "properties": {
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tags"
+        ],
+        "title": "UserTagsResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT access token. Pass as 'Authorization: Bearer <token>' header. The API also accepts tokens via httpOnly cookies set on login/register."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Регистрация, вход, обновление токенов, профиль пользователя."
+    },
+    {
+      "name": "accounts",
+      "description": "Управление счетами, балансами и валютами."
+    },
+    {
+      "name": "transactions",
+      "description": "Создание, просмотр, обновление и удаление транзакций."
+    },
+    {
+      "name": "categories",
+      "description": "Управление категориями доходов и расходов."
+    },
+    {
+      "name": "other",
+      "description": "Вспомогательные данные: теги пользователя, коды валют."
+    }
+  ]
+}

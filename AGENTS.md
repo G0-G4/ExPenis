@@ -17,10 +17,12 @@ Key paths:
 - `frontend/` — Flutter app: `lib/`, `pubspec.yaml`, platform dirs. See `frontend/AGENTS.md` for Flutter conventions.
 - `flutter_web/` — built web bundle (gitignored, produced via `just flutter-build`).
 - `tests/` — async tests and shared fixtures
-- `pyproject.toml` — dependencies and pytest settings
+- `pyproject.toml` — dependencies, pytest settings, **and backend version** (see Releases below).
+- `src/expenis/version.py` — helper that provides `__version__` (used by FastAPI and the OpenAPI spec).
 - `justfile` — compose and lockfile commands (run via `just <recipe>`)
 - `migrations/` — schema migrations as numbered SQL files `NNN_description.sql`. When modifying peewee models in `src/expenis/core/models/`, add a new migration file here; do not edit existing migrations.
 - `migration.py` — one-off data migration script (transactions from legacy schema), not used for schema changes.
+- `docs/openapi.json` — generated OpenAPI 3.1 spec (run `just openapi` after API changes). The `info.version` reflects the backend version from `pyproject.toml`.
 ### Clients
 - Flutter app lives in `frontend/`. Built web bundle is produced by `just flutter-build` into `flutter_web/` (gitignored) and deployed via `Dockerfile.frontend` + nginx.
 ## 2) Setup / Build / Run
@@ -38,25 +40,48 @@ Run commands from repo root.
 - Follow logs: `just logs`
 ### Lockfile maintenance
 - Rebuild lockfile: `just lock`
+
+### OpenAPI specification
+- Generate (or regenerate) machine-readable API spec: `just openapi`
+- Output: `docs/openapi.json` (committed)
+- Used by agents/LLMs to build skills, clients, or tests for the backend service.
+- All `operationId`, `summary`, `description` and tags are declared directly on the route decorators in `src/expenis/server/application.py` (using FastAPI `operation_id=...` / `summary=...` + a small `custom_openapi` hook for the security scheme). The generator is intentionally minimal.
+- The spec includes grouped tags, friendly `operationId`s (e.g. `listTransactions`, `login`), Russian summaries for humans, and a documented `BearerAuth` JWT security scheme.
+- `info.version` in the spec comes from `pyproject.toml` (backend version). Bump it only when the API contract changes.
 ### Releases and app auto-update
-- App version lives in `frontend/pubspec.yaml` (`version: X.Y.Z+build`). The git
-  tag `vX.Y.Z` (semver, no leading `v` in `pubspec`) marks a release and MUST
-  match the `pubspec.yaml` version. The build number (`+build`) is not part of
-  the tag.
+
+The frontend and backend use **independent versions**.
+
+- **Frontend version** (`frontend/pubspec.yaml`, format `X.Y.Z+build`):
+  - Drives Git tags (`vX.Y.Z`), GitHub Releases, APK/web artifact names.
+  - Used by the mobile app for auto-update checks (via `package_info_plus` + GitHub releases).
+  - This is the version that matters for end users and the release process.
+
+- **Backend version** (`pyproject.toml`, e.g. `1.0.3`):
+  - Used in the OpenAPI specification (`info.version`).
+  - Exposed as `src.expenis.__version__` and in `FastAPI(version=...)`.
+  - Reflects changes to the backend and API contract.
+
+**You do not need to keep the versions in sync.**
+
+It is normal for the versions to diverge. Example:
+- `frontend/pubspec.yaml`: `1.2.0+5`
+- `pyproject.toml`: `1.0.3`
+
+The git tag `vX.Y.Z` is **always** taken from `pubspec.yaml` (the build number after `+` is ignored for the tag).
+
 Before publishing a release — REQUIRED:
-1. Bump `version:` in `frontend/pubspec.yaml` (major/minor/patch + build
-   number, e.g. `1.0.0+1` → `1.0.1+2`). This is the single source of truth the
-   app reads via `package_info_plus` on the device.
-2. Commit the version bump.
-3. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git
-   tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version.
-4. The push triggers `.github/workflows/release.yml`: builds a release APK
-   (`ExPenis-X.Y.Z.apk`) and Flutter web zips (`ExPenis-X.Y.Z-web.zip` plus
-   stable `ExPenis-web.zip` for easy latest download), then creates a GitHub
-   Release with those assets and auto-generated notes.
-Never forget step 1 — bumping `pubspec.yaml` version before tagging. A tag that
-does not match the installed version breaks semver comparison in `UpdateService`
-and the app will not detect the update.
+1. Bump `version:` in `frontend/pubspec.yaml` (major/minor/patch + build number).
+2. (Optional) If the backend changed, bump `version = "..."` in `pyproject.toml`.
+3. Commit the version bump(s).
+4. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version.
+
+The push triggers `.github/workflows/release.yml`: builds a release APK
+(`ExPenis-X.Y.Z.apk`) and Flutter web zips (`ExPenis-X.Y.Z-web.zip` plus
+stable `ExPenis-web.zip` for easy latest download), then creates a GitHub
+Release with those assets and auto-generated notes.
+
+**Note**: The release CI and auto-update logic only care about the frontend/pubspec version. The OpenAPI `info.version` will reflect whatever is currently in `pyproject.toml` when you last ran `just openapi`.
 ### Deploy web from GitHub Release (server, no Flutter SDK)
 Public repo — no auth. On the server after a release is published:
 ```bash

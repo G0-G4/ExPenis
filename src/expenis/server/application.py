@@ -34,6 +34,7 @@ from ..core.service.auth_service import InvalidPasswordError, UsernameTakenError
 from ..core.errors import NotFoundException
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
 from ..core.utils.currency_codes import CODES
+from ..version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,22 @@ async def lifespan(app: FastAPI):
     await db.close_pool()
 
 
-app = FastAPI(lifespan=lifespan)
+tags_metadata = [
+    {"name": "auth", "description": "Регистрация, вход, обновление токенов, профиль пользователя."},
+    {"name": "accounts", "description": "Управление счетами, балансами и валютами."},
+    {"name": "transactions", "description": "Создание, просмотр, обновление и удаление транзакций."},
+    {"name": "categories", "description": "Управление категориями доходов и расходов."},
+    {"name": "other", "description": "Вспомогательные данные: теги пользователя, коды валют."},
+]
+
+app = FastAPI(
+    title="ExPenis API",
+    description="API сервиса для учёта личных доходов и расходов. "
+                "Поддерживает работу с пользователями, счетами, категориями и транзакциями.",
+    version=__version__,
+    openapi_tags=tags_metadata,
+    lifespan=lifespan,
+)
 
 if DEV:
     app.add_middleware(
@@ -68,6 +84,38 @@ if DEV:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+# Customize OpenAPI generation so that the security scheme is present both
+# when the server serves /openapi.json and in the committed docs/openapi.json.
+# This removes the need for post-processing in the generator script.
+from fastapi.openapi.utils import get_openapi
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})["BearerAuth"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT access token. Pass as 'Authorization: Bearer <token>' header. "
+                       "The API also accepts tokens via httpOnly cookies set on login/register.",
+    }
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
+
 config = AuthXConfig(
     JWT_SECRET_KEY=SECRET,
     JWT_TOKEN_LOCATION=["cookies", "headers"],
@@ -140,7 +188,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-@app.get("/api/transactions")
+@app.get(
+    "/api/transactions",
+    tags=["transactions"],
+    operation_id="listTransactions",
+    summary="Получить транзакции за период",
+)
 async def get_user_transactions(
         date_from: Annotated[date, Query(title="начальная дата", description="Начальная дата в формате yyyy-MM-dd")],
         date_to: Annotated[date, Query(title="конечная дата", description="Конечная дата в формате yyyy-MM-dd")],
@@ -158,7 +211,12 @@ async def get_user_transactions(
         amount.amount_rubles for amount in converted_transactions if amount.amount_rubles is not None
     ]))
 
-@app.get("/api/transactions/{transaction_id}")
+@app.get(
+    "/api/transactions/{transaction_id}",
+    tags=["transactions"],
+    operation_id="getTransaction",
+    summary="Получить одну транзакцию",
+)
 async def get_transaction(
         transaction_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -168,7 +226,12 @@ async def get_transaction(
     tags_by_transaction_id = await get_transaction_tags_by_transaction_ids(user_id, [transaction_id])
     return convert_transaction_to_dto(transaction, tags_by_transaction_id.get(transaction_id, []))
 
-@app.post("/api/transactions")
+@app.post(
+    "/api/transactions",
+    tags=["transactions"],
+    operation_id="createTransaction",
+    summary="Создать транзакцию",
+)
 async def create_transaction_endpoint(
         transaction_create: TransactionCreateRequest,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -184,7 +247,12 @@ async def create_transaction_endpoint(
     tags = await set_transaction_tags(user_id, transaction.id, transaction_create.tags)
     return convert_transaction_to_dto(transaction, tags)
 
-@app.put("/api/transactions/{transaction_id}")
+@app.put(
+    "/api/transactions/{transaction_id}",
+    tags=["transactions"],
+    operation_id="updateTransaction",
+    summary="Обновить транзакцию",
+)
 async def update_transaction_endpoint(
         transaction_id: int,
         transaction_create: TransactionCreateRequest,
@@ -209,13 +277,23 @@ async def update_transaction_endpoint(
     return convert_transaction_to_dto(transaction, tags)
 
 
-@app.get("/api/tags")
+@app.get(
+    "/api/tags",
+    tags=["other"],
+    operation_id="listUserTags",
+    summary="Получить список тегов пользователя",
+)
 async def get_user_tags_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> UserTagsResponse:
     return UserTagsResponse(tags=await get_user_tags(int(payload.sub)))
 
-@app.delete("/api/transactions/{transaction_id}")
+@app.delete(
+    "/api/transactions/{transaction_id}",
+    tags=["transactions"],
+    operation_id="deleteTransaction",
+    summary="Удалить транзакцию",
+)
 async def delete_transaction_endpoint(
         transaction_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -237,7 +315,12 @@ def _deliver_tokens(access_token: str, refresh_token: str, response: Response, c
     return AuthResponse(access_token=access_token, refresh_token=refresh_token, expires_in=EXPIRATION_TIME_SECONDS)
 
 
-@app.post("/api/register")
+@app.post(
+    "/api/register",
+    tags=["auth"],
+    operation_id="register",
+    summary="Зарегистрировать пользователя",
+)
 async def register_endpoint(
         body: RegisterRequest,
         response: Response,
@@ -252,7 +335,12 @@ async def register_endpoint(
     return _deliver_tokens(access_token, refresh_token, response, cookie)
 
 
-@app.post("/api/login")
+@app.post(
+    "/api/login",
+    tags=["auth"],
+    operation_id="login",
+    summary="Войти по логину и паролю",
+)
 async def login_endpoint(
         body: LoginRequest,
         response: Response,
@@ -266,7 +354,12 @@ async def login_endpoint(
     return _deliver_tokens(access_token, refresh_token, response, cookie)
 
 
-@app.post("/api/refresh")
+@app.post(
+    "/api/refresh",
+    tags=["auth"],
+    operation_id="refreshToken",
+    summary="Обновить пару токенов",
+)
 async def refresh_endpoint(
         response: Response,
         payload: TokenPayload = Depends(auth.refresh_token_required),
@@ -278,14 +371,24 @@ async def refresh_endpoint(
     return _deliver_tokens(access_token, refresh_token, response, cookie)
 
 
-@app.post("/api/logout")
+@app.post(
+    "/api/logout",
+    tags=["auth"],
+    operation_id="logout",
+    summary="Выйти (сбросить куки)",
+)
 async def logout_endpoint(response: Response) -> LogoutResponse:
     auth.unset_access_cookies(response)
     auth.unset_refresh_cookies(response)
     return LogoutResponse()
 
 
-@app.get("/api/me")
+@app.get(
+    "/api/me",
+    tags=["auth"],
+    operation_id="getCurrentUser",
+    summary="Получить профиль текущего пользователя",
+)
 async def me_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> MeResponse:
@@ -293,7 +396,12 @@ async def me_endpoint(
     return MeResponse(id=user.id, username=user.username, telegram_id=user.telegram_id)
 
 
-@app.put("/api/me/password")
+@app.put(
+    "/api/me/password",
+    tags=["auth"],
+    operation_id="changePassword",
+    summary="Сменить пароль",
+)
 async def change_password_endpoint(
         body: PasswordChangeRequest,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -308,7 +416,12 @@ async def change_password_endpoint(
     return MeResponse(id=user.id, username=user.username, telegram_id=user.telegram_id)
 
 
-@app.get("/api/accounts")
+@app.get(
+    "/api/accounts",
+    tags=["accounts"],
+    operation_id="listAccounts",
+    summary="Получить все счета с балансами",
+)
 async def get_user_accounts(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountsResponse:
@@ -321,8 +434,13 @@ async def get_user_accounts(
             [account.amount_rubles for account in account_map.values() if account.amount_rubles is not None])
     )
 
-@app.get("/api/accounts/account/{account_id}")
-async def get_user_accounts(
+@app.get(
+    "/api/accounts/account/{account_id}",
+    tags=["accounts"],
+    operation_id="getAccount",
+    summary="Получить счёт по ID",
+)
+async def get_user_account(
         account_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
@@ -331,7 +449,12 @@ async def get_user_accounts(
         raise HTTPException(status_code=404, detail="account not found")
     return await convert_account_with_balance_to_dto(account, balance)
 
-@app.put("/api/accounts/account/{account_id}")
+@app.put(
+    "/api/accounts/account/{account_id}",
+    tags=["accounts"],
+    operation_id="updateAccount",
+    summary="Обновить название или баланс счёта",
+)
 async def update_account_endpoint(
         account_id: int,
         update_request: AccountUpdateRequest,
@@ -344,7 +467,12 @@ async def update_account_endpoint(
     updated_account = await update_account(int(payload.sub), account, update_request.amount)
     return await convert_account_with_balance_to_dto(updated_account, update_request.amount)
 
-@app.delete("/api/accounts/account/{account_id}")
+@app.delete(
+    "/api/accounts/account/{account_id}",
+    tags=["accounts"],
+    operation_id="deleteAccount",
+    summary="Удалить счёт (soft или hard)",
+)
 async def delete_account_endpoint(
         account_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -352,7 +480,12 @@ async def delete_account_endpoint(
     delete_type = await delete_account_by_id_and_user_id(int(payload.sub), account_id)
     return DeleteAccountResponse(delete_type=delete_type)
 
-@app.post("/api/accounts/account")
+@app.post(
+    "/api/accounts/account",
+    tags=["accounts"],
+    operation_id="createAccount",
+    summary="Создать новый счёт",
+)
 async def create_account_endpoint(
         create_request: AccountCreateRequest,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -360,15 +493,25 @@ async def create_account_endpoint(
     account = await create_account(int(payload.sub), create_request.name, create_request.amount, create_request.currency_code)
     return await convert_account_with_balance_to_dto(account, create_request.amount)
 
-@app.get("/api/currency/codes")
-async def update_account_endpoint() -> CurrencyCodes:
+@app.get(
+    "/api/currency/codes",
+    tags=["other"],
+    operation_id="listCurrencyCodes",
+    summary="Получить поддерживаемые коды валют",
+)
+async def get_currency_codes() -> CurrencyCodes:
     return CurrencyCodes(
         codes={code.get("CharCode"): CurrencyCode(
             num_code=int(code.get("NumCode", None)) if code.get("NumCode", None) is not None else None,
             char_code=code.get("CharCode")) for code in CODES.values()}
     )
 
-@app.get("/api/categories")
+@app.get(
+    "/api/categories",
+    tags=["categories"],
+    operation_id="listCategories",
+    summary="Получить категории пользователя",
+)
 async def get_user_categories_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> CategoriesResponse:
@@ -381,7 +524,12 @@ async def get_user_categories_endpoint(
         categories=categories
     )
 
-@app.get("/api/categories/{category_id}")
+@app.get(
+    "/api/categories/{category_id}",
+    tags=["categories"],
+    operation_id="getCategory",
+    summary="Получить категорию по ID",
+)
 async def get_user_category_endpoint(
         category_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -389,7 +537,12 @@ async def get_user_category_endpoint(
     category = await get_category_by_id(int(payload.sub), category_id)
     return convert_category_to_dto(category)
 
-@app.post("/api/categories")
+@app.post(
+    "/api/categories",
+    tags=["categories"],
+    operation_id="createCategory",
+    summary="Создать категорию",
+)
 async def create_category_endpoint(
         create_request: CategoryCreateRequest,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -397,8 +550,13 @@ async def create_category_endpoint(
     category = await create_category(int(payload.sub), create_request.name, create_request.type)
     return convert_category_to_dto(category)
 
-@app.put("/api/categories/{category_id}")
-async def create_category_endpoint(
+@app.put(
+    "/api/categories/{category_id}",
+    tags=["categories"],
+    operation_id="updateCategory",
+    summary="Обновить категорию",
+)
+async def update_category_endpoint(
         category_id: int,
         create_request: CategoryCreateRequest,
         payload: TokenPayload = Depends(auth.access_token_required)
@@ -409,8 +567,13 @@ async def create_category_endpoint(
     category = await update_category(category)
     return convert_category_to_dto(category)
 
-@app.delete("/api/categories/{category_id}")
-async def create_category_endpoint(
+@app.delete(
+    "/api/categories/{category_id}",
+    tags=["categories"],
+    operation_id="deleteCategory",
+    summary="Удалить категорию",
+)
+async def delete_category_endpoint(
         category_id: int,
         payload: TokenPayload = Depends(auth.access_token_required)
 ):

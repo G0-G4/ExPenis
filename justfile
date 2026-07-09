@@ -14,6 +14,11 @@ build:
 lock:
     uv lock
 
+# Сгенерировать OpenAPI спецификацию в docs/openapi.json
+# Используется агентами и инструментами для генерации клиентов/скиллов.
+openapi:
+	uv run python generate_openapi.py
+
 # Следить за логами сервисов
 logs:
     docker-compose logs -f
