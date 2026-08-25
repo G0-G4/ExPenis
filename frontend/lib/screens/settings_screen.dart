@@ -34,12 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _loadError = null;
     });
     try {
-      final settingsService = await SettingsService.getInstance();
-      final accessToken = await settingsService.getAccessToken();
-      if (accessToken == null || accessToken.isEmpty) {
-        throw Exception("Not authenticated");
-      }
-      final profile = await _authService.me(accessToken);
+      final profile = await _authService.me();
       final info = await PackageInfo.fromPlatform();
       if (!mounted) return;
       setState(() {

@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -116,6 +116,14 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
+if REFRESH_TIME_SECONDS <= EXPIRATION_TIME_SECONDS:
+    logger.warning(
+        "refresh_time_seconds (%s) <= expiration_time_seconds (%s); "
+        "refresh tokens will already be expired when access tokens expire",
+        REFRESH_TIME_SECONDS,
+        EXPIRATION_TIME_SECONDS,
+    )
+
 config = AuthXConfig(
     JWT_SECRET_KEY=SECRET,
     JWT_TOKEN_LOCATION=["cookies", "headers"],
@@ -123,8 +131,8 @@ config = AuthXConfig(
     JWT_REFRESH_COOKIE_NAME="refresh_token",
     JWT_COOKIE_DOMAIN=COOKIE_DOMAIN,
     JWT_COOKIE_SAMESITE="strict",
-    JWT_ACCESS_TOKEN_EXPIRES=EXPIRATION_TIME_SECONDS,
-    JWT_REFRESH_TOKEN_EXPIRES=REFRESH_TIME_SECONDS,
+    JWT_ACCESS_TOKEN_EXPIRES=timedelta(seconds=EXPIRATION_TIME_SECONDS),
+    JWT_REFRESH_TOKEN_EXPIRES=timedelta(seconds=REFRESH_TIME_SECONDS),
     JWT_COOKIE_CSRF_PROTECT=False,
 )
 auth = AuthX(config)

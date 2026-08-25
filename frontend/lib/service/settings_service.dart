@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
@@ -15,6 +16,11 @@ class SettingsService {
     _instance ??= SettingsService._();
     _instance!._prefs ??= await SharedPreferences.getInstance();
     return _instance!;
+  }
+
+  @visibleForTesting
+  static void debugReset() {
+    _instance = null;
   }
 
   Future<String?> getAccessToken() async {
@@ -61,8 +67,10 @@ class SettingsService {
   }
 
   Future<bool> setExcludedAccountIds(int userId, Set<String> ids) async {
-    return await _prefs
-            ?.setStringList("$_excludedAccountIdsKeyPrefix$userId", ids.toList()) ??
+    return await _prefs?.setStringList(
+          "$_excludedAccountIdsKeyPrefix$userId",
+          ids.toList(),
+        ) ??
         false;
   }
 }

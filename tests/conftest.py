@@ -19,5 +19,12 @@ async def run_before_each_test():
         await db.run(Category.truncate_table)
         await db.run(Session.truncate_table)
         await db.run(User.truncate_table)
+        def _reset_pk_sequence():
+            try:
+                db.execute_sql("DELETE FROM sqlite_sequence")
+            except Exception:
+                pass
+
+        await db.run(_reset_pk_sequence)
     yield
     await db.close_pool()

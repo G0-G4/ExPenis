@@ -201,6 +201,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+# Python dist `lib/` would also ignore Flutter sources; keep frontend/lib tracked.
+!frontend/lib/
+!frontend/lib/**
 lib64/
 parts/
 sdist/

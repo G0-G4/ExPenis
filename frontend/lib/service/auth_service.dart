@@ -49,6 +49,7 @@ class AuthService extends BaseService {
       final response = await dio.post(
         "$baseUrl/api/login",
         data: {"username": username, "password": password},
+        options: Options(extra: {"skipAuth": true}),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return AuthSession.fromJson(response.data as Map<String, dynamic>);
@@ -69,6 +70,7 @@ class AuthService extends BaseService {
       final response = await dio.post(
         "$baseUrl/api/register",
         data: {"username": username, "password": password},
+        options: Options(extra: {"skipAuth": true}),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return AuthSession.fromJson(response.data as Map<String, dynamic>);
@@ -121,14 +123,13 @@ class AuthService extends BaseService {
     }
   }
 
-  Future<UserProfile> me(String accessToken) async {
+  Future<UserProfile> me([String? accessToken]) async {
     try {
       final response = await dio.get(
         "$baseUrl/api/me",
-        options: Options(
-          headers: {"Authorization": "Bearer $accessToken"},
-          extra: {"skipAuth": true},
-        ),
+        options: accessToken == null
+            ? null
+            : Options(headers: {"Authorization": "Bearer $accessToken"}),
       );
       if (response.statusCode == 200) {
         return UserProfile.fromJson(response.data as Map<String, dynamic>);

@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:package_info_plus/package_info_plus.dart";
@@ -10,10 +12,12 @@ import "package:expenis_mobile/screens/register_screen.dart";
 import "package:expenis_mobile/screens/settings_screen.dart";
 import "package:expenis_mobile/screens/transaction_screen.dart";
 import "package:expenis_mobile/screens/transaction_stats_screen.dart";
+import "package:expenis_mobile/service/base_service.dart";
 import "package:expenis_mobile/service/navigator_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
 import "package:expenis_mobile/service/update_service.dart";
 import "package:expenis_mobile/theme.dart";
+import "package:expenis_mobile/utils/jwt.dart";
 import "package:expenis_mobile/widgets/update_dialog.dart";
 
 void main() {
@@ -58,8 +62,29 @@ class _AuthGateState extends State<_AuthGate> {
 
   Future<void> _decide() async {
     final settingsService = await SettingsService.getInstance();
-    final hasToken = await settingsService.hasAccessToken();
-    final routeName = hasToken ? "/home" : "/login";
+    final accessToken = await settingsService.getAccessToken();
+    final refreshToken = await settingsService.getRefreshToken();
+    final hasRefresh = refreshToken != null && refreshToken.isNotEmpty;
+    final hasAccess = accessToken != null && accessToken.isNotEmpty;
+    var routeName = "/login";
+
+    if (hasRefresh && (accessToken == null || jwtIsExpired(accessToken))) {
+      final result = await refreshStoredTokens();
+      if (result == TokenRefreshResult.success) {
+        routeName = "/home";
+      } else if (result == TokenRefreshResult.failed && hasAccess) {
+        routeName = "/home";
+      } else {
+        await settingsService.clearAuth();
+        routeName = "/login";
+      }
+    } else if (hasAccess) {
+      routeName = "/home";
+      if (hasRefresh) {
+        unawaited(refreshStoredTokens());
+      }
+    }
+
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(routeName);
     if (kReleaseMode) {
