@@ -49,9 +49,12 @@ flutter-deploy: flutter-build
 # Создать git-тег версии из pubspec.yaml (например v1.2.3) и отправить его,
 # что запустит GitHub Actions workflow сборки релиза (APK + web zip).
 release-tag:
-    @version=$(grep '^version:' frontend/pubspec.yaml | awk '{print $$2}' | cut -d '+' -f1); \
-    echo "Creating tag v$$version"; \
-    git tag "v$$version" && git push origin "v$$version"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version=$(grep '^version:' frontend/pubspec.yaml | awk '{print $2}' | cut -d '+' -f1)
+    echo "Creating tag v${version}"
+    git tag "v${version}"
+    git push origin "v${version}"
 
 # Скачать latest web-бандл с GitHub Release (публичный URL, curl) и задеплоить.
 flutter-fetch-deploy:
