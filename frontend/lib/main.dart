@@ -2,8 +2,6 @@ import "dart:async";
 
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
-import "package:package_info_plus/package_info_plus.dart";
-
 import "package:expenis_mobile/screens/account_screen.dart";
 import "package:expenis_mobile/screens/category_screen.dart";
 import "package:expenis_mobile/screens/change_password_screen.dart";
@@ -17,6 +15,7 @@ import "package:expenis_mobile/service/navigator_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
 import "package:expenis_mobile/service/update_service.dart";
 import "package:expenis_mobile/theme.dart";
+import "package:expenis_mobile/utils/app_version.dart";
 import "package:expenis_mobile/utils/jwt.dart";
 import "package:expenis_mobile/widgets/update_dialog.dart";
 
@@ -131,11 +130,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadVersion() async {
-    final info = await PackageInfo.fromPlatform();
+    final version = await loadAppVersion();
     if (!mounted) return;
-    setState(() {
-      _appVersion = "${info.version}+${info.buildNumber}";
-    });
+    setState(() => _appVersion = version?.display);
   }
 
   @override

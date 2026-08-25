@@ -1,8 +1,8 @@
 import "package:flutter/material.dart";
-import "package:package_info_plus/package_info_plus.dart";
 
 import "package:expenis_mobile/service/auth_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
+import "package:expenis_mobile/utils/app_version.dart";
 import "package:expenis_mobile/widgets/app_loading_spinner.dart";
 import "package:expenis_mobile/theme.dart";
 
@@ -35,11 +35,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     try {
       final profile = await _authService.me();
-      final info = await PackageInfo.fromPlatform();
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _appVersion = "${info.version}+${info.buildNumber}";
         _isLoading = false;
       });
     } catch (e) {
@@ -49,6 +47,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = false;
       });
     }
+    final version = await loadAppVersion();
+    if (!mounted) return;
+    setState(() => _appVersion = version?.display);
   }
 
   Future<void> _logout() async {
