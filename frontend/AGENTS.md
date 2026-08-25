@@ -47,7 +47,8 @@ flutter build ios            # iOS (requires macOS + Xcode)
 flutter build web            # Web
 
 just release-tag             # Tag vX.Y.Z from pubspec and push (triggers release CI: APK + web zip)
-just flutter-fetch-deploy    # Server: curl latest ExPenis-web.zip, unpack, restart nginx
+just flutter-fetch-deploy    # Server: same as ./deploy.sh — curl latest zip, unpack, restart nginx
+./deploy.sh                  # Preferred on the server after the GitHub Release is published
 ```
 
 
@@ -67,6 +68,7 @@ lib/
 ├── screens/                   # UI screens (one class per file)
 │   ├── account_screen.dart
 │   ├── transaction_screen.dart       # TransactionScreen (main list)
+│   ├── transaction_stats_screen.dart # Income/expense stats
 │   ├── category_screen.dart
 │   ├── create_account_screen.dart
 │   ├── create_category_screen.dart
@@ -78,7 +80,7 @@ lib/
 │   ├── register_screen.dart          # Registration by username + password
 │   └── change_password_screen.dart   # Change current account password
 ├── service/                   # HTTP service layer
-│   ├── base_service.dart      # Dio setup, baseUrl resolution, auth interceptor (Bearer + auto-refresh on 401)
+│   ├── base_service.dart      # Shared Dio, Bearer header, 401 → refresh → retry
 │   ├── account_service.dart   # Also contains AccountsResult helper class
 │   ├── category_service.dart
 │   ├── auth_service.dart      # login/register/refresh/logout/me/changePassword
@@ -87,7 +89,9 @@ lib/
 │   ├── transaction_service.dart
 │   └── update_service.dart    # GitHub release check + APK download/install (auto-update)
 ├── utils/
-│   └── format.dart            # formatAmount() — number formatting via intl
+│   ├── format.dart            # formatAmount() — number formatting via intl
+│   ├── app_version.dart       # loadAppVersion(): version.json on web, PackageInfo elsewhere
+│   └── jwt.dart               # jwtExpiry / jwtIsExpired for access-token refresh on boot
 └── widgets/                   # Shared UI components
     ├── app_empty_state.dart
     ├── app_error_state.dart
@@ -100,8 +104,11 @@ lib/
 
 - App entry uses `MaterialApp.routes` with named routes: `/boot` (auth gate),
   `/login`, `/register`, `/home`, `/settings`, `/change-password`.
-- `_AuthGate` (in `main.dart`) checks `SettingsService.hasAccessToken()` at
-  startup and `pushReplacementNamed` to either `/login` or `/home`.
+- `_AuthGate` (in `main.dart`) reads stored tokens at startup. If the access
+  token is missing/expired and a refresh token exists, it calls
+  `refreshStoredTokens()` before routing. Then `pushReplacementNamed` to
+  either `/login` or `/home`. A valid access token still triggers a
+  background refresh so the session is extended.
 - `MaterialApp.navigatorKey` is `appNavigatorKey` (see `navigator_service.dart`)
   so the auth interceptor can force-redirect to `/login` when the refresh token
   is dead (see Auth section).
@@ -129,8 +136,10 @@ Resolved in `BaseService.baseUrl`:
   `UpdateService().checkForUpdate()` and shows `UpdateDialog` via
   `showUpdateDialog()` if a newer GitHub release exists.
 - Version comparisons use `UpdateService.compareSemver(a, b)` in
-  `lib/service/update_service.dart`. Version source is `pubspec.yaml`,
-  read via `package_info_plus`.
+  `lib/service/update_service.dart`. Current version comes from
+  `loadAppVersion()` (`lib/utils/app_version.dart`): `/version.json` on web,
+  `package_info_plus` on native. Do not call `PackageInfo.fromPlatform()` on
+  web — it throws `MissingPluginException` and used to break Settings.
 - On Android, the APK is downloaded to the temp dir and installed via a
   MethodChannel `expenis/installer` (`installApk(path)`) implemented in
   `MainActivity.kt`. Requires `REQUEST_INSTALL_PACKAGES` permission and a
@@ -140,6 +149,8 @@ Resolved in `BaseService.baseUrl`:
   `pubspec.yaml`; CI attaches APK plus web zips (`ExPenis-X.Y.Z-web.zip` and
   stable `ExPenis-web.zip` for curl latest download).
   See root `AGENTS.md` → "Releases and app auto-update".
+  Web is **not** auto-deployed by CI. After the GitHub Release exists, on the
+  server run `./deploy.sh` (or `just flutter-fetch-deploy`).
 
 
 ### State Management
@@ -285,6 +296,7 @@ team agreement.
 | `GET`            | `/api/accounts/account/{id}`  | Get account                                       |
 | `PUT`            | `/api/accounts/account/{id}`  | Update account                                    |
 | `DELETE`         | `/api/accounts/account/{id}`  | Delete account                                    |
+| `GET`            | `/api/tags`                   | Distinct tags used by the current user            |
 | `GET`            | `/api/currency/codes`         | List available currency codes                     |
 | `GET/POST`       | `/api/categories`             | Categories CRUD                                   |
 | `GET/PUT/DELETE` | `/api/categories/{id}`        | Individual category ops                           |
@@ -295,13 +307,15 @@ team agreement.
   on every authenticated request. Tokens are stored in `SettingsService`
   (singleton, `shared_preferences`): keys `access_token`, `refresh_token`,
   `username`.
-- `BaseService` uses a `QueuedInterceptorsWrapper`. On `401` it transparently
-  calls `AuthService.refresh()` using the stored refresh token, persists the
-  new pair, and retries the original request once (guarded by
-  `requestOptions.extra["retried"]`). If refresh fails, it clears auth state
-  and pushes `/login` via `appNavigatorKey`. Requests that set their own
-  `Authorization` header (refresh, logout, me, changePassword) mark
-  `Options.extra["skipAuth"] = true` so the interceptor doesn't overwrite it.
+- `BaseService` shares one Dio. `validateStatus` treats 200–499 as success, so
+  token refresh runs in `onResponse` (not `onError`) when status is 401.
+  Refresh and the retried request use a **separate** Dio without interceptors
+  (a fetch through `QueuedInterceptorsWrapper` would deadlock). If refresh
+  returns unauthorized, auth is cleared and `/login` is pushed via
+  `appNavigatorKey`. Login, register, refresh, logout, and change-password
+  set `Options.extra["skipAuth"] = true` so a business 401 is not treated as
+  an expired access token. `me()` uses the interceptor so an expired access
+  token is rotated.
 - Password rules: minimum 6 characters, maximum 72 bytes (bcrypt limit).
   Enforced both server-side and in the register/change-password forms.
 - Dio is configured with `validateStatus` accepting all responses with status

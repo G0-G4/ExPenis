@@ -58,15 +58,11 @@ just flutter-deploy   # собрать + пересобрать nginx-конте
 
 ### С сервера (без Flutter) — артефакт с GitHub Release
 При релизе (`just release-tag`) CI публикует web zip в GitHub Release (в т.ч. стабильное имя `ExPenis-web.zip`).
-На сервере достаточно `curl` + `unzip` (авторизация не нужна, репозиторий публичный):
+CI **не** выкатывает web на сервер. После того как GitHub Release опубликован, на сервере
+(корень репозитория, обычно `/home/gog4/ExPenis`):
 ```bash
-just flutter-fetch-deploy   # скачать latest zip, распаковать, пересобрать nginx
+./deploy.sh
 ```
-Вручную:
-```bash
-curl -fsSL -o /tmp/expenis-web.zip \
-  https://github.com/G0-G4/ExPenis/releases/latest/download/ExPenis-web.zip
-rm -rf flutter_web && mkdir -p flutter_web
-unzip -o /tmp/expenis-web.zip -d flutter_web/
-docker-compose build frontend && docker-compose up -d frontend
-```
+Скрипт скачивает latest zip, распаковывает в `flutter_web/` и пересобирает nginx-контейнер.
+Эквивалент: `just flutter-fetch-deploy` (он вызывает тот же `deploy.sh`).
+Репозиторий публичный, авторизация не нужна.

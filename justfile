@@ -56,16 +56,7 @@ release-tag:
     git tag "v${version}"
     git push origin "v${version}"
 
-# Скачать latest web-бандл с GitHub Release (публичный URL, curl) и задеплоить.
+# Скачать latest web-бандл с GitHub Release и задеплоить nginx-контейнер.
+# На сервере то же самое: ./deploy.sh
 flutter-fetch-deploy:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    tmp="$(mktemp)"
-    trap 'rm -f "$tmp"' EXIT
-    curl -fsSL -o "$tmp" \
-      "https://github.com/G0-G4/ExPenis/releases/latest/download/ExPenis-web.zip"
-    rm -rf flutter_web
-    mkdir -p flutter_web
-    unzip -o "$tmp" -d flutter_web
-    docker-compose build frontend
-    docker-compose up -d frontend
+    ./deploy.sh

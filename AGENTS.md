@@ -20,6 +20,7 @@ Key paths:
 - `pyproject.toml` — dependencies, pytest settings, **and backend version** (see Releases below).
 - `src/expenis/version.py` — helper that provides `__version__` (used by FastAPI and the OpenAPI spec).
 - `justfile` — compose and lockfile commands (run via `just <recipe>`)
+- `deploy.sh` — server web deploy from GitHub Release (`./deploy.sh` in repo root)
 - `migrations/` — schema migrations as numbered SQL files `NNN_description.sql`. When modifying peewee models in `src/expenis/core/models/`, add a new migration file here; do not edit existing migrations.
 - `migration.py` — one-off data migration script (transactions from legacy schema), not used for schema changes.
 - `docs/openapi.json` — generated OpenAPI 3.1 spec (run `just openapi` after API changes). The `info.version` reflects the backend version from `pyproject.toml`.
@@ -55,7 +56,9 @@ The frontend and backend use **independent versions**.
 
 - **Frontend version** (`frontend/pubspec.yaml`, format `X.Y.Z+build`):
   - Drives Git tags (`vX.Y.Z`), GitHub Releases, APK/web artifact names.
-  - Used by the mobile app for auto-update checks (via `package_info_plus` + GitHub releases).
+  - Used by the app for auto-update checks (`loadAppVersion()` + GitHub releases).
+    Native reads `package_info_plus`; web reads `/version.json` (do not call
+    `PackageInfo.fromPlatform()` on web — the plugin is not registered there).
   - This is the version that matters for end users and the release process.
 
 - **Backend version** (`pyproject.toml`, e.g. `1.0.3`):
@@ -75,29 +78,30 @@ Before publishing a release — REQUIRED:
 1. Bump `version:` in `frontend/pubspec.yaml` (major/minor/patch + build number).
 2. (Optional) If the backend changed, bump `version = "..."` in `pyproject.toml`.
 3. Commit the version bump(s).
-4. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version.
+4. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version. CI does **not** run on a plain `git push` to `main`; only the `v*` tag starts the release workflow.
 
-The push triggers `.github/workflows/release.yml`: builds a release APK
+The tag triggers `.github/workflows/release.yml`: builds a release APK
 (`ExPenis-X.Y.Z.apk`) and Flutter web zips (`ExPenis-X.Y.Z-web.zip` plus
 stable `ExPenis-web.zip` for easy latest download), then creates a GitHub
 Release with those assets and auto-generated notes.
 
 **Note**: The release CI and auto-update logic only care about the frontend/pubspec version. The OpenAPI `info.version` will reflect whatever is currently in `pyproject.toml` when you last ran `just openapi`.
+
+JWT lifetimes (`expiration_time_seconds` = access, `refresh_time_seconds` = refresh)
+must keep **refresh longer than access**. Otherwise `/api/refresh` is already dead
+when the access token expires. Default refresh is 90 days.
+
 ### Deploy web from GitHub Release (server, no Flutter SDK)
-Public repo — no auth. On the server after a release is published:
+Public repo — no auth. There is **no CI that deploys web to the server**; the
+workflow only uploads zips to the GitHub Release. After the release is published,
+on the server (repo root, typically `/home/gog4/ExPenis`):
 ```bash
-just flutter-fetch-deploy
+./deploy.sh
 ```
-This curls the stable latest asset, unpacks into `flutter_web/`, and
-rebuilds/restarts the nginx frontend container. Equivalent manual steps
-(`curl` + `unzip`):
-```bash
-curl -fsSL -o /tmp/expenis-web.zip \
-  https://github.com/G0-G4/ExPenis/releases/latest/download/ExPenis-web.zip
-rm -rf flutter_web && mkdir -p flutter_web
-unzip -o /tmp/expenis-web.zip -d flutter_web/
-docker-compose build frontend && docker-compose up -d frontend
-```
+Same thing via just: `just flutter-fetch-deploy` (it calls `deploy.sh`).
+The script curls `ExPenis-web.zip`, unpacks into `flutter_web/`, and
+rebuilds/restarts the nginx frontend container.
+
 Local build remains available: `just flutter-build` / `just flutter-deploy`.
 Auto-update behavior (Android): on startup in release mode, `UpdateService`
 fetches `/releases/latest` from GitHub and compares semver with the installed
@@ -112,7 +116,8 @@ Key paths:
 - `frontend/android/app/src/main/kotlin/ru/g0g4/expenis/MainActivity.kt` —
   MethodChannel `expenis/installer` (`installApk` method)
 - `.github/workflows/release.yml` — release CI (APK + web zip)
-- `justfile` recipes `release-tag`, `flutter-fetch-deploy`
+- `deploy.sh` — server web deploy from GitHub Release latest zip
+- `justfile` recipes `release-tag`, `flutter-fetch-deploy` (the latter runs `deploy.sh`)
 ## 3) Test Commands (Use These)
 Pytest settings (from `pyproject.toml`):
 - `asyncio_mode = "auto"`
