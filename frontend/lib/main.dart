@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
+import "package:flutter/semantics.dart";
 import "package:expenis_mobile/screens/account_screen.dart";
 import "package:expenis_mobile/screens/category_screen.dart";
 import "package:expenis_mobile/screens/change_password_screen.dart";
@@ -19,7 +20,15 @@ import "package:expenis_mobile/utils/app_version.dart";
 import "package:expenis_mobile/utils/jwt.dart";
 import "package:expenis_mobile/widgets/update_dialog.dart";
 
+// Kept alive so debug semantics stay on. Disposing the last handle turns them off.
+SemanticsHandle? _debugSemanticsHandle;
+
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (kDebugMode) {
+    _debugSemanticsHandle = SemanticsBinding.instance.ensureSemantics();
+    assert(_debugSemanticsHandle != null);
+  }
   runApp(const MyApp());
 }
 

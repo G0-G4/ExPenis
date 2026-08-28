@@ -134,6 +134,10 @@ Pytest settings (from `pyproject.toml`):
 ### Filter tests by keyword
 - `uv run pytest -k session`
 - `uv run pytest -k "basic_crud and not category"`
+### UI e2e (Playwright, Python)
+Needs local debug stack: `just dev-backend` and `just dev-web-server`.
+- `just e2e` or `uv run --group e2e pytest e2e --browser-channel chrome -s --log-cli-level=INFO`
+Default `uv run pytest` stays backend-only (`testpaths = ["tests"]`).
 ### Useful pytest flags
 - Verbose: `uv run pytest -v`
 - Stop on first failure: `uv run pytest -x`

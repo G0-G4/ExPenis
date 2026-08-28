@@ -31,6 +31,32 @@ generate-agent-token *ARGS:
 logs:
     docker-compose logs -f
 
+# Локальный backend на :8000 (DEV: CORS *, reload).
+# Фронт в debug ходит сюда: http://localhost:8000
+dev-backend:
+    uv run -m src.expenis.server
+
+# Flutter web debug в Chrome. Нужен уже запущенный `just dev-backend`.
+dev-web:
+    cd frontend && flutter run -d chrome
+
+# Flutter web-server на :8080 без окна Chrome (Playwright / агент).
+# Нужен уже запущенный `just dev-backend`.
+dev-web-server:
+    cd frontend && flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8080
+
+# Подсказка: два терминала для локального web
+dev:
+    @echo "Терминал 1: just dev-backend"
+    @echo "Терминал 2: just dev-web"
+    @echo "  (или just dev-web-server — UI на http://127.0.0.1:8080, без Chrome)"
+
+# Сценарные UI-тесты Playwright (Python). Нужны уже запущенные:
+#   just dev-backend
+#   just dev-web-server
+e2e:
+    uv run --group e2e pytest e2e --browser-channel chrome -s --log-cli-level=INFO --log-cli-format="%(asctime)s %(message)s" --log-cli-date-format="%H:%M:%S"
+
 # Собрать Flutter web-релиз в flutter_web/ (локально, не трекается)
 flutter-build:
     cd frontend && flutter build web --release

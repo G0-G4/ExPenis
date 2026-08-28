@@ -2,6 +2,8 @@
 .env
 logs/
 flutter_web/
+backup-log.txt
+backup-log.txt.tmp
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/flutter,intellij,python
@@ -307,6 +309,9 @@ celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
+
+# Playwright e2e
+e2e/test-results/
 
 # Environments
 .env
