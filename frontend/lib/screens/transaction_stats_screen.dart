@@ -48,8 +48,10 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   Set<int> _selectedExpenseCategoryIds = {};
   Map<String, String> _availableIncomeTagsByNormalized = {};
   Map<String, String> _availableExpenseTagsByNormalized = {};
-  Set<String> _selectedIncomeTagKeys = {};
-  Set<String> _selectedExpenseTagKeys = {};
+  Set<String> _includedIncomeTagKeys = {};
+  Set<String> _excludedIncomeTagKeys = {};
+  Set<String> _includedExpenseTagKeys = {};
+  Set<String> _excludedExpenseTagKeys = {};
   bool _hasInitializedSelections = false;
   bool _hasInitializedIncomeTagSelections = false;
   bool _hasInitializedExpenseTagSelections = false;
@@ -310,20 +312,30 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         _availableExpenseTagsByNormalized = expenseTagsByNormalized;
 
         if (!_hasInitializedIncomeTagSelections) {
-          _selectedIncomeTagKeys = <String>{};
+          _includedIncomeTagKeys = <String>{};
+          _excludedIncomeTagKeys = <String>{};
           _hasInitializedIncomeTagSelections = true;
         } else {
-          _selectedIncomeTagKeys = _selectedIncomeTagKeys.intersection(
-            incomeTagsByNormalized.keys.toSet(),
+          final availableIncomeKeys = incomeTagsByNormalized.keys.toSet();
+          _includedIncomeTagKeys = _includedIncomeTagKeys.intersection(
+            availableIncomeKeys,
+          );
+          _excludedIncomeTagKeys = _excludedIncomeTagKeys.intersection(
+            availableIncomeKeys,
           );
         }
 
         if (!_hasInitializedExpenseTagSelections) {
-          _selectedExpenseTagKeys = <String>{};
+          _includedExpenseTagKeys = <String>{};
+          _excludedExpenseTagKeys = <String>{};
           _hasInitializedExpenseTagSelections = true;
         } else {
-          _selectedExpenseTagKeys = _selectedExpenseTagKeys.intersection(
-            expenseTagsByNormalized.keys.toSet(),
+          final availableExpenseKeys = expenseTagsByNormalized.keys.toSet();
+          _includedExpenseTagKeys = _includedExpenseTagKeys.intersection(
+            availableExpenseKeys,
+          );
+          _excludedExpenseTagKeys = _excludedExpenseTagKeys.intersection(
+            availableExpenseKeys,
           );
         }
 
@@ -376,8 +388,10 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     _hasInitializedExpenseTagSelections = false;
     _selectedIncomeCategoryIds = {};
     _selectedExpenseCategoryIds = {};
-    _selectedIncomeTagKeys = {};
-    _selectedExpenseTagKeys = {};
+    _includedIncomeTagKeys = {};
+    _excludedIncomeTagKeys = {};
+    _includedExpenseTagKeys = {};
+    _excludedExpenseTagKeys = {};
   }
 
   void _toggleIncomeCategory(int id) {
@@ -410,41 +424,57 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     });
   }
 
-  void _toggleIncomeTag(String tagKey) {
+  void _cycleIncomeTag(String tagKey) {
     setState(() {
-      _selectedIncomeTagKeys = toggledSetValue(_selectedIncomeTagKeys, tagKey);
-    });
-  }
-
-  void _toggleExpenseTag(String tagKey) {
-    setState(() {
-      _selectedExpenseTagKeys = toggledSetValue(
-        _selectedExpenseTagKeys,
+      final next = cycleTagFilter(
+        _includedIncomeTagKeys,
+        _excludedIncomeTagKeys,
         tagKey,
       );
+      _includedIncomeTagKeys = next.included;
+      _excludedIncomeTagKeys = next.excluded;
     });
   }
 
-  void _setIncomeTagSelection(Set<String> keys) {
+  void _cycleExpenseTag(String tagKey) {
     setState(() {
-      _selectedIncomeTagKeys = keys;
+      final next = cycleTagFilter(
+        _includedExpenseTagKeys,
+        _excludedExpenseTagKeys,
+        tagKey,
+      );
+      _includedExpenseTagKeys = next.included;
+      _excludedExpenseTagKeys = next.excluded;
     });
   }
 
-  void _setExpenseTagSelection(Set<String> keys) {
+  void _setIncomeTagSelection(
+    Set<String> includedKeys,
+    Set<String> excludedKeys,
+  ) {
     setState(() {
-      _selectedExpenseTagKeys = keys;
+      _includedIncomeTagKeys = includedKeys;
+      _excludedIncomeTagKeys = excludedKeys;
     });
   }
 
-  bool _matchesTagFilter(Transaction transaction, Set<String> selectedTagKeys) {
-    if (selectedTagKeys.isEmpty) return true;
-    for (final tag in transaction.tags) {
-      if (selectedTagKeys.contains(normalizeTagKey(tag))) {
-        return true;
-      }
-    }
-    return false;
+  void _setExpenseTagSelection(
+    Set<String> includedKeys,
+    Set<String> excludedKeys,
+  ) {
+    setState(() {
+      _includedExpenseTagKeys = includedKeys;
+      _excludedExpenseTagKeys = excludedKeys;
+    });
+  }
+
+  bool _transactionMatchesTagFilter(Transaction transaction) {
+    final isIncome = transaction.type == TransactionType.income;
+    return matchesTagFilter(
+      transaction.tags,
+      includedKeys: isIncome ? _includedIncomeTagKeys : _includedExpenseTagKeys,
+      excludedKeys: isIncome ? _excludedIncomeTagKeys : _excludedExpenseTagKeys,
+    );
   }
 
   Future<void> _openEdit(Transaction transaction) async {
@@ -557,12 +587,12 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     final income = _transactions
         .where((t) => t.type == TransactionType.income)
         .where((t) => _selectedIncomeCategoryIds.contains(t.categoryId))
-        .where((t) => _matchesTagFilter(t, _selectedIncomeTagKeys))
+        .where(_transactionMatchesTagFilter)
         .toList();
     final expense = _transactions
         .where((t) => t.type == TransactionType.expense)
         .where((t) => _selectedExpenseCategoryIds.contains(t.categoryId))
-        .where((t) => _matchesTagFilter(t, _selectedExpenseTagKeys))
+        .where(_transactionMatchesTagFilter)
         .toList();
 
     final incomeCategories = _incomeCategories;
@@ -609,8 +639,9 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     onToggleCategory: _toggleIncomeCategory,
                     onSetCategorySelection: _setIncomeCategorySelection,
                     tagLabelsByKey: _availableIncomeTagsByNormalized,
-                    selectedTagKeys: _selectedIncomeTagKeys,
-                    onToggleTag: _toggleIncomeTag,
+                    includedTagKeys: _includedIncomeTagKeys,
+                    excludedTagKeys: _excludedIncomeTagKeys,
+                    onCycleTag: _cycleIncomeTag,
                     onSetTagSelection: _setIncomeTagSelection,
                   ),
                   const SizedBox(height: AppTheme.space24),
@@ -642,8 +673,9 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     onToggleCategory: _toggleExpenseCategory,
                     onSetCategorySelection: _setExpenseCategorySelection,
                     tagLabelsByKey: _availableExpenseTagsByNormalized,
-                    selectedTagKeys: _selectedExpenseTagKeys,
-                    onToggleTag: _toggleExpenseTag,
+                    includedTagKeys: _includedExpenseTagKeys,
+                    excludedTagKeys: _excludedExpenseTagKeys,
+                    onCycleTag: _cycleExpenseTag,
                     onSetTagSelection: _setExpenseTagSelection,
                   ),
                   const SizedBox(height: AppTheme.space24),
@@ -690,8 +722,9 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
               onToggleCategory: _toggleIncomeCategory,
               onSetCategorySelection: _setIncomeCategorySelection,
               tagLabelsByKey: _availableIncomeTagsByNormalized,
-              selectedTagKeys: _selectedIncomeTagKeys,
-              onToggleTag: _toggleIncomeTag,
+              includedTagKeys: _includedIncomeTagKeys,
+              excludedTagKeys: _excludedIncomeTagKeys,
+              onCycleTag: _cycleIncomeTag,
               onSetTagSelection: _setIncomeTagSelection,
             ),
           ],
@@ -716,8 +749,9 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
               onToggleCategory: _toggleExpenseCategory,
               onSetCategorySelection: _setExpenseCategorySelection,
               tagLabelsByKey: _availableExpenseTagsByNormalized,
-              selectedTagKeys: _selectedExpenseTagKeys,
-              onToggleTag: _toggleExpenseTag,
+              includedTagKeys: _includedExpenseTagKeys,
+              excludedTagKeys: _excludedExpenseTagKeys,
+              onCycleTag: _cycleExpenseTag,
               onSetTagSelection: _setExpenseTagSelection,
             ),
           ],
@@ -738,10 +772,7 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         : _selectedExpenseCategoryIds;
     if (!selectedCategoryIds.contains(transaction.categoryId)) return false;
 
-    final selectedTagKeys = isIncome
-        ? _selectedIncomeTagKeys
-        : _selectedExpenseTagKeys;
-    return _matchesTagFilter(transaction, selectedTagKeys);
+    return _transactionMatchesTagFilter(transaction);
   }
 
   List<Transaction> get _filteredTransactions {

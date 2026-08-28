@@ -12,8 +12,9 @@ class AnalyticsFiltersCard extends StatelessWidget {
     required this.onToggleCategory,
     required this.onSetCategorySelection,
     required this.tagLabelsByKey,
-    required this.selectedTagKeys,
-    required this.onToggleTag,
+    required this.includedTagKeys,
+    required this.excludedTagKeys,
+    required this.onCycleTag,
     required this.onSetTagSelection,
     this.title = "Filters",
   });
@@ -27,9 +28,11 @@ class AnalyticsFiltersCard extends StatelessWidget {
   final ValueChanged<int> onToggleCategory;
   final ValueChanged<Set<int>> onSetCategorySelection;
   final Map<String, String> tagLabelsByKey;
-  final Set<String> selectedTagKeys;
-  final ValueChanged<String> onToggleTag;
-  final ValueChanged<Set<String>> onSetTagSelection;
+  final Set<String> includedTagKeys;
+  final Set<String> excludedTagKeys;
+  final ValueChanged<String> onCycleTag;
+  final void Function(Set<String> includedKeys, Set<String> excludedKeys)
+  onSetTagSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -44,12 +47,17 @@ class AnalyticsFiltersCard extends StatelessWidget {
     final selectedCategoryCount = categories
         .where((category) => selectedCategoryIds.contains(category.id))
         .length;
-    final selectedTagCount = sortedTagKeys
-        .where((tagKey) => selectedTagKeys.contains(tagKey))
+    final includedTagCount = sortedTagKeys
+        .where((tagKey) => includedTagKeys.contains(tagKey))
+        .length;
+    final excludedTagCount = sortedTagKeys
+        .where((tagKey) => excludedTagKeys.contains(tagKey))
         .length;
     final categorySummary =
         "$selectedCategoryCount/${categories.length} selected";
-    final tagSummary = "$selectedTagCount/${sortedTagKeys.length} selected";
+    final tagSummary = includedTagCount == 0 && excludedTagCount == 0
+        ? "0/${sortedTagKeys.length} selected"
+        : "$includedTagCount included · $excludedTagCount excluded";
 
     return Card(
       child: Column(
@@ -155,10 +163,11 @@ class AnalyticsFiltersCard extends StatelessWidget {
               _FilterActions(
                 onSelectAll: sortedTagKeys.isEmpty
                     ? null
-                    : () => onSetTagSelection(sortedTagKeys.toSet()),
-                onClearAll: selectedTagCount == 0
+                    : () =>
+                          onSetTagSelection(sortedTagKeys.toSet(), <String>{}),
+                onClearAll: includedTagCount == 0 && excludedTagCount == 0
                     ? null
-                    : () => onSetTagSelection(<String>{}),
+                    : () => onSetTagSelection(<String>{}, <String>{}),
               ),
               const SizedBox(height: AppTheme.space8),
               if (sortedTagKeys.isEmpty)
@@ -176,26 +185,38 @@ class AnalyticsFiltersCard extends StatelessWidget {
                   child: Wrap(
                     spacing: AppTheme.space8,
                     runSpacing: AppTheme.space8,
-                    children: sortedTagKeys
-                        .map(
-                          (tagKey) => FilterChip(
-                            label: Text(tagLabelsByKey[tagKey] ?? tagKey),
-                            selected: selectedTagKeys.contains(tagKey),
-                            onSelected: (_) => onToggleTag(tagKey),
-                            showCheckmark: false,
-                            selectedColor: accentColor.withAlpha(30),
-                            backgroundColor: colorScheme.surfaceContainerLow,
-                            checkmarkColor: accentColor,
-                            side: BorderSide(color: colorScheme.outlineVariant),
-                            labelStyle: textTheme.labelMedium?.copyWith(
-                              color: selectedTagKeys.contains(tagKey)
-                                  ? accentColor
-                                  : colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                        .toList(),
+                    children: sortedTagKeys.map((tagKey) {
+                      final isIncluded = includedTagKeys.contains(tagKey);
+                      final isExcluded = excludedTagKeys.contains(tagKey);
+                      return FilterChip(
+                        label: Text(tagLabelsByKey[tagKey] ?? tagKey),
+                        selected: isIncluded,
+                        onSelected: (_) => onCycleTag(tagKey),
+                        showCheckmark: false,
+                        selectedColor: accentColor.withAlpha(30),
+                        backgroundColor: colorScheme.surfaceContainerLow,
+                        checkmarkColor: accentColor,
+                        side: BorderSide(
+                          color: isExcluded
+                              ? colorScheme.outline
+                              : colorScheme.outlineVariant,
+                        ),
+                        labelStyle: textTheme.labelMedium?.copyWith(
+                          color: isIncluded
+                              ? accentColor
+                              : isExcluded
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          decoration: isExcluded
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                          decorationColor: isExcluded
+                              ? colorScheme.onSurfaceVariant
+                              : null,
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
             ],
