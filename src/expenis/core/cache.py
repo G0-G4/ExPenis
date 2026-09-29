@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
@@ -33,6 +34,8 @@ class Cache:
         return False
 
     def cached(self, ttl_seconds: int | None = None):
+        locks: dict[str, asyncio.Lock] = {}
+
         def decorator(func):
             @wraps(func)
             async def wrapper(*args, **kwargs):
@@ -40,16 +43,20 @@ class Cache:
                 key_parts.extend(str(arg) for arg in args)
                 key_parts.extend(f"{k}:{v}" for k, v in sorted(kwargs.items()))
                 key = ":".join(key_parts)
+                lock = locks.setdefault(key, asyncio.Lock())
 
-                self._reset_if_needed(key)
+                # One refresh at a time: parallel callers wait and reuse the result
+                # instead of each missing the cache and calling upstream.
+                async with lock:
+                    self._reset_if_needed(key)
 
-                if key in self._cache:
-                    value, ttl = self._cache[key]
-                    return value
+                    if key in self._cache:
+                        value, _ttl = self._cache[key]
+                        return value
 
-                result = await func(*args, **kwargs)
-                self._cache[key] = (result, Ttl(ttl_seconds))
-                return result
+                    result = await func(*args, **kwargs)
+                    self._cache[key] = (result, Ttl(ttl_seconds))
+                    return result
 
             return wrapper
 
