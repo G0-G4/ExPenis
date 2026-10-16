@@ -77,13 +77,18 @@ The git tag `vX.Y.Z` is **always** taken from `pubspec.yaml` (the build number a
 Before publishing a release — REQUIRED:
 1. Bump `version:` in `frontend/pubspec.yaml` (major/minor/patch + build number).
 2. (Optional) If the backend changed, bump `version = "..."` in `pyproject.toml`.
-3. Commit the version bump(s).
-4. Run `just release-tag` — parses the version from `pubspec.yaml`, creates git tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version. CI does **not** run on a plain `git push` to `main`; only the `v*` tag starts the release workflow.
+3. Write `release-notes/vX.Y.Z.md`: a short, user-readable summary (what's new,
+   fixes) in Russian. It becomes the GitHub Release body and is shown in the
+   app's update dialog as plain text, so use plain lines and `- ` bullets only
+   (no `#` headings or `**bold**`). Leave out server and deployment details.
+4. Commit the version bump(s) and the notes.
+5. Run `just release-tag` (refuses to tag if the notes are not in `HEAD`) — parses the version from `pubspec.yaml`, creates git tag `vX.Y.Z`, and pushes it. Do not tag manually with a mismatched version. CI does **not** run on a plain `git push` to `main`; only the `v*` tag starts the release workflow.
 
 The tag triggers `.github/workflows/release.yml`: builds a release APK
 (`ExPenis-X.Y.Z.apk`) and Flutter web zips (`ExPenis-X.Y.Z-web.zip` plus
 stable `ExPenis-web.zip` for easy latest download), then creates a GitHub
-Release with those assets and auto-generated notes.
+Release with those assets and `release-notes/vX.Y.Z.md` as the body. The
+workflow fails early if that file is missing.
 
 **Note**: The release CI and auto-update logic only care about the frontend/pubspec version. The OpenAPI `info.version` will reflect whatever is currently in `pyproject.toml` when you last ran `just openapi`.
 

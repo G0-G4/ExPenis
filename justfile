@@ -78,6 +78,12 @@ release-tag:
     #!/usr/bin/env bash
     set -euo pipefail
     version=$(grep '^version:' frontend/pubspec.yaml | awk '{print $2}' | cut -d '+' -f1)
+    notes="release-notes/v${version}.md"
+    # CI reads the notes from the tagged commit, so they must be committed.
+    if ! git cat-file -e "HEAD:$notes" 2>/dev/null; then
+        echo "Missing $notes in HEAD: write and commit the release notes first" >&2
+        exit 1
+    fi
     echo "Creating tag v${version}"
     git tag "v${version}"
     git push origin "v${version}"
