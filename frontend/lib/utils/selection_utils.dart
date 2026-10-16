@@ -26,9 +26,20 @@ Set<T> toggledSetValue<T>(Set<T> source, T value) {
   return (included: nextIncluded, excluded: nextExcluded);
 }
 
-Set<T> intersectOrAll<T>(Set<T> selected, Set<T> available) {
-  final next = selected.intersection(available);
-  return next.isEmpty ? <T>{...available} : next;
+/// Selection shown for a period. A `null` [explicit] set means "all": every
+/// available value is selected, including ones that appear later.
+Set<T> effectiveSelection<T>(Set<T>? explicit, Set<T> available) {
+  if (explicit == null) return <T>{...available};
+  return explicit.intersection(available);
+}
+
+/// Toggles [value]; toggling from "all" fixes the currently available set.
+Set<T> toggledExplicitSelection<T>(
+  Set<T>? explicit,
+  Set<T> available,
+  T value,
+) {
+  return toggledSetValue(explicit ?? available, value);
 }
 
 Set<T> intersectOrKeepEmpty<T>(Set<T> selected, Set<T> available) {

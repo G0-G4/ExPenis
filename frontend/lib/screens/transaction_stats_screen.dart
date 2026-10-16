@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'package:expenis_mobile/models/category.dart';
+import 'package:expenis_mobile/models/tag_period.dart';
 import 'package:expenis_mobile/models/transaction.dart';
 import 'package:expenis_mobile/screens/edit_transaction_screen.dart';
 import 'package:expenis_mobile/service/category_service.dart';
@@ -46,17 +47,17 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
 
   Set<int> _availableIncomeCategoryIds = {};
   Set<int> _availableExpenseCategoryIds = {};
-  Set<int> _selectedIncomeCategoryIds = {};
-  Set<int> _selectedExpenseCategoryIds = {};
+  // null = all categories, including ones that appear in later periods.
+  Set<int>? _explicitIncomeCategoryIds;
+  Set<int>? _explicitExpenseCategoryIds;
+  List<TagPeriod> _tagPeriods = [];
+  bool _hasLoadedTagPeriods = false;
   Map<String, String> _availableIncomeTagsByNormalized = {};
   Map<String, String> _availableExpenseTagsByNormalized = {};
   Set<String> _includedIncomeTagKeys = {};
   Set<String> _excludedIncomeTagKeys = {};
   Set<String> _includedExpenseTagKeys = {};
   Set<String> _excludedExpenseTagKeys = {};
-  bool _hasInitializedSelections = false;
-  bool _hasInitializedIncomeTagSelections = false;
-  bool _hasInitializedExpenseTagSelections = false;
   bool _isFirstLoad = true;
   bool _isLoading = false;
   bool _groupByMonth = false;
@@ -64,6 +65,16 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   String? _loadError;
 
   bool get _isIncomeSelected => _selectedType == TransactionType.income;
+
+  Set<int> get _selectedIncomeCategoryIds => effectiveSelection(
+    _explicitIncomeCategoryIds,
+    _availableIncomeCategoryIds,
+  );
+
+  Set<int> get _selectedExpenseCategoryIds => effectiveSelection(
+    _explicitExpenseCategoryIds,
+    _availableExpenseCategoryIds,
+  );
 
   bool _isCurrentMonth(DateTime date) {
     final now = DateTime.now();
@@ -129,7 +140,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         _endDate = DateTime(monthEnd.year, monthEnd.month, monthEnd.day);
       }
     });
-    _resetFiltersForReload();
     _loadData();
   }
 
@@ -142,7 +152,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       _startDate = monthStart;
       _endDate = DateTime(monthEnd.year, monthEnd.month, monthEnd.day);
     });
-    _resetFiltersForReload();
     _loadData();
   }
 
@@ -191,7 +200,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       }
       _rebuildMonths();
     });
-    _resetFiltersForReload();
     _loadData();
   }
 
@@ -209,7 +217,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       }
       _rebuildMonths();
     });
-    _resetFiltersForReload();
     _loadData();
   }
 
@@ -252,11 +259,15 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
           dateTo: _groupByMonth ? _groupedRangeEndDate() : _endDate,
         ),
         _categoryService.fetchCategories(),
+        _hasLoadedTagPeriods
+            ? Future.value(_tagPeriods)
+            : _transactionService.fetchTagPeriods(),
       ]);
 
       if (!mounted) return;
       final transactions = results[0] as List<Transaction>;
       final categories = results[1] as List<Category>;
+      final tagPeriods = results[2] as List<TagPeriod>;
       final incomeTagsByNormalized = <String, String>{};
       final expenseTagsByNormalized = <String, String>{};
 
@@ -298,52 +309,10 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         _categories = categories;
         _availableIncomeCategoryIds = incomeIds;
         _availableExpenseCategoryIds = expenseIds;
-        if (!_hasInitializedSelections) {
-          _selectedIncomeCategoryIds = incomeIds;
-          _selectedExpenseCategoryIds = expenseIds;
-          _hasInitializedSelections = true;
-        } else {
-          _selectedIncomeCategoryIds = intersectOrAll(
-            _selectedIncomeCategoryIds,
-            incomeIds,
-          );
-          _selectedExpenseCategoryIds = intersectOrAll(
-            _selectedExpenseCategoryIds,
-            expenseIds,
-          );
-        }
-
         _availableIncomeTagsByNormalized = incomeTagsByNormalized;
         _availableExpenseTagsByNormalized = expenseTagsByNormalized;
-
-        if (!_hasInitializedIncomeTagSelections) {
-          _includedIncomeTagKeys = <String>{};
-          _excludedIncomeTagKeys = <String>{};
-          _hasInitializedIncomeTagSelections = true;
-        } else {
-          final availableIncomeKeys = incomeTagsByNormalized.keys.toSet();
-          _includedIncomeTagKeys = _includedIncomeTagKeys.intersection(
-            availableIncomeKeys,
-          );
-          _excludedIncomeTagKeys = _excludedIncomeTagKeys.intersection(
-            availableIncomeKeys,
-          );
-        }
-
-        if (!_hasInitializedExpenseTagSelections) {
-          _includedExpenseTagKeys = <String>{};
-          _excludedExpenseTagKeys = <String>{};
-          _hasInitializedExpenseTagSelections = true;
-        } else {
-          final availableExpenseKeys = expenseTagsByNormalized.keys.toSet();
-          _includedExpenseTagKeys = _includedExpenseTagKeys.intersection(
-            availableExpenseKeys,
-          );
-          _excludedExpenseTagKeys = _excludedExpenseTagKeys.intersection(
-            availableExpenseKeys,
-          );
-        }
-
+        _tagPeriods = tagPeriods;
+        _hasLoadedTagPeriods = true;
         _isLoading = false;
         _isFirstLoad = false;
       });
@@ -368,7 +337,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     setState(() {
       _startDate = picked;
     });
-    _resetFiltersForReload();
     _loadData();
   }
 
@@ -383,26 +351,14 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     setState(() {
       _endDate = picked;
     });
-    _resetFiltersForReload();
     _loadData();
-  }
-
-  void _resetFiltersForReload() {
-    _hasInitializedSelections = false;
-    _hasInitializedIncomeTagSelections = false;
-    _hasInitializedExpenseTagSelections = false;
-    _selectedIncomeCategoryIds = {};
-    _selectedExpenseCategoryIds = {};
-    _includedIncomeTagKeys = {};
-    _excludedIncomeTagKeys = {};
-    _includedExpenseTagKeys = {};
-    _excludedExpenseTagKeys = {};
   }
 
   void _toggleIncomeCategory(int id) {
     setState(() {
-      _selectedIncomeCategoryIds = toggledSetValue(
-        _selectedIncomeCategoryIds,
+      _explicitIncomeCategoryIds = toggledExplicitSelection(
+        _explicitIncomeCategoryIds,
+        _availableIncomeCategoryIds,
         id,
       );
     });
@@ -410,22 +366,23 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
 
   void _toggleExpenseCategory(int id) {
     setState(() {
-      _selectedExpenseCategoryIds = toggledSetValue(
-        _selectedExpenseCategoryIds,
+      _explicitExpenseCategoryIds = toggledExplicitSelection(
+        _explicitExpenseCategoryIds,
+        _availableExpenseCategoryIds,
         id,
       );
     });
   }
 
-  void _setIncomeCategorySelection(Set<int> ids) {
+  void _setIncomeCategorySelection(Set<int>? explicitIds) {
     setState(() {
-      _selectedIncomeCategoryIds = ids;
+      _explicitIncomeCategoryIds = explicitIds;
     });
   }
 
-  void _setExpenseCategorySelection(Set<int> ids) {
+  void _setExpenseCategorySelection(Set<int>? explicitIds) {
     setState(() {
-      _selectedExpenseCategoryIds = ids;
+      _explicitExpenseCategoryIds = explicitIds;
     });
   }
 
@@ -473,6 +430,87 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     });
   }
 
+  List<TagPeriod> _tagPeriodsOf(TransactionType type) {
+    return _tagPeriods.where((period) => period.type == type).toList();
+  }
+
+  /// Tags used on [type] at some point but absent from the loaded period.
+  Map<String, String> _outOfPeriodTags(
+    TransactionType type,
+    Map<String, String> inPeriodTags,
+  ) {
+    final result = <String, String>{};
+    for (final period in _tagPeriodsOf(type)) {
+      final key = normalizeTagKey(period.name);
+      if (key.isEmpty || inPeriodTags.containsKey(key)) continue;
+      result.putIfAbsent(key, () => period.name.trim());
+    }
+    return result;
+  }
+
+  Set<String> get _selectedIncludedTagKeys =>
+      _isIncomeSelected ? _includedIncomeTagKeys : _includedExpenseTagKeys;
+
+  /// Combined period of the included tags when it does not fit the range.
+  ({DateTime firstMonth, DateTime lastMonth})? get _tagPeriodOutsideRange {
+    final period = combinedTagPeriod(
+      _selectedIncludedTagKeys,
+      _tagPeriodsOf(_selectedType),
+    );
+    if (period == null) return null;
+    final fits =
+        !period.firstMonth.isBefore(_startMonth) &&
+        !period.lastMonth.isAfter(_endMonth);
+    return fits ? null : period;
+  }
+
+  void _showTagPeriod(DateTime firstMonth, DateTime lastMonth) {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month, 1);
+    final endMonth = lastMonth.isAfter(currentMonth) ? currentMonth : lastMonth;
+
+    if (!firstMonth.isBefore(endMonth)) {
+      setState(() => _groupByMonth = false);
+      _applyMonthRange(firstMonth);
+      return;
+    }
+
+    setState(() {
+      _groupByMonth = true;
+      _startDate = firstMonth;
+      final endDate = _isCurrentMonth(endMonth)
+          ? now
+          : _lastDayOfMonth(endMonth);
+      _endDate = DateTime(endDate.year, endDate.month, endDate.day);
+      _rebuildMonths();
+    });
+    _loadData();
+  }
+
+  Widget? _buildTagPeriodHint() {
+    final period = _tagPeriodOutsideRange;
+    if (period == null) return null;
+
+    final inPeriodLabels = _isIncomeSelected
+        ? _availableIncomeTagsByNormalized
+        : _availableExpenseTagsByNormalized;
+    final outOfPeriodLabels = _outOfPeriodTags(_selectedType, inPeriodLabels);
+    final tagKeys = _selectedIncludedTagKeys.toList()..sort();
+    final tagNames = tagKeys
+        .map((key) => inPeriodLabels[key] ?? outOfPeriodLabels[key] ?? key)
+        .join(", ");
+    final firstLabel = formatMonthYearLabel(period.firstMonth);
+    final lastLabel = formatMonthYearLabel(period.lastMonth);
+    final periodLabel = firstLabel == lastLabel
+        ? firstLabel
+        : "$firstLabel – $lastLabel";
+
+    return _TagPeriodHint(
+      message: "$tagNames: transactions in $periodLabel",
+      onShowPeriod: () => _showTagPeriod(period.firstMonth, period.lastMonth),
+    );
+  }
+
   bool _transactionMatchesTagFilter(Transaction transaction) {
     final isIncome = transaction.type == TransactionType.income;
     return matchesTagFilter(
@@ -492,7 +530,8 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     );
     if (!mounted) return;
     if (result == true) {
-      _resetFiltersForReload();
+      // The edit may have changed tags or dates.
+      _hasLoadedTagPeriods = false;
       _loadData();
     }
   }
@@ -658,12 +697,21 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       onToggleCategory: isIncome
           ? _toggleIncomeCategory
           : _toggleExpenseCategory,
-      onSetCategorySelection: isIncome
-          ? _setIncomeCategorySelection
-          : _setExpenseCategorySelection,
+      onSelectAllCategories: () => isIncome
+          ? _setIncomeCategorySelection(null)
+          : _setExpenseCategorySelection(null),
+      onClearAllCategories: () => isIncome
+          ? _setIncomeCategorySelection(<int>{})
+          : _setExpenseCategorySelection(<int>{}),
       tagLabelsByKey: isIncome
           ? _availableIncomeTagsByNormalized
           : _availableExpenseTagsByNormalized,
+      outOfPeriodTagLabelsByKey: _outOfPeriodTags(
+        _selectedType,
+        isIncome
+            ? _availableIncomeTagsByNormalized
+            : _availableExpenseTagsByNormalized,
+      ),
       includedTagKeys: isIncome
           ? _includedIncomeTagKeys
           : _includedExpenseTagKeys,
@@ -689,13 +737,14 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
           : Icons.arrow_upward_rounded,
       chartData: _buildCategoryTotals(transactions),
       emptyLabel: isIncome
-          ? "No income in selected categories"
-          : "No expenses in selected categories",
+          ? "No income matches the selected filters"
+          : "No expenses match the selected filters",
     );
   }
 
   Widget _buildDetailedContent() {
-    if (_transactions.isEmpty) {
+    // With known tags the filters stay reachable, so an earlier tag can be picked.
+    if (_transactions.isEmpty && _tagPeriods.isEmpty) {
       return const AppEmptyState(
         icon: Icons.pie_chart_outline_rounded,
         title: "No transactions",
@@ -733,6 +782,8 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       ],
       secondary: [
         _buildFiltersCard(),
+        // Below the card so its appearance doesn't shift (and collapse) the card.
+        ?_buildTagPeriodHint(),
         _TransactionsSection(
           title: isIncome ? "Income transactions" : "Expense transactions",
           color: isIncome ? AppTheme.incomeColor : AppTheme.expenseColor,
@@ -770,6 +821,8 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
           filtered.where((t) => t.type == _selectedType).toList(),
         ),
         _buildFiltersCard(),
+        // Below the card so its appearance doesn't shift (and collapse) the card.
+        ?_buildTagPeriodHint(),
       ],
     );
   }
@@ -1844,6 +1897,51 @@ class _SummaryItem extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TagPeriodHint extends StatelessWidget {
+  const _TagPeriodHint({required this.message, required this.onShowPeriod});
+
+  final String message;
+  final VoidCallback onShowPeriod;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      color: colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.space16,
+          AppTheme.space8,
+          AppTheme.space8,
+          AppTheme.space8,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.date_range_rounded,
+              color: colorScheme.onSecondaryContainer,
+            ),
+            const SizedBox(width: AppTheme.space8),
+            Expanded(
+              child: Text(
+                message,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onShowPeriod,
+              child: const Text("Show period"),
             ),
           ],
         ),

@@ -38,4 +38,35 @@ void main() {
       expect(excluded, isEmpty);
     });
   });
+
+  group("category selection", () {
+    test("all mode picks up categories new to a period", () {
+      expect(effectiveSelection<int>(null, {1, 2}), {1, 2});
+      expect(effectiveSelection<int>(null, {1, 2, 3}), {1, 2, 3});
+    });
+
+    test("explicit set does not pick up new categories", () {
+      final explicit = {1, 2, 3};
+      expect(effectiveSelection(explicit, {1, 2, 3, 4}), {1, 2, 3});
+    });
+
+    test("deselecting from all mode fixes the remaining set", () {
+      final explicit = toggledExplicitSelection<int>(null, {1, 2, 3}, 2);
+      expect(explicit, {1, 3});
+      expect(effectiveSelection(explicit, {1, 2, 3, 4}), {1, 3});
+    });
+
+    test("select all restores all mode and clear all empties", () {
+      const Set<int>? selectAll = null;
+      expect(effectiveSelection(selectAll, {1, 5}), {1, 5});
+      expect(effectiveSelection(<int>{}, {1, 5}), isEmpty);
+    });
+
+    test("explicit set survives a period without its categories", () {
+      final explicit = {7};
+      expect(effectiveSelection(explicit, {1, 2}), isEmpty);
+      expect(explicit, {7});
+      expect(effectiveSelection(explicit, {7, 8}), {7});
+    });
+  });
 }

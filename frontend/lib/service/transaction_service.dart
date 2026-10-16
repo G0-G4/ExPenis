@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:expenis_mobile/models/tag_period.dart';
 import 'package:expenis_mobile/models/transaction.dart';
 import 'package:expenis_mobile/service/base_service.dart';
 
@@ -16,6 +17,22 @@ class TransactionService extends BaseService {
       );
     } on DioException catch (e) {
       throw Exception('Failed to load tags: ${e.message}');
+    }
+  }
+
+  Future<List<TagPeriod>> fetchTagPeriods() async {
+    try {
+      final response = await dio.get('$baseUrl/api/tags');
+      if (response.statusCode == 200) {
+        return (response.data['tag_periods'] as List<dynamic>? ?? const [])
+            .map((json) => TagPeriod.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      throw Exception(
+        'Failed to load tag periods with status: ${response.statusCode}',
+      );
+    } on DioException catch (e) {
+      throw Exception('Failed to load tag periods: ${e.message}');
     }
   }
 

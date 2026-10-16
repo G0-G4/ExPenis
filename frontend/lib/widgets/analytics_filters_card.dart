@@ -10,8 +10,10 @@ class AnalyticsFiltersCard extends StatelessWidget {
     required this.categories,
     required this.selectedCategoryIds,
     required this.onToggleCategory,
-    required this.onSetCategorySelection,
+    required this.onSelectAllCategories,
+    required this.onClearAllCategories,
     required this.tagLabelsByKey,
+    this.outOfPeriodTagLabelsByKey = const {},
     required this.includedTagKeys,
     required this.excludedTagKeys,
     required this.onCycleTag,
@@ -26,8 +28,14 @@ class AnalyticsFiltersCard extends StatelessWidget {
   final List<Category> categories;
   final Set<int> selectedCategoryIds;
   final ValueChanged<int> onToggleCategory;
-  final ValueChanged<Set<int>> onSetCategorySelection;
+  final VoidCallback onSelectAllCategories;
+  final VoidCallback onClearAllCategories;
+
+  /// Tags present in the loaded period.
   final Map<String, String> tagLabelsByKey;
+
+  /// Tags used before but absent from the loaded period; shown dimmed.
+  final Map<String, String> outOfPeriodTagLabelsByKey;
   final Set<String> includedTagKeys;
   final Set<String> excludedTagKeys;
   final ValueChanged<String> onCycleTag;
@@ -38,25 +46,19 @@ class AnalyticsFiltersCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final sortedTagKeys = tagLabelsByKey.keys.toList()
-      ..sort(
-        (a, b) => tagLabelsByKey[a]!.toLowerCase().compareTo(
-          tagLabelsByKey[b]!.toLowerCase(),
-        ),
-      );
+    final sortedTagKeys = _sortedKeys(tagLabelsByKey);
+    final sortedOutOfPeriodTagKeys = _sortedKeys(outOfPeriodTagLabelsByKey);
+    final totalTagCount =
+        sortedTagKeys.length + sortedOutOfPeriodTagKeys.length;
     final selectedCategoryCount = categories
         .where((category) => selectedCategoryIds.contains(category.id))
         .length;
-    final includedTagCount = sortedTagKeys
-        .where((tagKey) => includedTagKeys.contains(tagKey))
-        .length;
-    final excludedTagCount = sortedTagKeys
-        .where((tagKey) => excludedTagKeys.contains(tagKey))
-        .length;
+    final includedTagCount = includedTagKeys.length;
+    final excludedTagCount = excludedTagKeys.length;
     final categorySummary =
         "$selectedCategoryCount/${categories.length} selected";
     final tagSummary = includedTagCount == 0 && excludedTagCount == 0
-        ? "0/${sortedTagKeys.length} selected"
+        ? "0/$totalTagCount selected"
         : "$includedTagCount included · $excludedTagCount excluded";
 
     return Card(
@@ -97,14 +99,10 @@ class AnalyticsFiltersCard extends StatelessWidget {
             ),
             children: [
               _FilterActions(
-                onSelectAll: categories.isEmpty
-                    ? null
-                    : () => onSetCategorySelection(
-                        categories.map((category) => category.id).toSet(),
-                      ),
+                onSelectAll: categories.isEmpty ? null : onSelectAllCategories,
                 onClearAll: selectedCategoryCount == 0
                     ? null
-                    : () => onSetCategorySelection(<int>{}),
+                    : onClearAllCategories,
               ),
               const SizedBox(height: AppTheme.space8),
               if (categories.isEmpty)
@@ -170,11 +168,11 @@ class AnalyticsFiltersCard extends StatelessWidget {
                     : () => onSetTagSelection(<String>{}, <String>{}),
               ),
               const SizedBox(height: AppTheme.space8),
-              if (sortedTagKeys.isEmpty)
+              if (totalTagCount == 0)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "No tags in selected range",
+                    "No tags",
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -182,46 +180,30 @@ class AnalyticsFiltersCard extends StatelessWidget {
                 )
               else
                 _buildScrollableChipArea(
-                  child: Wrap(
-                    spacing: AppTheme.space8,
-                    runSpacing: AppTheme.space8,
-                    children: sortedTagKeys.map((tagKey) {
-                      final isIncluded = includedTagKeys.contains(tagKey);
-                      final isExcluded = excludedTagKeys.contains(tagKey);
-                      return FilterChip(
-                        label: Text(tagLabelsByKey[tagKey] ?? tagKey),
-                        selected: isIncluded,
-                        onSelected: (_) => onCycleTag(tagKey),
-                        showCheckmark: false,
-                        selectedColor: accentColor.withAlpha(30),
-                        backgroundColor: colorScheme.surfaceContainerLow,
-                        checkmarkColor: accentColor,
-                        side: BorderSide(
-                          color: isExcluded
-                              ? colorScheme.outline
-                              : colorScheme.outlineVariant,
-                        ),
-                        labelStyle: textTheme.labelMedium?.copyWith(
-                          color: isIncluded
-                              ? accentColor
-                              : isExcluded
-                              ? colorScheme.onSurfaceVariant
-                              : colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                          decoration: isExcluded
-                              ? TextDecoration.lineThrough
-                              : TextDecoration.none,
-                          decorationColor: isExcluded
-                              ? colorScheme.onSurfaceVariant
-                              : null,
-                        ),
-                      );
-                    }).toList(),
+                  child: _TagChips(
+                    accentColor: accentColor,
+                    inPeriodKeys: sortedTagKeys,
+                    outOfPeriodKeys: sortedOutOfPeriodTagKeys,
+                    labelFor: (tagKey) =>
+                        tagLabelsByKey[tagKey] ??
+                        outOfPeriodTagLabelsByKey[tagKey] ??
+                        tagKey,
+                    includedTagKeys: includedTagKeys,
+                    excludedTagKeys: excludedTagKeys,
+                    onCycleTag: onCycleTag,
                   ),
                 ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  static List<String> _sortedKeys(Map<String, String> labelsByKey) {
+    return labelsByKey.keys.toList()..sort(
+      (a, b) => labelsByKey[a]!.toLowerCase().compareTo(
+        labelsByKey[b]!.toLowerCase(),
       ),
     );
   }
@@ -240,6 +222,116 @@ class AnalyticsFiltersCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _TagChips extends StatefulWidget {
+  const _TagChips({
+    required this.accentColor,
+    required this.inPeriodKeys,
+    required this.outOfPeriodKeys,
+    required this.labelFor,
+    required this.includedTagKeys,
+    required this.excludedTagKeys,
+    required this.onCycleTag,
+  });
+
+  final Color accentColor;
+  final List<String> inPeriodKeys;
+  final List<String> outOfPeriodKeys;
+  final String Function(String tagKey) labelFor;
+  final Set<String> includedTagKeys;
+  final Set<String> excludedTagKeys;
+  final ValueChanged<String> onCycleTag;
+
+  @override
+  State<_TagChips> createState() => _TagChipsState();
+}
+
+class _TagChipsState extends State<_TagChips> {
+  bool _showOutOfPeriod = false;
+
+  bool _isActive(String tagKey) =>
+      widget.includedTagKeys.contains(tagKey) ||
+      widget.excludedTagKeys.contains(tagKey);
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    // Selected out-of-period tags stay visible while the rest is collapsed.
+    final pinnedKeys = widget.outOfPeriodKeys.where(_isActive).toList();
+    final hiddenKeys = widget.outOfPeriodKeys
+        .where((tagKey) => !_isActive(tagKey))
+        .toList();
+    final shownOutOfPeriodKeys = _showOutOfPeriod
+        ? widget.outOfPeriodKeys
+        : pinnedKeys;
+
+    return Wrap(
+      spacing: AppTheme.space8,
+      runSpacing: AppTheme.space8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final tagKey in widget.inPeriodKeys)
+          _buildChip(context, tagKey, dimmed: false),
+        for (final tagKey in shownOutOfPeriodKeys)
+          _buildChip(context, tagKey, dimmed: true),
+        if (hiddenKeys.isNotEmpty)
+          TextButton(
+            onPressed: () =>
+                setState(() => _showOutOfPeriod = !_showOutOfPeriod),
+            child: Text(
+              _showOutOfPeriod
+                  ? "Hide other periods"
+                  : "${hiddenKeys.length} more from other periods",
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildChip(
+    BuildContext context,
+    String tagKey, {
+    required bool dimmed,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final accentColor = widget.accentColor;
+    final isIncluded = widget.includedTagKeys.contains(tagKey);
+    final isExcluded = widget.excludedTagKeys.contains(tagKey);
+    final chip = FilterChip(
+      label: Text(widget.labelFor(tagKey)),
+      selected: isIncluded,
+      onSelected: (_) => widget.onCycleTag(tagKey),
+      showCheckmark: false,
+      selectedColor: accentColor.withAlpha(30),
+      backgroundColor: dimmed
+          ? colorScheme.surface
+          : colorScheme.surfaceContainerLow,
+      checkmarkColor: accentColor,
+      side: BorderSide(
+        color: isExcluded ? colorScheme.outline : colorScheme.outlineVariant,
+      ),
+      labelStyle: textTheme.labelMedium?.copyWith(
+        color: isIncluded
+            ? accentColor
+            : isExcluded
+            ? colorScheme.onSurfaceVariant
+            : colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+        decoration: isExcluded
+            ? TextDecoration.lineThrough
+            : TextDecoration.none,
+        decorationColor: isExcluded ? colorScheme.onSurfaceVariant : null,
+      ),
+    );
+    if (!dimmed) return chip;
+    return Opacity(opacity: 0.6, child: chip);
   }
 }
 
