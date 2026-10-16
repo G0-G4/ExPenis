@@ -19,7 +19,7 @@ from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, Account
     CurrencyCodes, DeleteAccountResponse, \
     LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, \
     RegisterRequest, Transaction, \
-    TransactionCreateRequest, TransactionsResponse, UserTagsResponse
+    TagPeriodDto, TransactionCreateRequest, TransactionsResponse, UserTagsResponse
 from ..config import COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
 from ..core.service import authenticate_user, change_password, clear_old_sessions, create_account, create_category, \
@@ -29,7 +29,8 @@ from ..core.service import authenticate_user, change_password, clear_old_session
     get_category_by_id, \
     get_transaction_by_id_and_user_id, get_transaction_tags_by_transaction_ids, get_transactions_for_period, \
     get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, get_user_by_id, register_user, \
-    save_transaction, set_transaction_tags, update_account, update_category, update_transaction, get_user_tags
+    save_transaction, set_transaction_tags, update_account, update_category, update_transaction, get_user_tags, \
+    get_user_tag_periods
 from ..core.service.auth_service import InvalidPasswordError, UsernameTakenError
 from ..core.errors import NotFoundException
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
@@ -294,7 +295,20 @@ async def update_transaction_endpoint(
 async def get_user_tags_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> UserTagsResponse:
-    return UserTagsResponse(tags=await get_user_tags(int(payload.sub)))
+    user_id = int(payload.sub)
+    tag_periods = await get_user_tag_periods(user_id)
+    return UserTagsResponse(
+        tags=await get_user_tags(user_id),
+        tag_periods=[
+            TagPeriodDto(
+                name=period.name,
+                type=period.type,
+                first_at=period.first_at,
+                last_at=period.last_at,
+            )
+            for period in tag_periods
+        ],
+    )
 
 @app.delete(
     "/api/transactions/{transaction_id}",

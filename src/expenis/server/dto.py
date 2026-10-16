@@ -34,8 +34,16 @@ class TransactionsResponse(BaseModel):
     total_amount_rubles: float
 
 
+class TagPeriodDto(BaseModel):
+    name: str
+    type: Literal["income", "expense"]
+    first_at: datetime
+    last_at: datetime
+
+
 class UserTagsResponse(BaseModel):
     tags: list[str]
+    tag_periods: list[TagPeriodDto] = []
 
 
 class AccountDto(BaseModel):

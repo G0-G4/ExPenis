@@ -9,6 +9,7 @@ from src.expenis.core.service.transaction_service import (delete_transaction,
                                                           delete_transaction_by_id, get_transaction_by_id,
                                                           get_transaction_tags_by_transaction_ids,
                                                           get_transactions_for_period,
+                                                          get_user_tag_periods,
                                                           get_user_tags,
                                                           set_transaction_tags,
                                                           save_transaction)
@@ -190,3 +191,70 @@ async def test_get_user_tags_is_scoped_by_user(test_account, test_category):
 
         assert await get_user_tags(1) == ["food"]
         assert await get_user_tags(2) == ["food", "transport"]
+
+
+async def _save_tagged_transaction(account, category, created_at, tags, user_id=1):
+    transaction = Transaction(
+        user_id=user_id,
+        account=account,
+        category=category,
+        amount=10.0,
+        description="tx",
+        created_at=created_at,
+    )
+    await save_transaction(transaction)
+    await set_transaction_tags(user_id, transaction.id, tags)
+    return transaction
+
+
+@pytest.mark.asyncio
+async def test_get_user_tag_periods_reports_first_and_last_per_type(test_account):
+    async with db:
+        expense = Category(user_id=1, name="Travel", type="expense")
+        income = Category(user_id=1, name="Gifts", type="income")
+        await db.run(expense.save)
+        await db.run(income.save)
+
+        march = datetime(2024, 3, 5, 12, 0, tzinfo=UTC)
+        april = datetime(2024, 4, 10, 12, 0, tzinfo=UTC)
+        june = datetime(2024, 6, 20, 12, 0, tzinfo=UTC)
+        await _save_tagged_transaction(test_account, expense, march, ["trip", "gift"])
+        await _save_tagged_transaction(test_account, expense, june, ["trip"])
+        await _save_tagged_transaction(test_account, expense, april, ["gift"])
+        await _save_tagged_transaction(test_account, income, april, ["gift"])
+        unused = await _save_tagged_transaction(test_account, expense, march, ["old"])
+        await set_transaction_tags(1, unused.id, [])
+
+        periods = await get_user_tag_periods(1)
+
+        by_key = {(p.name, p.type): p for p in periods}
+        assert set(by_key) == {("gift", "expense"), ("gift", "income"), ("trip", "expense")}
+        assert by_key[("trip", "expense")].first_at == march
+        assert by_key[("trip", "expense")].last_at == june
+        assert by_key[("gift", "expense")].first_at == march
+        assert by_key[("gift", "expense")].last_at == april
+        assert by_key[("gift", "income")].first_at == april
+        assert by_key[("gift", "income")].last_at == april
+        assert "old" in await get_user_tags(1)
+
+
+@pytest.mark.asyncio
+async def test_get_user_tag_periods_is_scoped_by_user(test_account):
+    async with db:
+        category_user_1 = Category(user_id=1, name="Travel", type="expense")
+        account_user_2 = Account(user_id=2, name="User2")
+        category_user_2 = Category(user_id=2, name="Travel", type="expense")
+        await db.run(category_user_1.save)
+        await db.run(account_user_2.save)
+        await db.run(category_user_2.save)
+
+        mine = datetime(2024, 3, 5, 12, 0, tzinfo=UTC)
+        theirs = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
+        await _save_tagged_transaction(test_account, category_user_1, mine, ["trip"])
+        await _save_tagged_transaction(account_user_2, category_user_2, theirs, ["trip"], user_id=2)
+
+        periods = await get_user_tag_periods(1)
+
+        assert [(p.name, p.type, p.first_at, p.last_at) for p in periods] == [
+            ("trip", "expense", mine, mine),
+        ]

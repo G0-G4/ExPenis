@@ -1,5 +1,9 @@
 import logging
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Literal
+
+from peewee import fn
 
 from ..models import Account, Category, Tag, Transaction, TransactionTag, db
 
@@ -141,3 +145,43 @@ async def get_user_tags(user_id: int) -> list[str]:
         Tag.select().where(Tag.user_id == user_id).order_by(Tag.name)
     )
     return [tag.name for tag in tags]
+
+
+@dataclass(frozen=True)
+class TagPeriod:
+    name: str
+    type: Literal["income", "expense"]
+    first_at: datetime
+    last_at: datetime
+
+
+def _as_datetime(value: datetime | str) -> datetime:
+    # Aggregates bypass the field converter, and tz-aware values are stored as ISO text.
+    return value if isinstance(value, datetime) else datetime.fromisoformat(value)
+
+
+async def get_user_tag_periods(user_id: int) -> list[TagPeriod]:
+    """First and last transaction time per tag, split by income/expense."""
+    first_at = fn.MIN(Transaction.created_at).alias("first_at")
+    last_at = fn.MAX(Transaction.created_at).alias("last_at")
+    rows = await db.list(
+        TransactionTag
+        .select(Tag.name, Category.type, first_at, last_at)
+        .join(Tag)
+        .switch(TransactionTag)
+        .join(Transaction)
+        .join(Category)
+        .where((Tag.user_id == user_id) & (Transaction.user_id == user_id))
+        .group_by(Tag.name, Category.type)
+        .order_by(Tag.name, Category.type)
+        .dicts()
+    )
+    return [
+        TagPeriod(
+            name=row["name"],
+            type=row["type"],
+            first_at=_as_datetime(row["first_at"]),
+            last_at=_as_datetime(row["last_at"]),
+        )
+        for row in rows
+    ]

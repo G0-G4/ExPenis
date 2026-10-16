@@ -3,7 +3,7 @@
   "info": {
     "title": "ExPenis API",
     "description": "API сервиса для учёта личных доходов и расходов. Поддерживает работу с пользователями, счетами, категориями и транзакциями.",
-    "version": "1.0.3"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/transactions": {
@@ -1265,6 +1265,40 @@
         ],
         "title": "RegisterRequest"
       },
+      "TagPeriodDto": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense"
+            ],
+            "title": "Type"
+          },
+          "first_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First At"
+          },
+          "last_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "first_at",
+          "last_at"
+        ],
+        "title": "TagPeriodDto"
+      },
       "Transaction": {
         "properties": {
           "id": {
@@ -1439,6 +1473,14 @@
             },
             "type": "array",
             "title": "Tags"
+          },
+          "tag_periods": {
+            "items": {
+              "$ref": "#/components/schemas/TagPeriodDto"
+            },
+            "type": "array",
+            "title": "Tag Periods",
+            "default": []
           }
         },
         "type": "object",
