@@ -111,8 +111,8 @@ async def _fill_crypto_from_binance(
             params={"symbols": json.dumps(symbols, separators=(",", ":"))},
             timeout=AV_TIMEOUT_SECONDS,
         )
-    except httpx.TimeoutException:
-        logger.warning("binance crypto quote timeout after %.0fs", AV_TIMEOUT_SECONDS)
+    except httpx.TransportError as exc:
+        logger.warning("binance crypto quote failed: %r", exc)
         return []
     if res.status_code != 200:
         logger.warning("binance crypto quote failed with status %d", res.status_code)
@@ -178,12 +178,9 @@ async def get_course():
                     },
                     timeout=AV_TIMEOUT_SECONDS,
                 )
-            except httpx.TimeoutException:
-                logger.warning(
-                    "alphavantage timeout for %s after %.0fs",
-                    crypto,
-                    AV_TIMEOUT_SECONDS,
-                )
+            except httpx.TransportError as exc:
+                # Timeouts and dropped connections alike: crypto is optional.
+                logger.warning("alphavantage request failed for %s: %r", crypto, exc)
                 break
             if res.status_code != 200:
                 logger.error(

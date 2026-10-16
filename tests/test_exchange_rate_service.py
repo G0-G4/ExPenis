@@ -102,6 +102,18 @@ async def test_alphavantage_timeout_keeps_fiat_rates_and_is_cached(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_crypto_connection_errors_keep_fiat_rates(monkeypatch):
+    async def handler(url, params, timeout):
+        if "cbr-xml-daily" in url:
+            return _cbr()
+        raise httpx.ConnectError("tls handshake failed")
+
+    _install(monkeypatch, handler)
+    assert await fx.get_currency_exchange_rate("RUB") == 1.0
+    assert await fx.get_currency_exchange_rate("USD") == 90.0
+
+
+@pytest.mark.asyncio
 async def test_rate_limit_payload_does_not_fail_fiat_rates(monkeypatch):
     av = []
 
