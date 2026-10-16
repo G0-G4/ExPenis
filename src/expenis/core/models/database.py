@@ -1,3 +1,10 @@
+import os
+
 from playhouse.pwasyncio import AsyncSqliteDatabase
 
-db = AsyncSqliteDatabase('./data/expenis.db', pragmas={'foreign_keys': 1})
+DEFAULT_DB_PATH = './data/expenis.db'
+
+db = AsyncSqliteDatabase(
+    os.getenv('EXPENIS_DB_PATH', DEFAULT_DB_PATH),
+    pragmas={'foreign_keys': 1},
+)

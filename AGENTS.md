@@ -143,7 +143,9 @@ Default `uv run pytest` stays backend-only (`testpaths = ["tests"]`).
 - Stop on first failure: `uv run pytest -x`
 - Show stdout/logs: `uv run pytest -s`
 ### Test isolation notes
-- `tests/conftest.py` truncates core tables before each test via an autouse fixture.
+- `tests/conftest.py` builds a temporary SQLite DB from `migrations/*.sql` and points
+  `EXPENIS_DB_PATH` at it before models are imported, then truncates core tables before
+  each test. Tests never touch the dev DB `./data/expenis.db` (the default path).
 - Async tests should use `@pytest.mark.asyncio`.
 - Keep tests deterministic and order-independent.
 ## 4) Lint / Type / Quality Checks
