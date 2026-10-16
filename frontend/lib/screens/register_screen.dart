@@ -4,6 +4,7 @@ import "package:expenis_mobile/service/auth_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
 import "package:expenis_mobile/theme.dart";
 import "package:expenis_mobile/widgets/app_loading_spinner.dart";
+import "package:expenis_mobile/widgets/responsive.dart";
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -75,78 +76,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Register")),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: AppTheme.screenPadding,
-          children: [
-            TextFormField(
-              controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: "Username",
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-              textCapitalization: TextCapitalization.none,
-              autofillHints: const [AutofillHints.username],
-              validator: (value) => (value == null || value.trim().isEmpty)
-                  ? "Please enter a username"
-                  : null,
-            ),
-            const SizedBox(height: AppTheme.space16),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                labelText: "Password",
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                  ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
+      body: ResponsiveCenter(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: AppTheme.screenPadding,
+            children: [
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: "Username",
+                  prefixIcon: Icon(Icons.person_outline),
                 ),
+                textCapitalization: TextCapitalization.none,
+                autofillHints: const [AutofillHints.username],
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? "Please enter a username"
+                    : null,
               ),
-              autofillHints: const [AutofillHints.newPassword],
-              validator: _validatePassword,
-            ),
-            const SizedBox(height: AppTheme.space16),
-            TextFormField(
-              controller: _confirmController,
-              obscureText: _obscureConfirm,
-              decoration: InputDecoration(
-                labelText: "Confirm Password",
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirm
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+              const SizedBox(height: AppTheme.space16),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: "Password",
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  onPressed: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
+                autofillHints: const [AutofillHints.newPassword],
+                validator: _validatePassword,
               ),
-              autofillHints: const [AutofillHints.newPassword],
-              validator: _validateConfirm,
-            ),
-            const SizedBox(height: AppTheme.space32),
-            FilledButton(
-              onPressed: _isSubmitting ? null : _submit,
-              child: _isSubmitting
-                  ? const AppLoadingSpinner()
-                  : const Text("Register"),
-            ),
-            const SizedBox(height: AppTheme.space16),
-            TextButton(
-              onPressed: _isSubmitting
-                  ? null
-                  : () => Navigator.of(context).pop(),
-              child: const Text("Already have an account? Login"),
-            ),
-          ],
+              const SizedBox(height: AppTheme.space16),
+              TextFormField(
+                controller: _confirmController,
+                obscureText: _obscureConfirm,
+                decoration: InputDecoration(
+                  labelText: "Confirm Password",
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirm
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+                ),
+                autofillHints: const [AutofillHints.newPassword],
+                validator: _validateConfirm,
+              ),
+              const SizedBox(height: AppTheme.space32),
+              FilledButton(
+                onPressed: _isSubmitting ? null : _submit,
+                child: _isSubmitting
+                    ? const AppLoadingSpinner()
+                    : const Text("Register"),
+              ),
+              const SizedBox(height: AppTheme.space16),
+              TextButton(
+                onPressed: _isSubmitting
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: const Text("Already have an account? Login"),
+              ),
+            ],
+          ),
         ),
       ),
     );

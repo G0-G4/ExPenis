@@ -5,6 +5,7 @@ import "package:expenis_mobile/service/settings_service.dart";
 import "package:expenis_mobile/utils/app_version.dart";
 import "package:expenis_mobile/widgets/app_loading_spinner.dart";
 import "package:expenis_mobile/theme.dart";
+import "package:expenis_mobile/widgets/responsive.dart";
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -80,116 +81,118 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Settings")),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadProfile,
-              child: ListView(
-                padding: AppTheme.screenPadding,
-                children: [
-                  Text(
-                    "Account",
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+      body: ResponsiveCenter(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadProfile,
+                child: ListView(
+                  padding: AppTheme.screenPadding,
+                  children: [
+                    Text(
+                      "Account",
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppTheme.space8),
-                  Text(
-                    "Manage your account and security settings",
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                    const SizedBox(height: AppTheme.space8),
+                    Text(
+                      "Manage your account and security settings",
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppTheme.space24),
-                  Card(
-                    child: Padding(
-                      padding: AppTheme.cardPadding,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _ProfileRow(
-                            icon: Icons.person_outline,
-                            label: "Username",
-                            value: _profile?.username ?? "—",
-                          ),
-                          if (_profile?.telegramId != null) ...[
+                    const SizedBox(height: AppTheme.space24),
+                    Card(
+                      child: Padding(
+                        padding: AppTheme.cardPadding,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _ProfileRow(
+                              icon: Icons.person_outline,
+                              label: "Username",
+                              value: _profile?.username ?? "—",
+                            ),
+                            if (_profile?.telegramId != null) ...[
+                              const SizedBox(height: AppTheme.space12),
+                              Divider(color: colorScheme.outlineVariant),
+                              const SizedBox(height: AppTheme.space12),
+                              _ProfileRow(
+                                icon: Icons.tag_rounded,
+                                label: "Telegram ID",
+                                value: "${_profile!.telegramId}",
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_loadError != null) ...[
+                      const SizedBox(height: AppTheme.space12),
+                      Text(
+                        "Failed to load profile: $_loadError",
+                        style: TextStyle(color: colorScheme.error),
+                      ),
+                    ],
+                    const SizedBox(height: AppTheme.space24),
+                    ListTile(
+                      leading: const Icon(Icons.lock_outline),
+                      title: const Text("Change password"),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () =>
+                          Navigator.of(context).pushNamed("/change-password"),
+                    ),
+                    const SizedBox(height: AppTheme.space16),
+                    FilledButton.icon(
+                      onPressed: _isLoggingOut ? null : _logout,
+                      icon: _isLoggingOut
+                          ? const AppLoadingSpinner()
+                          : const Icon(
+                              Icons.logout,
+                              size: AppTheme.iconSizeMedium,
+                            ),
+                      label: const Text("Log out"),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.errorContainer,
+                        foregroundColor: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.space32),
+                    Text(
+                      "About",
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.space16),
+                    Card(
+                      child: Padding(
+                        padding: AppTheme.cardPadding,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _InfoRow(
+                              icon: Icons.cloud_outlined,
+                              label: "Server",
+                              value: "expenis.g0g4.ru",
+                            ),
                             const SizedBox(height: AppTheme.space12),
                             Divider(color: colorScheme.outlineVariant),
                             const SizedBox(height: AppTheme.space12),
-                            _ProfileRow(
-                              icon: Icons.tag_rounded,
-                              label: "Telegram ID",
-                              value: "${_profile!.telegramId}",
+                            _InfoRow(
+                              icon: Icons.info_outline,
+                              label: "Version",
+                              value: _appVersion ?? "—",
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                  if (_loadError != null) ...[
-                    const SizedBox(height: AppTheme.space12),
-                    Text(
-                      "Failed to load profile: $_loadError",
-                      style: TextStyle(color: colorScheme.error),
                     ),
                   ],
-                  const SizedBox(height: AppTheme.space24),
-                  ListTile(
-                    leading: const Icon(Icons.lock_outline),
-                    title: const Text("Change password"),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () =>
-                        Navigator.of(context).pushNamed("/change-password"),
-                  ),
-                  const SizedBox(height: AppTheme.space16),
-                  FilledButton.icon(
-                    onPressed: _isLoggingOut ? null : _logout,
-                    icon: _isLoggingOut
-                        ? const AppLoadingSpinner()
-                        : const Icon(
-                            Icons.logout,
-                            size: AppTheme.iconSizeMedium,
-                          ),
-                    label: const Text("Log out"),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.errorContainer,
-                      foregroundColor: colorScheme.onErrorContainer,
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.space32),
-                  Text(
-                    "About",
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.space16),
-                  Card(
-                    child: Padding(
-                      padding: AppTheme.cardPadding,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _InfoRow(
-                            icon: Icons.cloud_outlined,
-                            label: "Server",
-                            value: "expenis.g0g4.ru",
-                          ),
-                          const SizedBox(height: AppTheme.space12),
-                          Divider(color: colorScheme.outlineVariant),
-                          const SizedBox(height: AppTheme.space12),
-                          _InfoRow(
-                            icon: Icons.info_outline,
-                            label: "Version",
-                            value: _appVersion ?? "—",
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+      ),
     );
   }
 }

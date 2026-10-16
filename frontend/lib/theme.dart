@@ -54,6 +54,22 @@ class AppTheme {
   static const Color incomeColorLight = Color(0xFFE8F5E9); // green[50]
   static const Color expenseColorLight = Color(0xFFFFEBEE); // red[50]
 
+  // ── Chart colours ────────────────────────────────────────────────────────
+  /// Categorical series colours, assigned by rank. Red and green are left out
+  /// on purpose: they already mean income/expense across the app.
+  static const List<Color> chartPalette = [
+    Color(0xFF4E79A7), // blue
+    Color(0xFFF28E2B), // orange
+    Color(0xFFB07AA1), // purple
+    Color(0xFF76B7B2), // teal
+    Color(0xFFEDC948), // yellow
+    Color(0xFF9C755F), // brown
+    Color(0xFFFF9DA7), // pink
+  ];
+
+  /// Colour of the merged "Other" bucket beyond [chartPalette].
+  static const Color chartOtherColor = Color(0xFFBAB0AC);
+
   // ── ThemeData ────────────────────────────────────────────────────────────
   static ThemeData get light {
     final colorScheme = ColorScheme.fromSeed(

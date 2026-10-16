@@ -8,6 +8,7 @@ import 'package:expenis_mobile/screens/edit_transaction_screen.dart';
 import 'package:expenis_mobile/service/category_service.dart';
 import 'package:expenis_mobile/service/transaction_service.dart';
 import 'package:expenis_mobile/theme.dart';
+import 'package:expenis_mobile/utils/chart_utils.dart';
 import 'package:expenis_mobile/utils/date_labels.dart';
 import 'package:expenis_mobile/utils/format.dart';
 import 'package:expenis_mobile/utils/selection_utils.dart';
@@ -16,6 +17,7 @@ import 'package:expenis_mobile/widgets/analytics_filters_card.dart';
 import 'package:expenis_mobile/widgets/app_empty_state.dart';
 import 'package:expenis_mobile/widgets/app_error_state.dart';
 import 'package:expenis_mobile/widgets/month_picker_bottom_sheet.dart';
+import 'package:expenis_mobile/widgets/responsive.dart';
 
 class TransactionStatsScreen extends StatefulWidget {
   const TransactionStatsScreen({
@@ -58,7 +60,10 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
   bool _isFirstLoad = true;
   bool _isLoading = false;
   bool _groupByMonth = false;
+  TransactionType _selectedType = TransactionType.expense;
   String? _loadError;
+
+  bool get _isIncomeSelected => _selectedType == TransactionType.income;
 
   bool _isCurrentMonth(DateTime date) {
     final now = DateTime.now();
@@ -494,16 +499,13 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(title: const Text("Statistics")),
-        body: SafeArea(
-          top: false,
-          bottom: true,
+    return Scaffold(
+      appBar: AppBar(title: const Text("Statistics")),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: ResponsiveCenter(
+          maxWidth: Breakpoints.dashboardMaxWidth,
           child: Column(
             children: [
               Padding(
@@ -539,18 +541,6 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
                     ? const LinearProgressIndicator()
                     : const SizedBox.shrink(),
               ),
-              TabBar(
-                labelStyle: textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-                labelColor: colorScheme.onSurface,
-                unselectedLabelColor: colorScheme.onSurfaceVariant,
-                indicatorColor: colorScheme.primary,
-                tabs: const [
-                  Tab(text: "Income"),
-                  Tab(text: "Expenses"),
-                ],
-              ),
               Expanded(
                 child: _isFirstLoad && _isLoading
                     ? const Center(child: CircularProgressIndicator())
@@ -575,6 +565,135 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     return _buildDetailedContent();
   }
 
+  /// Narrow screens get a single scrolling column. Wide screens put the
+  /// charts on the left and the drill-down (filters, transactions) on the
+  /// right, each scrolling independently.
+  Widget _buildResponsiveBody({
+    required List<Widget> primary,
+    required List<Widget> secondary,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < Breakpoints.twoColumnMinWidth) {
+          return ListView(
+            padding: AppTheme.screenPadding,
+            children: _withSpacing([...primary, ...secondary]),
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.space16,
+                  AppTheme.space16,
+                  AppTheme.space8,
+                  AppTheme.space16,
+                ),
+                children: _withSpacing(primary),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.space8,
+                  AppTheme.space16,
+                  AppTheme.space16,
+                  AppTheme.space16,
+                ),
+                children: _withSpacing(secondary),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static List<Widget> _withSpacing(List<Widget> children) {
+    return [
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0) const SizedBox(height: AppTheme.space16),
+        children[i],
+      ],
+    ];
+  }
+
+  Widget _buildTypeSelector() {
+    return SegmentedButton<TransactionType>(
+      expandedInsets: EdgeInsets.zero,
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(
+          value: TransactionType.income,
+          icon: Icon(Icons.arrow_downward_rounded),
+          label: Text("Income"),
+        ),
+        ButtonSegment(
+          value: TransactionType.expense,
+          icon: Icon(Icons.arrow_upward_rounded),
+          label: Text("Expenses"),
+        ),
+      ],
+      selected: {_selectedType},
+      onSelectionChanged: (selection) {
+        setState(() => _selectedType = selection.first);
+      },
+    );
+  }
+
+  Widget _buildFiltersCard() {
+    final isIncome = _isIncomeSelected;
+    return AnalyticsFiltersCard(
+      title: isIncome ? "Income filters" : "Expense filters",
+      accentColor: isIncome ? AppTheme.incomeColor : AppTheme.expenseColor,
+      categories: isIncome ? _incomeCategories : _expenseCategories,
+      selectedCategoryIds: isIncome
+          ? _selectedIncomeCategoryIds
+          : _selectedExpenseCategoryIds,
+      onToggleCategory: isIncome
+          ? _toggleIncomeCategory
+          : _toggleExpenseCategory,
+      onSetCategorySelection: isIncome
+          ? _setIncomeCategorySelection
+          : _setExpenseCategorySelection,
+      tagLabelsByKey: isIncome
+          ? _availableIncomeTagsByNormalized
+          : _availableExpenseTagsByNormalized,
+      includedTagKeys: isIncome
+          ? _includedIncomeTagKeys
+          : _includedExpenseTagKeys,
+      excludedTagKeys: isIncome
+          ? _excludedIncomeTagKeys
+          : _excludedExpenseTagKeys,
+      onCycleTag: isIncome ? _cycleIncomeTag : _cycleExpenseTag,
+      onSetTagSelection: isIncome
+          ? _setIncomeTagSelection
+          : _setExpenseTagSelection,
+    );
+  }
+
+  Widget _buildCategorySection(List<Transaction> transactions) {
+    final isIncome = _isIncomeSelected;
+    return _CategorySection(
+      // Resets the touched slice when switching between income and expenses.
+      key: ValueKey<TransactionType>(_selectedType),
+      title: isIncome ? "Income by category" : "Expenses by category",
+      color: isIncome ? AppTheme.incomeColor : AppTheme.expenseColor,
+      icon: isIncome
+          ? Icons.arrow_downward_rounded
+          : Icons.arrow_upward_rounded,
+      chartData: _buildCategoryTotals(transactions),
+      emptyLabel: isIncome
+          ? "No income in selected categories"
+          : "No expenses in selected categories",
+    );
+  }
+
   Widget _buildDetailedContent() {
     if (_transactions.isEmpty) {
       return const AppEmptyState(
@@ -595,167 +714,62 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         .where(_transactionMatchesTagFilter)
         .toList();
 
-    final incomeCategories = _incomeCategories;
-    final expenseCategories = _expenseCategories;
-
     final incomeTotal = income.fold<double>(0, (s, t) => s + t.amountRubles);
     final expenseTotal = expense.fold<double>(0, (s, t) => s + t.amountRubles);
     final net = incomeTotal - expenseTotal;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTheme.space16,
-            AppTheme.space16,
-            AppTheme.space16,
-            AppTheme.space8,
-          ),
-          child: _TotalSummaryCard(
-            incomeTotal: incomeTotal,
-            expenseTotal: expenseTotal,
-            netTotal: net,
-          ),
+    final isIncome = _isIncomeSelected;
+    final selected = isIncome ? income : expense;
+
+    return _buildResponsiveBody(
+      primary: [
+        _TotalSummaryCard(
+          incomeTotal: incomeTotal,
+          expenseTotal: expenseTotal,
+          netTotal: net,
         ),
-        Expanded(
-          child: TabBarView(
-            children: [
-              ListView(
-                padding: AppTheme.screenPadding,
-                children: [
-                  _CategorySection(
-                    title: "Income by Category",
-                    color: AppTheme.incomeColor,
-                    icon: Icons.arrow_downward_rounded,
-                    palette: _PieColors.incomePalette,
-                    chartData: _buildCategoryTotals(income),
-                    emptyLabel: "No income in selected categories",
-                  ),
-                  const SizedBox(height: AppTheme.space24),
-                  AnalyticsFiltersCard(
-                    accentColor: AppTheme.incomeColor,
-                    categories: incomeCategories,
-                    selectedCategoryIds: _selectedIncomeCategoryIds,
-                    onToggleCategory: _toggleIncomeCategory,
-                    onSetCategorySelection: _setIncomeCategorySelection,
-                    tagLabelsByKey: _availableIncomeTagsByNormalized,
-                    includedTagKeys: _includedIncomeTagKeys,
-                    excludedTagKeys: _excludedIncomeTagKeys,
-                    onCycleTag: _cycleIncomeTag,
-                    onSetTagSelection: _setIncomeTagSelection,
-                  ),
-                  const SizedBox(height: AppTheme.space24),
-                  _TransactionsSection(
-                    title: "Income transactions",
-                    color: AppTheme.incomeColor,
-                    icon: Icons.arrow_downward_rounded,
-                    transactions: income,
-                    onTap: _openEdit,
-                  ),
-                ],
-              ),
-              ListView(
-                padding: AppTheme.screenPadding,
-                children: [
-                  _CategorySection(
-                    title: "Expenses by Category",
-                    color: AppTheme.expenseColor,
-                    icon: Icons.arrow_upward_rounded,
-                    palette: _PieColors.expensePalette,
-                    chartData: _buildCategoryTotals(expense),
-                    emptyLabel: "No expenses in selected categories",
-                  ),
-                  const SizedBox(height: AppTheme.space24),
-                  AnalyticsFiltersCard(
-                    accentColor: AppTheme.expenseColor,
-                    categories: expenseCategories,
-                    selectedCategoryIds: _selectedExpenseCategoryIds,
-                    onToggleCategory: _toggleExpenseCategory,
-                    onSetCategorySelection: _setExpenseCategorySelection,
-                    tagLabelsByKey: _availableExpenseTagsByNormalized,
-                    includedTagKeys: _includedExpenseTagKeys,
-                    excludedTagKeys: _excludedExpenseTagKeys,
-                    onCycleTag: _cycleExpenseTag,
-                    onSetTagSelection: _setExpenseTagSelection,
-                  ),
-                  const SizedBox(height: AppTheme.space24),
-                  _TransactionsSection(
-                    title: "Expense transactions",
-                    color: AppTheme.expenseColor,
-                    icon: Icons.arrow_upward_rounded,
-                    transactions: expense,
-                    onTap: _openEdit,
-                  ),
-                ],
-              ),
-            ],
-          ),
+        _buildTypeSelector(),
+        _buildCategorySection(selected),
+      ],
+      secondary: [
+        _buildFiltersCard(),
+        _TransactionsSection(
+          title: isIncome ? "Income transactions" : "Expense transactions",
+          color: isIncome ? AppTheme.incomeColor : AppTheme.expenseColor,
+          icon: isIncome
+              ? Icons.arrow_downward_rounded
+              : Icons.arrow_upward_rounded,
+          transactions: selected,
+          onTap: _openEdit,
         ),
       ],
     );
   }
 
   Widget _buildGroupedContent() {
-    final monthPoints = _buildMonthPoints();
-    final incomeStacked = _buildStackedMonthlyData(TransactionType.income);
-    final expenseStacked = _buildStackedMonthlyData(TransactionType.expense);
+    final filtered = _filteredTransactions;
+    final monthPoints = _buildMonthPoints(filtered);
+    final stacked = _buildStackedMonthlyData(filtered, _selectedType);
+    final isIncome = _isIncomeSelected;
 
-    return TabBarView(
-      children: [
-        ListView(
-          padding: AppTheme.screenPadding,
-          children: [
-            _MonthTrendCard(points: monthPoints),
-            const SizedBox(height: AppTheme.space12),
-            _StackedMonthlyBarCard(
-              title: "Income by category",
-              rows: incomeStacked.rows,
-              legend: incomeStacked.legend,
-              emptyLabel: "No income in selected range",
-            ),
-            const SizedBox(height: AppTheme.space12),
-            AnalyticsFiltersCard(
-              title: "Income filters",
-              accentColor: AppTheme.incomeColor,
-              categories: _incomeCategories,
-              selectedCategoryIds: _selectedIncomeCategoryIds,
-              onToggleCategory: _toggleIncomeCategory,
-              onSetCategorySelection: _setIncomeCategorySelection,
-              tagLabelsByKey: _availableIncomeTagsByNormalized,
-              includedTagKeys: _includedIncomeTagKeys,
-              excludedTagKeys: _excludedIncomeTagKeys,
-              onCycleTag: _cycleIncomeTag,
-              onSetTagSelection: _setIncomeTagSelection,
-            ),
-          ],
+    return _buildResponsiveBody(
+      primary: [
+        _MonthTrendCard(points: monthPoints),
+        _buildTypeSelector(),
+        _StackedMonthlyBarCard(
+          title: isIncome ? "Income by category" : "Expenses by category",
+          rows: stacked.rows,
+          legend: stacked.legend,
+          emptyLabel: isIncome
+              ? "No income in selected range"
+              : "No expenses in selected range",
         ),
-        ListView(
-          padding: AppTheme.screenPadding,
-          children: [
-            _MonthTrendCard(points: monthPoints),
-            const SizedBox(height: AppTheme.space12),
-            _StackedMonthlyBarCard(
-              title: "Expenses by category",
-              rows: expenseStacked.rows,
-              legend: expenseStacked.legend,
-              emptyLabel: "No expenses in selected range",
-            ),
-            const SizedBox(height: AppTheme.space12),
-            AnalyticsFiltersCard(
-              title: "Expense filters",
-              accentColor: AppTheme.expenseColor,
-              categories: _expenseCategories,
-              selectedCategoryIds: _selectedExpenseCategoryIds,
-              onToggleCategory: _toggleExpenseCategory,
-              onSetCategorySelection: _setExpenseCategorySelection,
-              tagLabelsByKey: _availableExpenseTagsByNormalized,
-              includedTagKeys: _includedExpenseTagKeys,
-              excludedTagKeys: _excludedExpenseTagKeys,
-              onCycleTag: _cycleExpenseTag,
-              onSetTagSelection: _setExpenseTagSelection,
-            ),
-          ],
+      ],
+      secondary: [
+        _buildCategorySection(
+          filtered.where((t) => t.type == _selectedType).toList(),
         ),
+        _buildFiltersCard(),
       ],
     );
   }
@@ -779,11 +793,11 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     return _transactions.where(_matchesFilters).toList();
   }
 
-  List<_MonthPoint> _buildMonthPoints() {
+  List<_MonthPoint> _buildMonthPoints(List<Transaction> filtered) {
     return _months.map((month) {
       double income = 0;
       double expense = 0;
-      for (final transaction in _filteredTransactions) {
+      for (final transaction in filtered) {
         final createdAt = transaction.createdAt;
         if (createdAt == null) continue;
         if (createdAt.year != month.year || createdAt.month != month.month) {
@@ -799,7 +813,11 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
     }).toList();
   }
 
-  _StackedChartData _buildStackedMonthlyData(TransactionType type) {
+  _StackedChartData _buildStackedMonthlyData(
+    List<Transaction> filtered,
+    TransactionType type,
+  ) {
+    const otherKey = "other";
     final monthBuckets = <DateTime, Map<String, double>>{};
     final labelsByKey = <String, String>{};
     final totalByKey = <String, double>{};
@@ -808,7 +826,7 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       monthBuckets[month] = <String, double>{};
     }
 
-    for (final transaction in _filteredTransactions) {
+    for (final transaction in filtered) {
       if (transaction.type != type) continue;
 
       final createdAt = transaction.createdAt;
@@ -823,14 +841,20 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       totalByKey[key] = (totalByKey[key] ?? 0) + transaction.amountRubles;
     }
 
-    final rankedKeys = totalByKey.keys.toList()
-      ..sort((a, b) => (totalByKey[b] ?? 0).compareTo(totalByKey[a] ?? 0));
+    // Small categories are merged into "Other" so every colour stays unique.
+    // One palette slot is held back: a lone leftover key keeps its own colour.
+    final topKeys = topKeysByTotal(
+      totalByKey,
+      AppTheme.chartPalette.length - 1,
+    );
+    final topKeySet = topKeys.toSet();
+    final hasOther = topKeys.length < totalByKey.length;
 
     final rows = _months.map((month) {
       final values = monthBuckets[month] ?? const <String, double>{};
       final segments = <_StackSegment>[];
 
-      for (final key in rankedKeys) {
+      for (final key in topKeys) {
         final value = values[key] ?? 0;
         if (value > 0) {
           segments.add(
@@ -843,24 +867,34 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         }
       }
 
+      if (hasOther) {
+        final otherAmount = values.entries
+            .where((entry) => !topKeySet.contains(entry.key))
+            .fold<double>(0, (sum, entry) => sum + entry.value);
+        if (otherAmount > 0) {
+          segments.add(
+            _StackSegment(key: otherKey, label: "Other", amount: otherAmount),
+          );
+        }
+      }
+
       return _MonthlyStackedRow(month: month, segments: segments);
     }).toList();
 
-    final legend = <_LegendEntry>[];
-    final colorPalette = type == TransactionType.income
-        ? _ChartPalette.income
-        : _ChartPalette.expense;
-
-    for (var i = 0; i < rankedKeys.length; i++) {
-      final key = rankedKeys[i];
-      legend.add(
+    final legend = <_LegendEntry>[
+      for (var i = 0; i < topKeys.length; i++)
         _LegendEntry(
-          key: key,
-          label: labelsByKey[key] ?? key,
-          color: colorPalette[i % colorPalette.length],
+          key: topKeys[i],
+          label: labelsByKey[topKeys[i]] ?? topKeys[i],
+          color: AppTheme.chartPalette[i],
         ),
-      );
-    }
+      if (hasOther)
+        const _LegendEntry(
+          key: otherKey,
+          label: "Other",
+          color: AppTheme.chartOtherColor,
+        ),
+    ];
 
     return _StackedChartData(rows: rows, legend: legend);
   }
@@ -1215,8 +1249,88 @@ class _StackedChartData {
   final List<_LegendEntry> legend;
 }
 
+/// Width reserved for Y-axis labels such as "125k".
+const double _yAxisReservedSize = 44;
+
+/// Minimum horizontal room per X-axis month label before labels get skipped.
+const double _monthLabelMinWidth = 36;
+
+FlGridData _horizontalGrid(ColorScheme colorScheme, double interval) {
+  return FlGridData(
+    show: true,
+    drawVerticalLine: false,
+    horizontalInterval: interval,
+    getDrawingHorizontalLine: (value) => FlLine(
+      color: colorScheme.outlineVariant.withAlpha(120),
+      strokeWidth: 1,
+    ),
+  );
+}
+
+FlBorderData _axisBorder(ColorScheme colorScheme) {
+  return FlBorderData(
+    show: true,
+    border: Border(
+      left: BorderSide(color: colorScheme.outlineVariant),
+      bottom: BorderSide(color: colorScheme.outlineVariant),
+    ),
+  );
+}
+
+/// Amount ticks on the left and month names along the bottom. The year is
+/// added under the first label and under every January.
+FlTitlesData _monthAxisTitles({
+  required List<DateTime> months,
+  required AxisScale scale,
+  required int labelStride,
+  required TextTheme textTheme,
+}) {
+  return FlTitlesData(
+    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    leftTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: _yAxisReservedSize,
+        interval: scale.step,
+        getTitlesWidget: (value, meta) =>
+            Text(compactAmount(value), style: textTheme.labelSmall),
+      ),
+    ),
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 40,
+        interval: 1,
+        getTitlesWidget: (value, meta) {
+          final index = value.round();
+          if (index != value || index < 0 || index >= months.length) {
+            return const SizedBox.shrink();
+          }
+          if (index % labelStride != 0) return const SizedBox.shrink();
+          final month = months[index];
+          final showYear = index == 0 || month.month == DateTime.january;
+          return Padding(
+            padding: const EdgeInsets.only(top: AppTheme.space4),
+            child: Text(
+              showYear
+                  ? "${monthShortLabel(month.month)}\n${month.year}"
+                  : monthShortLabel(month.month),
+              textAlign: TextAlign.center,
+              style: textTheme.labelSmall,
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
 class _MonthTrendCard extends StatelessWidget {
   const _MonthTrendCard({required this.points});
+
+  /// Point markers clutter the line once there are more months than this.
+  static const int _maxPointsWithDots = 24;
 
   final List<_MonthPoint> points;
 
@@ -1224,6 +1338,11 @@ class _MonthTrendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = niceAxisScale(_minValue(points), _maxValue(points));
+    final showDots = points.length <= _maxPointsWithDots;
+    final tooltipStyle =
+        textTheme.labelMedium?.copyWith(color: Colors.white) ??
+        const TextStyle(color: Colors.white);
 
     return Card(
       child: Padding(
@@ -1232,126 +1351,119 @@ class _MonthTrendCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Net, income and expenses by month",
+              "Income, expenses and net by month",
               style: textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: AppTheme.space12),
+            const SizedBox(height: AppTheme.space16),
             SizedBox(
               height: 260,
-              child: LineChart(
-                LineChartData(
-                  minY: _minY(points),
-                  maxY: _maxY(points),
-                  minX: 0,
-                  maxX: (points.length - 1).toDouble(),
-                  gridData: FlGridData(
-                    show: true,
-                    horizontalInterval: _gridInterval(points),
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: colorScheme.outlineVariant.withAlpha(120),
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border(
-                      left: BorderSide(color: colorScheme.outlineVariant),
-                      bottom: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                  ),
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      getTooltipColor: (_) =>
-                          _ChartTooltipStyle.backgroundColor,
-                      getTooltipItems: (touchedSpots) {
-                        return touchedSpots.map((spot) {
-                          final label = switch (spot.barIndex) {
-                            0 => "Income",
-                            1 => "Expenses",
-                            2 => "Net",
-                            _ => "Value",
-                          };
-                          return LineTooltipItem(
-                            "$label: ${formatAmount(spot.y)} ₽",
-                            textTheme.labelMedium?.copyWith(
-                                  color: Colors.white,
-                                ) ??
-                                const TextStyle(color: Colors.white),
-                          );
-                        }).toList();
-                      },
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 48,
-                        interval: _gridInterval(points),
-                        getTitlesWidget: (value, meta) =>
-                            Text(_compact(value), style: textTheme.labelSmall),
-                      ),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 1,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.round();
-                          if (index < 0 || index >= points.length) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              top: AppTheme.space8,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final stride = labelStride(
+                    points.length,
+                    constraints.maxWidth - _yAxisReservedSize,
+                    _monthLabelMinWidth,
+                  );
+                  return LineChart(
+                    LineChartData(
+                      minY: scale.min,
+                      maxY: scale.max,
+                      minX: 0,
+                      maxX: points.length > 1 ? points.length - 1 : 1,
+                      gridData: _horizontalGrid(colorScheme, scale.step),
+                      borderData: _axisBorder(colorScheme),
+                      extraLinesData: ExtraLinesData(
+                        horizontalLines: [
+                          if (scale.min < 0)
+                            HorizontalLine(
+                              y: 0,
+                              color: colorScheme.outline,
+                              strokeWidth: 1,
                             ),
-                            child: Text(
-                              _shortMonth(points[index].month),
-                              style: textTheme.labelSmall,
-                            ),
-                          );
-                        },
+                        ],
                       ),
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (_) =>
+                              _ChartTooltipStyle.backgroundColor,
+                          fitInsideHorizontally: true,
+                          fitInsideVertically: true,
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.asMap().entries.map((entry) {
+                              final spot = entry.value;
+                              final label = switch (spot.barIndex) {
+                                0 => "Income",
+                                1 => "Expenses",
+                                2 => "Net",
+                                _ => "Value",
+                              };
+                              final index = spot.x.round();
+                              final header =
+                                  entry.key == 0 &&
+                                      index >= 0 &&
+                                      index < points.length
+                                  ? "${formatMonthYearLabel(points[index].month)}\n"
+                                  : "";
+                              return LineTooltipItem(
+                                "$header$label: ${formatAmount(spot.y)} ₽",
+                                tooltipStyle,
+                                textAlign: TextAlign.start,
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                      titlesData: _monthAxisTitles(
+                        months: points.map((point) => point.month).toList(),
+                        scale: scale,
+                        labelStride: stride,
+                        textTheme: textTheme,
+                      ),
+                      lineBarsData: [
+                        _line(
+                          points,
+                          (item) => item.income,
+                          AppTheme.incomeColor,
+                          showDots: showDots,
+                        ),
+                        _line(
+                          points,
+                          (item) => item.expense,
+                          AppTheme.expenseColor,
+                          showDots: showDots,
+                        ),
+                        _line(
+                          points,
+                          (item) => item.net,
+                          colorScheme.primary,
+                          showDots: false,
+                          dashed: true,
+                        ),
+                      ],
                     ),
-                  ),
-                  lineBarsData: [
-                    _line(points, (item) => item.income, AppTheme.incomeColor),
-                    _line(
-                      points,
-                      (item) => item.expense,
-                      AppTheme.expenseColor,
-                    ),
-                    _line(points, (item) => item.net, colorScheme.primary),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: AppTheme.space12),
             _LegendWrap(
               entries: [
-                _LegendEntry(
+                const _LegendEntry(
                   key: "income",
                   label: "Income",
                   color: AppTheme.incomeColor,
                 ),
-                _LegendEntry(
+                const _LegendEntry(
                   key: "expense",
                   label: "Expenses",
                   color: AppTheme.expenseColor,
                 ),
                 _LegendEntry(
                   key: "net",
-                  label: "Net",
+                  label: "Net (dashed)",
                   color: colorScheme.primary,
                 ),
               ],
@@ -1362,49 +1474,36 @@ class _MonthTrendCard extends StatelessWidget {
     );
   }
 
-  static String _shortMonth(DateTime date) {
-    const months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
-    return months[date.month - 1];
-  }
-
-  static String _compact(double value) {
-    final absolute = value.abs();
-    if (absolute >= 1000000) {
-      return "${(value / 1000000).toStringAsFixed(1)}M";
-    }
-    if (absolute >= 1000) {
-      return "${(value / 1000).toStringAsFixed(0)}k";
-    }
-    return value.toStringAsFixed(0);
-  }
-
-  static double _gridInterval(List<_MonthPoint> points) {
-    final span = (_maxY(points) - _minY(points)).abs();
-    if (span <= 0) return 1;
-    return (span / 4).clamp(1, double.infinity);
-  }
-
+  // Straight segments on purpose: a smoothed curve overshoots between months
+  // and suggests values (even negative ones) that never happened.
   static LineChartBarData _line(
     List<_MonthPoint> points,
     double Function(_MonthPoint point) valueOf,
-    Color color,
-  ) {
+    Color color, {
+    required bool showDots,
+    bool dashed = false,
+  }) {
     return LineChartBarData(
       spots: points
           .asMap()
           .entries
           .map((entry) => FlSpot(entry.key.toDouble(), valueOf(entry.value)))
           .toList(),
-      isCurved: true,
+      isCurved: false,
       color: color,
-      barWidth: 2,
+      barWidth: dashed ? 2 : 2.5,
+      dashArray: dashed ? const [6, 4] : null,
       belowBarData: BarAreaData(show: false),
-      dotData: FlDotData(show: false),
+      dotData: FlDotData(
+        show: showDots,
+        getDotPainter: (spot, percent, bar, index) =>
+            FlDotCirclePainter(radius: 3, color: color, strokeWidth: 0),
+      ),
     );
   }
 
-  static double _maxY(List<_MonthPoint> points) {
-    final maxValue = points.fold<double>(0, (max, point) {
+  static double _maxValue(List<_MonthPoint> points) {
+    return points.fold<double>(0, (max, point) {
       final local = [
         point.expense,
         point.income,
@@ -1412,12 +1511,10 @@ class _MonthTrendCard extends StatelessWidget {
       ].reduce((a, b) => a > b ? a : b);
       return local > max ? local : max;
     });
-    if (maxValue <= 0) return 1;
-    return maxValue * 1.2;
   }
 
-  static double _minY(List<_MonthPoint> points) {
-    final minValue = points.fold<double>(0, (min, point) {
+  static double _minValue(List<_MonthPoint> points) {
+    return points.fold<double>(0, (min, point) {
       final local = [
         point.expense,
         point.income,
@@ -1425,8 +1522,6 @@ class _MonthTrendCard extends StatelessWidget {
       ].reduce((a, b) => a < b ? a : b);
       return local < min ? local : min;
     });
-    if (minValue >= 0) return 0;
-    return minValue * 1.2;
   }
 }
 
@@ -1446,12 +1541,17 @@ class _StackedMonthlyBarCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final maxTotal = rows.fold<double>(
       0,
       (max, row) => row.total > max ? row.total : max,
     );
     final hasData = maxTotal > 0;
+    final scale = niceAxisScale(0, maxTotal);
     final colorByKey = {for (final item in legend) item.key: item.color};
+    final tooltipStyle =
+        textTheme.labelMedium?.copyWith(color: Colors.white) ??
+        const TextStyle(color: Colors.white);
 
     return Card(
       child: Padding(
@@ -1465,145 +1565,104 @@ class _StackedMonthlyBarCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: AppTheme.space12),
+            const SizedBox(height: AppTheme.space16),
             if (!hasData)
               Text(
                 emptyLabel,
                 style: textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               )
             else
               SizedBox(
                 height: 300,
-                child: BarChart(
-                  BarChartData(
-                    minY: 0,
-                    maxY: maxTotal * 1.2,
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      horizontalInterval: (maxTotal / 4).clamp(
-                        1,
-                        double.infinity,
-                      ),
-                      getDrawingHorizontalLine: (value) => FlLine(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outlineVariant.withAlpha(120),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    borderData: FlBorderData(
-                      show: true,
-                      border: Border(
-                        left: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                        bottom: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 48,
-                          getTitlesWidget: (value, meta) => Text(
-                            _MonthTrendCard._compact(value),
-                            style: textTheme.labelSmall,
-                          ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 38,
-                          interval: 1,
-                          getTitlesWidget: (value, meta) {
-                            final index = value.round();
-                            if (index < 0 || index >= rows.length) {
-                              return const SizedBox.shrink();
-                            }
-                            final month = rows[index].month;
-                            return Padding(
-                              padding: const EdgeInsets.only(
-                                top: AppTheme.space8,
-                              ),
-                              child: Text(
-                                "${_MonthTrendCard._shortMonth(month)}\n${month.year % 100}",
-                                textAlign: TextAlign.center,
-                                style: textTheme.labelSmall,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (_) =>
-                            _ChartTooltipStyle.backgroundColor,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          final row = rows[group.x.toInt()];
-                          final monthTitle =
-                              "${row.month.month.toString().padLeft(2, "0")}.${row.month.year}";
-                          final visibleSegments = row.segments
-                              .where((segment) => segment.amount > 0)
-                              .toList();
-                          return BarTooltipItem(
-                            "$monthTitle\nTotal: ${formatAmount(row.total)} ₽",
-                            textTheme.labelMedium?.copyWith(
-                                  color: Colors.white,
-                                ) ??
-                                const TextStyle(color: Colors.white),
-                            children: visibleSegments
-                                .map(
-                                  (segment) => TextSpan(
-                                    text:
-                                        "\n${segment.label}: ${formatAmount(segment.amount)} ₽",
-                                  ),
-                                )
-                                .toList(),
-                          );
-                        },
-                      ),
-                    ),
-                    barGroups: rows.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final row = entry.value;
-                      var cursor = 0.0;
-                      final stacks = <BarChartRodStackItem>[];
-                      for (final segment in row.segments) {
-                        final from = cursor;
-                        final to = cursor + segment.amount;
-                        final color =
-                            colorByKey[segment.key] ?? const Color(0xFF90A4AE);
-                        stacks.add(BarChartRodStackItem(from, to, color));
-                        cursor = to;
-                      }
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final plotWidth = constraints.maxWidth - _yAxisReservedSize;
+                    final stride = labelStride(
+                      rows.length,
+                      plotWidth,
+                      _monthLabelMinWidth,
+                    );
+                    final rodWidth = (plotWidth / rows.length * 0.6)
+                        .clamp(6.0, 32.0)
+                        .toDouble();
 
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: row.total,
-                            rodStackItems: stacks,
-                            width: 18,
-                            borderRadius: AppTheme.borderRadiusSmall,
+                    return BarChart(
+                      BarChartData(
+                        minY: 0,
+                        maxY: scale.max,
+                        gridData: _horizontalGrid(colorScheme, scale.step),
+                        borderData: _axisBorder(colorScheme),
+                        titlesData: _monthAxisTitles(
+                          months: rows.map((row) => row.month).toList(),
+                          scale: scale,
+                          labelStride: stride,
+                          textTheme: textTheme,
+                        ),
+                        barTouchData: BarTouchData(
+                          enabled: true,
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipColor: (_) =>
+                                _ChartTooltipStyle.backgroundColor,
+                            fitInsideHorizontally: true,
+                            fitInsideVertically: true,
+                            tooltipHorizontalAlignment:
+                                FLHorizontalAlignment.center,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              final row = rows[group.x.toInt()];
+                              return BarTooltipItem(
+                                "${formatMonthYearLabel(row.month)}\n"
+                                "Total: ${formatAmount(row.total)} ₽",
+                                tooltipStyle.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                textAlign: TextAlign.start,
+                                children: row.segments
+                                    .map(
+                                      (segment) => TextSpan(
+                                        text:
+                                            "\n${segment.label}: ${formatAmount(segment.amount)} ₽",
+                                        style: tooltipStyle,
+                                      ),
+                                    )
+                                    .toList(),
+                              );
+                            },
                           ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+                        ),
+                        barGroups: rows.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final row = entry.value;
+                          var cursor = 0.0;
+                          final stacks = <BarChartRodStackItem>[];
+                          for (final segment in row.segments) {
+                            final from = cursor;
+                            final to = cursor + segment.amount;
+                            final color =
+                                colorByKey[segment.key] ??
+                                AppTheme.chartOtherColor;
+                            stacks.add(BarChartRodStackItem(from, to, color));
+                            cursor = to;
+                          }
+
+                          return BarChartGroupData(
+                            x: index,
+                            barRods: [
+                              BarChartRodData(
+                                toY: row.total,
+                                rodStackItems: stacks,
+                                width: rodWidth,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    );
+                  },
                 ),
               ),
             if (hasData) ...[
@@ -1651,28 +1710,8 @@ class _LegendWrap extends StatelessWidget {
   }
 }
 
-class _ChartPalette {
-  static const List<Color> income = [
-    Color(0xFF2E7D32),
-    Color(0xFF00897B),
-    Color(0xFF0097A7),
-    Color(0xFF1976D2),
-    Color(0xFF43A047),
-    Color(0xFF26A69A),
-  ];
-
-  static const List<Color> expense = [
-    Color(0xFFC62828),
-    Color(0xFFD32F2F),
-    Color(0xFFF4511E),
-    Color(0xFFFF7043),
-    Color(0xFF8E24AA),
-    Color(0xFFEC407A),
-  ];
-}
-
 class _ChartTooltipStyle {
-  static const Color backgroundColor = Color(0xCC1F2937);
+  static const Color backgroundColor = Color(0xE61F2937);
 }
 
 class _TotalSummaryCard extends StatelessWidget {
@@ -1845,10 +1884,10 @@ class _SectionHeader extends StatelessWidget {
 
 class _CategorySection extends StatelessWidget {
   const _CategorySection({
+    super.key,
     required this.title,
     required this.color,
     required this.icon,
-    required this.palette,
     required this.chartData,
     required this.emptyLabel,
   });
@@ -1856,7 +1895,6 @@ class _CategorySection extends StatelessWidget {
   final String title;
   final Color color;
   final IconData icon;
-  final List<Color> palette;
   final List<_CategoryTotal> chartData;
   final String emptyLabel;
 
@@ -1866,307 +1904,353 @@ class _CategorySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(label: title, color: color, icon: icon),
-        const SizedBox(height: AppTheme.space16),
-        _PieChartCard(
-          baseColor: color,
-          palette: palette,
-          data: chartData,
-          emptyLabel: emptyLabel,
-        ),
+        const SizedBox(height: AppTheme.space8),
+        _CategoryBreakdownCard(data: chartData, emptyLabel: emptyLabel),
       ],
     );
   }
 }
 
-class _PieChartCard extends StatefulWidget {
-  const _PieChartCard({
-    required this.baseColor,
-    required this.palette,
-    required this.data,
-    required this.emptyLabel,
-  });
+/// Donut with the largest categories (the tail merged into "Other") next to a
+/// ranked list of every category with its amount and share.
+class _CategoryBreakdownCard extends StatefulWidget {
+  const _CategoryBreakdownCard({required this.data, required this.emptyLabel});
 
-  static const double _minSlicePercent = 1;
-  static const double _chartHeight = 220;
-  static const double _minLegendHeight = 56;
-  static const double _maxLegendHeight = 172;
-  static const double _legendRowHeight = 30;
+  static const double _donutSize = 180;
+  static const double _sideBySideMinWidth = 520;
+  static const int _collapsedRowCount = 8;
 
-  final Color baseColor;
-  final List<Color> palette;
+  /// Categories sorted by total, largest first.
   final List<_CategoryTotal> data;
   final String emptyLabel;
 
   @override
-  State<_PieChartCard> createState() => _PieChartCardState();
+  State<_CategoryBreakdownCard> createState() => _CategoryBreakdownCardState();
 }
 
-class _PieChartCardState extends State<_PieChartCard> {
-  int? _touchedSectionIndex;
+class _CategoryBreakdownCardState extends State<_CategoryBreakdownCard> {
+  int? _touchedSliceIndex;
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final sliceTotals = _buildSliceTotals(widget.data);
-    final sections = _buildSections(sliceTotals);
-    final legendHeight = _legendHeightForCount(widget.data.length);
-    final touchedIndex = _touchedSectionIndex;
-    final touchedItem =
-        touchedIndex != null &&
-            touchedIndex >= 0 &&
-            touchedIndex < sliceTotals.length
-        ? sliceTotals[touchedIndex]
+
+    if (widget.data.isEmpty) {
+      return Card(
+        child: SizedBox(
+          height: 160,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.pie_chart_outline_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 32,
+                ),
+                const SizedBox(height: AppTheme.space8),
+                Text(
+                  widget.emptyLabel,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final total = widget.data.fold<double>(0, (sum, item) => sum + item.total);
+    final slices = _buildSlices(widget.data);
+    final touchedIndex = _touchedSliceIndex;
+    final touched = touchedIndex != null && touchedIndex < slices.length
+        ? slices[touchedIndex]
         : null;
 
     return Card(
       child: Padding(
         padding: AppTheme.cardPadding,
-        child: widget.data.isEmpty
-            ? SizedBox(
-                height: _PieChartCard._chartHeight,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.pie_chart_outline_rounded,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 32,
-                      ),
-                      const SizedBox(height: AppTheme.space8),
-                      Text(
-                        widget.emptyLabel,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final donut = _buildDonut(slices, total, touched);
+            final list = _buildList(total, touched);
+            if (constraints.maxWidth >=
+                _CategoryBreakdownCard._sideBySideMinWidth) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  donut,
+                  const SizedBox(width: AppTheme.space24),
+                  Expanded(child: list),
+                ],
+              );
+            }
+            return Column(
+              children: [
+                donut,
+                const SizedBox(height: AppTheme.space16),
+                list,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDonut(
+    List<_CategoryTotal> slices,
+    double total,
+    _CategoryTotal? touched,
+  ) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final centerTitle = touched?.name ?? "Total";
+    final centerValue = touched?.total ?? total;
+    final centerShare = touched == null
+        ? null
+        : _formatShare(touched.total / total);
+
+    return SizedBox(
+      width: _CategoryBreakdownCard._donutSize,
+      height: _CategoryBreakdownCard._donutSize,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PieChart(
+            PieChartData(
+              centerSpaceRadius: 58,
+              sectionsSpace: 2,
+              sections: [
+                for (var i = 0; i < slices.length; i++)
+                  PieChartSectionData(
+                    color: slices[i].color,
+                    value: slices[i].total,
+                    radius: i == _touchedSliceIndex ? 32 : 26,
+                    showTitle: false,
+                  ),
+              ],
+              pieTouchData: PieTouchData(
+                enabled: true,
+                touchCallback: (event, response) {
+                  final index = response?.touchedSection?.touchedSectionIndex;
+                  final next =
+                      event.isInterestedForInteractions &&
+                          index != null &&
+                          index >= 0 &&
+                          index < slices.length
+                      ? index
+                      : null;
+                  if (next != _touchedSliceIndex) {
+                    setState(() => _touchedSliceIndex = next);
+                  }
+                },
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 100,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  centerTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
-              )
-            : Column(
-                children: [
-                  SizedBox(
-                    height: _PieChartCard._chartHeight,
-                    child: Stack(
-                      children: [
-                        PieChart(
-                          PieChartData(
-                            sections: sections,
-                            centerSpaceRadius: 52,
-                            sectionsSpace: 2,
-                            pieTouchData: PieTouchData(
-                              enabled: true,
-                              touchCallback: (event, response) {
-                                final touchedSection = response?.touchedSection;
-                                if (!event.isInterestedForInteractions ||
-                                    touchedSection == null) {
-                                  if (_touchedSectionIndex != null) {
-                                    setState(() {
-                                      _touchedSectionIndex = null;
-                                    });
-                                  }
-                                  return;
-                                }
-
-                                final index =
-                                    touchedSection.touchedSectionIndex;
-                                if (index < 0 || index >= sliceTotals.length) {
-                                  if (_touchedSectionIndex != null) {
-                                    setState(() {
-                                      _touchedSectionIndex = null;
-                                    });
-                                  }
-                                  return;
-                                }
-                                if (_touchedSectionIndex != index) {
-                                  setState(() {
-                                    _touchedSectionIndex = index;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 120),
-                              child: touchedItem == null
-                                  ? const SizedBox.shrink()
-                                  : _PieTouchTooltip(
-                                      key: ValueKey<int>(
-                                        touchedItem.categoryId,
-                                      ),
-                                      label: touchedItem.name,
-                                      value:
-                                          "${formatAmount(touchedItem.total)} ₽",
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ],
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    "${formatAmount(centerValue)} ₽",
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: AppTheme.space16),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOut,
-                    alignment: Alignment.topCenter,
-                    child: SizedBox(
-                      height: legendHeight,
-                      child: Scrollbar(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: widget.data
-                                .map(
-                                  (item) => Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: AppTheme.space8,
-                                    ),
-                                    child: _LegendRow(
-                                      color: item.color,
-                                      label: item.name,
-                                      value: "${formatAmount(item.total)} ₽",
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ),
-                      ),
+                ),
+                if (centerShare != null)
+                  Text(
+                    centerShare,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
-              ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  double _legendHeightForCount(int count) {
-    if (count <= 0) return _PieChartCard._minLegendHeight;
-    final desired = count * _PieChartCard._legendRowHeight;
-    return desired
-        .clamp(_PieChartCard._minLegendHeight, _PieChartCard._maxLegendHeight)
-        .toDouble();
-  }
+  Widget _buildList(double total, _CategoryTotal? touched) {
+    final data = widget.data;
+    final canCollapse = data.length > _CategoryBreakdownCard._collapsedRowCount;
+    final visible = canCollapse && !_isExpanded
+        ? data.take(_CategoryBreakdownCard._collapsedRowCount).toList()
+        : data;
+    final largest = data.first.total;
 
-  List<_CategoryTotal> _buildSliceTotals(List<_CategoryTotal> totals) {
-    final totalValue = totals.fold<double>(0, (sum, item) => sum + item.total);
-    if (totalValue == 0) return <_CategoryTotal>[];
-
-    final colors = totals.length > 1 ? widget.palette : [widget.baseColor];
-    final visibleTotals = totals
-        .where(
-          (item) =>
-              item.total / totalValue * 100 >= _PieChartCard._minSlicePercent,
-        )
-        .toList();
-    final sliceTotals = visibleTotals.isEmpty ? totals : visibleTotals;
-
-    for (var i = 0; i < sliceTotals.length; i++) {
-      sliceTotals[i].color = colors[i % colors.length];
-    }
-
-    return sliceTotals;
-  }
-
-  List<PieChartSectionData> _buildSections(List<_CategoryTotal> sliceTotals) {
-    final totalValue = sliceTotals.fold<double>(
-      0,
-      (sum, item) => sum + item.total,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in visible)
+          _CategoryShareRow(
+            color: item.color,
+            label: item.name,
+            amount: item.total,
+            share: _formatShare(item.total / total),
+            barFraction: largest > 0 ? item.total / largest : 0,
+            isHighlighted:
+                touched != null &&
+                (touched.categoryId == item.categoryId ||
+                    (touched.categoryId == _otherCategoryId &&
+                        item.color == AppTheme.chartOtherColor)),
+          ),
+        if (canCollapse)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _isExpanded = !_isExpanded),
+              icon: Icon(
+                _isExpanded
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+              ),
+              label: Text(
+                _isExpanded ? "Show less" : "Show all ${data.length}",
+              ),
+            ),
+          ),
+      ],
     );
-    if (totalValue == 0) return [];
+  }
 
-    return sliceTotals.asMap().entries.map((entry) {
-      final item = entry.value;
-      final value = item.total;
-      final percentage = value / totalValue * 100;
-      return PieChartSectionData(
-        color: item.color,
-        value: value,
-        radius: 72,
-        title: "${percentage.toStringAsFixed(0)}%",
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+  /// Colours the top categories from the palette and the rest grey, and
+  /// returns the donut slices with the grey tail merged into one "Other".
+  List<_CategoryTotal> _buildSlices(List<_CategoryTotal> totals) {
+    final palette = AppTheme.chartPalette;
+    final totalsById = {for (final item in totals) item.categoryId: item.total};
+    // One palette slot is held back: a lone leftover key keeps its own colour.
+    final topIds = topKeysByTotal(totalsById, palette.length - 1).toSet();
+
+    final slices = <_CategoryTotal>[];
+    double otherTotal = 0;
+    for (final item in totals) {
+      if (topIds.contains(item.categoryId)) {
+        item.color = palette[slices.length];
+        slices.add(item);
+      } else {
+        item.color = AppTheme.chartOtherColor;
+        otherTotal += item.total;
+      }
+    }
+    if (otherTotal > 0) {
+      slices.add(
+        _CategoryTotal(
+          categoryId: _otherCategoryId,
+          name: "Other",
+          total: otherTotal,
+          color: AppTheme.chartOtherColor,
         ),
       );
-    }).toList();
+    }
+    return slices;
+  }
+
+  static String _formatShare(double share) {
+    final percent = share * 100;
+    if (percent > 0 && percent < 1) return "<1%";
+    return "${percent.round()}%";
   }
 }
 
-class _PieTouchTooltip extends StatelessWidget {
-  const _PieTouchTooltip({super.key, required this.label, required this.value});
+/// Synthetic id of the merged "Other" slice; real category ids are positive.
+const int _otherCategoryId = -1;
 
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.space8,
-        vertical: AppTheme.space4,
-      ),
-      decoration: BoxDecoration(
-        color: _ChartTooltipStyle.backgroundColor,
-        borderRadius: AppTheme.borderRadiusSmall,
-      ),
-      child: Text(
-        "$label\n$value",
-        textAlign: TextAlign.center,
-        style:
-            textTheme.labelMedium?.copyWith(color: Colors.white) ??
-            const TextStyle(color: Colors.white),
-      ),
-    );
-  }
-}
-
-class _LegendRow extends StatelessWidget {
-  const _LegendRow({
+class _CategoryShareRow extends StatelessWidget {
+  const _CategoryShareRow({
     required this.color,
     required this.label,
-    required this.value,
+    required this.amount,
+    required this.share,
+    required this.barFraction,
+    required this.isHighlighted,
   });
 
   final Color color;
   final String label;
-  final String value;
+  final double amount;
+  final String share;
+  final double barFraction;
+  final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: AppTheme.space8),
-        Expanded(
-          child: Text(
-            label,
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.space4 + 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: AppTheme.space8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: isHighlighted
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppTheme.space8),
+              Text(
+                share,
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: AppTheme.space12),
+              Text(
+                "${formatAmount(amount)} ₽",
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-        ),
-        Text(
-          value,
-          style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-      ],
+          const SizedBox(height: AppTheme.space4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: barFraction,
+              minHeight: 4,
+              color: color,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2192,38 +2276,6 @@ class _CategoryTotal {
       color: color,
     );
   }
-}
-
-class _PieColors {
-  static const List<Color> incomePalette = [
-    Color(0xFF2E7D32),
-    Color(0xFF00897B),
-    Color(0xFF0097A7),
-    Color(0xFF1976D2),
-    Color(0xFF7CB342),
-    Color(0xFF43A047),
-    Color(0xFF00ACC1),
-    Color(0xFF5C6BC0),
-    Color(0xFFAFB42B),
-    Color(0xFF7E57C2),
-    Color(0xFFFFB300),
-    Color(0xFF26A69A),
-  ];
-
-  static const List<Color> expensePalette = [
-    Color(0xFFC62828),
-    Color(0xFFD32F2F),
-    Color(0xFFF4511E),
-    Color(0xFFFF7043),
-    Color(0xFF8E24AA),
-    Color(0xFFEC407A),
-    Color(0xFF6D4C41),
-    Color(0xFFFF8F00),
-    Color(0xFF5D4037),
-    Color(0xFFFFA000),
-    Color(0xFFAD1457),
-    Color(0xFFEF5350),
-  ];
 }
 
 class _TransactionsSection extends StatelessWidget {

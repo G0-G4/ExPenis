@@ -18,6 +18,7 @@ import "package:expenis_mobile/service/update_service.dart";
 import "package:expenis_mobile/theme.dart";
 import "package:expenis_mobile/utils/app_version.dart";
 import "package:expenis_mobile/utils/jwt.dart";
+import "package:expenis_mobile/widgets/responsive.dart";
 import "package:expenis_mobile/widgets/update_dialog.dart";
 
 // Kept alive so debug semantics stay on. Disposing the last handle turns them off.
@@ -130,6 +131,9 @@ class _HomeScreenState extends State<HomeScreen> {
     initialPage: _defaultTabIndex,
   );
   int _currentPageIndex = _defaultTabIndex;
+  // Keeps the PageView (and its pages' state) alive when the window crosses
+  // the rail/bottom-bar breakpoint and the widget moves in the tree.
+  final GlobalKey _pagesKey = GlobalKey();
   String? _appVersion;
 
   @override
@@ -159,8 +163,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openAnalytics() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TransactionStatsScreen(
+          initialEndDate: DateTime.now(),
+          initialGroupByMonth: true,
+        ),
+      ),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.pushNamed(context, "/settings");
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Wide windows (desktop, web, tablets in landscape) get a side rail
+    // instead of the bottom bar, and the pages stop stretching edge to edge.
+    final isWide = MediaQuery.sizeOf(context).width >= Breakpoints.medium;
+    final pages = PageView(
+      key: _pagesKey,
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      onPageChanged: (index) => setState(() => _currentPageIndex = index),
+      children: const [
+        ResponsiveCenter(child: AccountScreen()),
+        ResponsiveCenter(child: TransactionScreen()),
+        ResponsiveCenter(child: CategoryScreen()),
+      ],
+    );
+
     return Scaffold(
       drawer: Drawer(
         child: ListView(
@@ -198,15 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text("Monthly analytics"),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TransactionStatsScreen(
-                      initialEndDate: DateTime.now(),
-                      initialGroupByMonth: true,
-                    ),
-                  ),
-                );
+                _openAnalytics();
               },
             ),
             ListTile(
@@ -214,43 +241,87 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text("Settings"),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, "/settings");
+                _openSettings();
               },
             ),
           ],
         ),
       ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (index) => setState(() => _currentPageIndex = index),
-        children: const [
-          AccountScreen(),
-          TransactionScreen(),
-          CategoryScreen(),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentPageIndex,
-        onDestinationSelected: _onDestinationSelected,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_outlined),
-            selectedIcon: Icon(Icons.account_balance),
-            label: "Accounts",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.swap_horiz_outlined),
-            selectedIcon: Icon(Icons.swap_horiz),
-            label: "Transactions",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder),
-            label: "Categories",
-          ),
-        ],
-      ),
+      body: isWide
+          ? Row(
+              children: [
+                SafeArea(
+                  right: false,
+                  child: NavigationRail(
+                    selectedIndex: _currentPageIndex,
+                    onDestinationSelected: _onDestinationSelected,
+                    labelType: NavigationRailLabelType.all,
+                    groupAlignment: -1,
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.account_balance_outlined),
+                        selectedIcon: Icon(Icons.account_balance),
+                        label: Text("Accounts"),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.swap_horiz_outlined),
+                        selectedIcon: Icon(Icons.swap_horiz),
+                        label: Text("Transactions"),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.folder_outlined),
+                        selectedIcon: Icon(Icons.folder),
+                        label: Text("Categories"),
+                      ),
+                    ],
+                    trailing: Padding(
+                      padding: const EdgeInsets.only(top: AppTheme.space24),
+                      child: Column(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.insights_outlined),
+                            tooltip: "Monthly analytics",
+                            onPressed: _openAnalytics,
+                          ),
+                          const SizedBox(height: AppTheme.space8),
+                          IconButton(
+                            icon: const Icon(Icons.settings_outlined),
+                            tooltip: "Settings",
+                            onPressed: _openSettings,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: pages),
+              ],
+            )
+          : pages,
+      bottomNavigationBar: isWide
+          ? null
+          : NavigationBar(
+              selectedIndex: _currentPageIndex,
+              onDestinationSelected: _onDestinationSelected,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.account_balance_outlined),
+                  selectedIcon: Icon(Icons.account_balance),
+                  label: "Accounts",
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.swap_horiz_outlined),
+                  selectedIcon: Icon(Icons.swap_horiz),
+                  label: "Transactions",
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.folder_outlined),
+                  selectedIcon: Icon(Icons.folder),
+                  label: "Categories",
+                ),
+              ],
+            ),
     );
   }
 }

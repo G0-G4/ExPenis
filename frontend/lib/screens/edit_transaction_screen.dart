@@ -11,6 +11,7 @@ import 'package:expenis_mobile/service/transaction_service.dart';
 import 'package:expenis_mobile/theme.dart';
 import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
 import 'package:expenis_mobile/widgets/delete_dialog.dart';
+import 'package:expenis_mobile/widgets/responsive.dart';
 
 class EditTransactionScreen extends StatefulWidget {
   final int? transactionId;
@@ -251,241 +252,243 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
             ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: AppTheme.screenPadding,
-          children: [
-            // ── Type selector ─────────────────────────────────────────
-            Text(
-              'Type',
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppTheme.space8),
-            SegmentedButton<CategoryType>(
-              segments: const [
-                ButtonSegment(
-                  value: CategoryType.expense,
-                  label: Text('Expense'),
-                  icon: Icon(Icons.arrow_upward_rounded, size: 16),
+      body: ResponsiveCenter(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: AppTheme.screenPadding,
+            children: [
+              // ── Type selector ─────────────────────────────────────────
+              Text(
+                'Type',
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                ButtonSegment(
-                  value: CategoryType.income,
-                  label: Text('Income'),
-                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
+              ),
+              const SizedBox(height: AppTheme.space8),
+              SegmentedButton<CategoryType>(
+                segments: const [
+                  ButtonSegment(
+                    value: CategoryType.expense,
+                    label: Text('Expense'),
+                    icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: CategoryType.income,
+                    label: Text('Income'),
+                    icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                  ),
+                ],
+                selected: {_transactionType},
+                onSelectionChanged: (selection) => setState(() {
+                  _transactionType = selection.first;
+                  _selectedCategoryId = null;
+                }),
+              ),
+              const SizedBox(height: AppTheme.space16),
+
+              // ── Amount ────────────────────────────────────────────────
+              TextFormField(
+                controller: _amountController,
+                decoration: InputDecoration(
+                  labelText: 'Amount',
+                  prefixIcon: const Icon(Icons.attach_money_outlined),
+                  suffixText: _selectedCurrencyCode.isEmpty
+                      ? null
+                      : _selectedCurrencyCode,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter an amount';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Please enter a valid number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppTheme.space16),
+
+              // ── Description ───────────────────────────────────────────
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: AppTheme.space16),
+
+              TypeAheadField<String>(
+                controller: _tagController,
+                builder: (context, controller, focusNode) {
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'Tags (optional)',
+                      prefixIcon: const Icon(Icons.sell_outlined),
+                      hintText: 'Type tag and press enter',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: () => _addTag(controller.text),
+                      ),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: _addTag,
+                  );
+                },
+                suggestionsCallback: (pattern) {
+                  final normalizedPattern = _normalizeTag(pattern);
+                  if (normalizedPattern.isEmpty) return const <String>[];
+                  return _allTags.where((tag) {
+                    final normalizedTag = _normalizeTag(tag);
+                    return normalizedTag.contains(normalizedPattern) &&
+                        !_isTagSelected(tag);
+                  }).toList();
+                },
+                itemBuilder: (context, suggestion) {
+                  return ListTile(title: Text(suggestion));
+                },
+                onSelected: _addTag,
+              ),
+              if (_selectedTags.isNotEmpty) ...[
+                const SizedBox(height: AppTheme.space8),
+                Wrap(
+                  spacing: AppTheme.space8,
+                  runSpacing: AppTheme.space8,
+                  children: _selectedTags
+                      .map(
+                        (tag) => InputChip(
+                          label: Text(tag),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedTags.remove(tag);
+                            });
+                          },
+                        ),
+                      )
+                      .toList(),
                 ),
               ],
-              selected: {_transactionType},
-              onSelectionChanged: (selection) => setState(() {
-                _transactionType = selection.first;
-                _selectedCategoryId = null;
-              }),
-            ),
-            const SizedBox(height: AppTheme.space16),
+              const SizedBox(height: AppTheme.space16),
 
-            // ── Amount ────────────────────────────────────────────────
-            TextFormField(
-              controller: _amountController,
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                prefixIcon: const Icon(Icons.attach_money_outlined),
-                suffixText: _selectedCurrencyCode.isEmpty
-                    ? null
-                    : _selectedCurrencyCode,
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an amount';
-                }
-                if (double.tryParse(value) == null) {
-                  return 'Please enter a valid number';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: AppTheme.space16),
-
-            // ── Description ───────────────────────────────────────────
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                prefixIcon: Icon(Icons.notes_outlined),
-              ),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: AppTheme.space16),
-
-            TypeAheadField<String>(
-              controller: _tagController,
-              builder: (context, controller, focusNode) {
-                return TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: InputDecoration(
-                    labelText: 'Tags (optional)',
-                    prefixIcon: const Icon(Icons.sell_outlined),
-                    hintText: 'Type tag and press enter',
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.add_circle_outline),
-                      onPressed: () => _addTag(controller.text),
-                    ),
+              // ── Date ──────────────────────────────────────────────────
+              InkWell(
+                onTap: _selectDate,
+                borderRadius: AppTheme.borderRadiusSmall,
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Date',
+                    prefixIcon: Icon(Icons.calendar_today_outlined),
+                    suffixIcon: Icon(Icons.edit_calendar_outlined),
                   ),
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: _addTag,
-                );
-              },
-              suggestionsCallback: (pattern) {
-                final normalizedPattern = _normalizeTag(pattern);
-                if (normalizedPattern.isEmpty) return const <String>[];
-                return _allTags.where((tag) {
-                  final normalizedTag = _normalizeTag(tag);
-                  return normalizedTag.contains(normalizedPattern) &&
-                      !_isTagSelected(tag);
-                }).toList();
-              },
-              itemBuilder: (context, suggestion) {
-                return ListTile(title: Text(suggestion));
-              },
-              onSelected: _addTag,
-            ),
-            if (_selectedTags.isNotEmpty) ...[
-              const SizedBox(height: AppTheme.space8),
-              Wrap(
-                spacing: AppTheme.space8,
-                runSpacing: AppTheme.space8,
-                children: _selectedTags
-                    .map(
-                      (tag) => InputChip(
-                        label: Text(tag),
-                        onDeleted: () {
-                          setState(() {
-                            _selectedTags.remove(tag);
-                          });
-                        },
+                  child: Text(
+                    _formatDate(_selectedDate),
+                    style: textTheme.bodyLarge,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppTheme.space16),
+
+              // ── Account dropdown ──────────────────────────────────────
+              FutureBuilder<AccountsResult>(
+                future: _futureAccounts,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final accounts = snapshot.data!.accounts;
+                    if (_accounts.isEmpty && accounts.isNotEmpty) {
+                      // Cache accounts list for currency lookup without setState.
+                      _accounts = accounts;
+                    }
+                    return DropdownButtonFormField<int>(
+                      initialValue: _selectedAccountId,
+                      decoration: const InputDecoration(
+                        labelText: 'Account',
+                        prefixIcon: Icon(Icons.account_balance_outlined),
                       ),
-                    )
-                    .toList(),
+                      items: accounts.map((account) {
+                        return DropdownMenuItem<int>(
+                          value: account.id,
+                          child: Text(account.name),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setState(() {
+                        _selectedAccountId = value;
+                      }),
+                      validator: (value) =>
+                          value == null ? 'Please select an account' : null,
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text(
+                      'Failed to load accounts',
+                      style: TextStyle(color: colorScheme.error),
+                    );
+                  }
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(AppTheme.space16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppTheme.space16),
+
+              // ── Category dropdown ─────────────────────────────────────
+              FutureBuilder<List<Category>>(
+                future: _futureCategories,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final filtered = snapshot.data!
+                        .where((cat) => cat.type == _transactionType)
+                        .toList();
+                    return DropdownButtonFormField<int>(
+                      initialValue: _selectedCategoryId,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        prefixIcon: Icon(Icons.folder_outlined),
+                      ),
+                      items: filtered.map((category) {
+                        return DropdownMenuItem<int>(
+                          value: category.id,
+                          child: Text(category.name),
+                        );
+                      }).toList(),
+                      onChanged: (value) =>
+                          setState(() => _selectedCategoryId = value),
+                      validator: (value) =>
+                          value == null ? 'Please select a category' : null,
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text(
+                      'Failed to load categories',
+                      style: TextStyle(color: colorScheme.error),
+                    );
+                  }
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(AppTheme.space16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppTheme.space32),
+
+              // ── Save button ───────────────────────────────────────────
+              FilledButton(
+                onPressed: _isSaving ? null : _saveTransaction,
+                child: _isSaving
+                    ? const AppLoadingSpinner()
+                    : Text(_isEditing ? 'Save Changes' : 'Add Transaction'),
               ),
             ],
-            const SizedBox(height: AppTheme.space16),
-
-            // ── Date ──────────────────────────────────────────────────
-            InkWell(
-              onTap: _selectDate,
-              borderRadius: AppTheme.borderRadiusSmall,
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date',
-                  prefixIcon: Icon(Icons.calendar_today_outlined),
-                  suffixIcon: Icon(Icons.edit_calendar_outlined),
-                ),
-                child: Text(
-                  _formatDate(_selectedDate),
-                  style: textTheme.bodyLarge,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppTheme.space16),
-
-            // ── Account dropdown ──────────────────────────────────────
-            FutureBuilder<AccountsResult>(
-              future: _futureAccounts,
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  final accounts = snapshot.data!.accounts;
-                  if (_accounts.isEmpty && accounts.isNotEmpty) {
-                    // Cache accounts list for currency lookup without setState.
-                    _accounts = accounts;
-                  }
-                  return DropdownButtonFormField<int>(
-                    initialValue: _selectedAccountId,
-                    decoration: const InputDecoration(
-                      labelText: 'Account',
-                      prefixIcon: Icon(Icons.account_balance_outlined),
-                    ),
-                    items: accounts.map((account) {
-                      return DropdownMenuItem<int>(
-                        value: account.id,
-                        child: Text(account.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) => setState(() {
-                      _selectedAccountId = value;
-                    }),
-                    validator: (value) =>
-                        value == null ? 'Please select an account' : null,
-                  );
-                } else if (snapshot.hasError) {
-                  return Text(
-                    'Failed to load accounts',
-                    style: TextStyle(color: colorScheme.error),
-                  );
-                }
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppTheme.space16),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: AppTheme.space16),
-
-            // ── Category dropdown ─────────────────────────────────────
-            FutureBuilder<List<Category>>(
-              future: _futureCategories,
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  final filtered = snapshot.data!
-                      .where((cat) => cat.type == _transactionType)
-                      .toList();
-                  return DropdownButtonFormField<int>(
-                    initialValue: _selectedCategoryId,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      prefixIcon: Icon(Icons.folder_outlined),
-                    ),
-                    items: filtered.map((category) {
-                      return DropdownMenuItem<int>(
-                        value: category.id,
-                        child: Text(category.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) =>
-                        setState(() => _selectedCategoryId = value),
-                    validator: (value) =>
-                        value == null ? 'Please select a category' : null,
-                  );
-                } else if (snapshot.hasError) {
-                  return Text(
-                    'Failed to load categories',
-                    style: TextStyle(color: colorScheme.error),
-                  );
-                }
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppTheme.space16),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: AppTheme.space32),
-
-            // ── Save button ───────────────────────────────────────────
-            FilledButton(
-              onPressed: _isSaving ? null : _saveTransaction,
-              child: _isSaving
-                  ? const AppLoadingSpinner()
-                  : Text(_isEditing ? 'Save Changes' : 'Add Transaction'),
-            ),
-          ],
+          ),
         ),
       ),
     );

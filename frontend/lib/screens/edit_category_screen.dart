@@ -5,6 +5,7 @@ import 'package:expenis_mobile/service/category_service.dart';
 import 'package:expenis_mobile/theme.dart';
 import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
 import 'package:expenis_mobile/widgets/delete_dialog.dart';
+import 'package:expenis_mobile/widgets/responsive.dart';
 
 class EditCategoryScreen extends StatefulWidget {
   final int categoryId;
@@ -109,59 +110,61 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
             ),
         ],
       ),
-      body: _nameController == null || _type == null
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: AppTheme.screenPadding,
-                children: [
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Category Name',
-                      prefixIcon: Icon(Icons.folder_outlined),
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                    validator: (value) => (value == null || value.isEmpty)
-                        ? 'Please enter a name'
-                        : null,
-                  ),
-                  const SizedBox(height: AppTheme.space24),
-                  Text(
-                    'Type',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.space8),
-                  SegmentedButton<CategoryType>(
-                    segments: const [
-                      ButtonSegment(
-                        value: CategoryType.income,
-                        label: Text('Income'),
-                        icon: Icon(Icons.arrow_downward_rounded, size: 16),
+      body: ResponsiveCenter(
+        child: _nameController == null || _type == null
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: AppTheme.screenPadding,
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Category Name',
+                        prefixIcon: Icon(Icons.folder_outlined),
                       ),
-                      ButtonSegment(
-                        value: CategoryType.expense,
-                        label: Text('Expense'),
-                        icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Please enter a name'
+                          : null,
+                    ),
+                    const SizedBox(height: AppTheme.space24),
+                    Text(
+                      'Type',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                    selected: {_type!},
-                    onSelectionChanged: (selection) =>
-                        setState(() => _type = selection.first),
-                  ),
-                  const SizedBox(height: AppTheme.space32),
-                  FilledButton(
-                    onPressed: _isSaving ? null : _updateCategory,
-                    child: _isSaving
-                        ? const AppLoadingSpinner()
-                        : const Text('Save Changes'),
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: AppTheme.space8),
+                    SegmentedButton<CategoryType>(
+                      segments: const [
+                        ButtonSegment(
+                          value: CategoryType.income,
+                          label: Text('Income'),
+                          icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: CategoryType.expense,
+                          label: Text('Expense'),
+                          icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                        ),
+                      ],
+                      selected: {_type!},
+                      onSelectionChanged: (selection) =>
+                          setState(() => _type = selection.first),
+                    ),
+                    const SizedBox(height: AppTheme.space32),
+                    FilledButton(
+                      onPressed: _isSaving ? null : _updateCategory,
+                      child: _isSaving
+                          ? const AppLoadingSpinner()
+                          : const Text('Save Changes'),
+                    ),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 }

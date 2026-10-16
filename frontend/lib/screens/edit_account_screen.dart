@@ -6,6 +6,7 @@ import 'package:expenis_mobile/theme.dart';
 import 'package:expenis_mobile/widgets/app_error_state.dart';
 import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
 import 'package:expenis_mobile/widgets/delete_dialog.dart';
+import 'package:expenis_mobile/widgets/responsive.dart';
 
 class EditAccountScreen extends StatefulWidget {
   final int accountId;
@@ -120,66 +121,68 @@ class _EditAccountScreenState extends State<EditAccountScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? AppErrorState(message: _error!, onRetry: _fetchAccount)
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: AppTheme.screenPadding,
-                children: [
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Account Name',
-                      prefixIcon: Icon(Icons.account_balance_outlined),
+      body: ResponsiveCenter(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? AppErrorState(message: _error!, onRetry: _fetchAccount)
+            : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: AppTheme.screenPadding,
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Account Name',
+                        prefixIcon: Icon(Icons.account_balance_outlined),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Please enter a name'
+                          : null,
                     ),
-                    textCapitalization: TextCapitalization.words,
-                    validator: (value) => (value == null || value.isEmpty)
-                        ? 'Please enter a name'
-                        : null,
-                  ),
-                  const SizedBox(height: AppTheme.space16),
-                  TextFormField(
-                    controller: _amountController,
-                    decoration: InputDecoration(
-                      labelText: 'Balance',
-                      prefixIcon: const Icon(Icons.attach_money_outlined),
-                      suffixText: _account?.currencyCode,
+                    const SizedBox(height: AppTheme.space16),
+                    TextFormField(
+                      controller: _amountController,
+                      decoration: InputDecoration(
+                        labelText: 'Balance',
+                        prefixIcon: const Icon(Icons.attach_money_outlined),
+                        suffixText: _account?.currencyCode,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter an amount';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return 'Please enter a valid number';
+                        }
+                        return null;
+                      },
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    const SizedBox(height: AppTheme.space16),
+                    TextFormField(
+                      initialValue: _account!.currencyCode,
+                      enabled: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Currency Code',
+                        prefixIcon: Icon(Icons.language_outlined),
+                      ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter an amount';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppTheme.space16),
-                  TextFormField(
-                    initialValue: _account!.currencyCode,
-                    enabled: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Currency Code',
-                      prefixIcon: Icon(Icons.language_outlined),
+                    const SizedBox(height: AppTheme.space32),
+                    FilledButton(
+                      onPressed: _isSaving ? null : _updateAccount,
+                      child: _isSaving
+                          ? const AppLoadingSpinner()
+                          : const Text('Save Changes'),
                     ),
-                  ),
-                  const SizedBox(height: AppTheme.space32),
-                  FilledButton(
-                    onPressed: _isSaving ? null : _updateAccount,
-                    child: _isSaving
-                        ? const AppLoadingSpinner()
-                        : const Text('Save Changes'),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 }

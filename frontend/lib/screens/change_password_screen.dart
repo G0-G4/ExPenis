@@ -4,6 +4,7 @@ import "package:expenis_mobile/service/auth_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
 import "package:expenis_mobile/theme.dart";
 import "package:expenis_mobile/widgets/app_loading_spinner.dart";
+import "package:expenis_mobile/widgets/responsive.dart";
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -106,45 +107,47 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Change Password")),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: AppTheme.screenPadding,
-          children: [
-            _buildField(
-              controller: _oldController,
-              label: "Current Password",
-              obscure: _obscureOld,
-              onToggle: () => setState(() => _obscureOld = !_obscureOld),
-              validator: (value) => (value == null || value.isEmpty)
-                  ? "Please enter your current password"
-                  : null,
-            ),
-            const SizedBox(height: AppTheme.space16),
-            _buildField(
-              controller: _newController,
-              label: "New Password",
-              obscure: _obscureNew,
-              onToggle: () => setState(() => _obscureNew = !_obscureNew),
-              validator: _validateNewPassword,
-            ),
-            const SizedBox(height: AppTheme.space16),
-            _buildField(
-              controller: _confirmController,
-              label: "Confirm New Password",
-              obscure: _obscureConfirm,
-              onToggle: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-              validator: _validateConfirm,
-            ),
-            const SizedBox(height: AppTheme.space32),
-            FilledButton(
-              onPressed: _isSubmitting ? null : _submit,
-              child: _isSubmitting
-                  ? const AppLoadingSpinner()
-                  : const Text("Change Password"),
-            ),
-          ],
+      body: ResponsiveCenter(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: AppTheme.screenPadding,
+            children: [
+              _buildField(
+                controller: _oldController,
+                label: "Current Password",
+                obscure: _obscureOld,
+                onToggle: () => setState(() => _obscureOld = !_obscureOld),
+                validator: (value) => (value == null || value.isEmpty)
+                    ? "Please enter your current password"
+                    : null,
+              ),
+              const SizedBox(height: AppTheme.space16),
+              _buildField(
+                controller: _newController,
+                label: "New Password",
+                obscure: _obscureNew,
+                onToggle: () => setState(() => _obscureNew = !_obscureNew),
+                validator: _validateNewPassword,
+              ),
+              const SizedBox(height: AppTheme.space16),
+              _buildField(
+                controller: _confirmController,
+                label: "Confirm New Password",
+                obscure: _obscureConfirm,
+                onToggle: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+                validator: _validateConfirm,
+              ),
+              const SizedBox(height: AppTheme.space32),
+              FilledButton(
+                onPressed: _isSubmitting ? null : _submit,
+                child: _isSubmitting
+                    ? const AppLoadingSpinner()
+                    : const Text("Change Password"),
+              ),
+            ],
+          ),
         ),
       ),
     );
