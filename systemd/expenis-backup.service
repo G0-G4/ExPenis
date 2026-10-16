@@ -9,7 +9,7 @@ Group=gog4
 ExecStart=/home/gog4/ExPenis/backup.sh
 WorkingDirectory=/home/gog4/ExPenis
 StandardOutput=append:/var/log/expenis-backup.log
-StandardError==append:/var/log/expenis-backup-error.log
+StandardError=append:/var/log/expenis-backup-error.log
 LimitMEMLOCK=infinity
 LimitRTPRIO=infinity
 LimitRTTIME=infinity

@@ -1,9 +1,9 @@
 [Unit]
 Description=Timer for ExPenis daily backup
-Requires=backup.service
+Requires=expenis-backup.service
 
 [Timer]
-Unit=backup.service
+Unit=expenis-backup.service
 OnCalendar=daily
 Persistent=true
 
