@@ -43,7 +43,7 @@ dev-web:
 # Flutter web-server на :8080 без окна Chrome (Playwright / агент).
 # Нужен уже запущенный `just dev-backend`.
 dev-web-server:
-    cd frontend && flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8080
+    cd frontend && flutter run -d web-server --web-hostname 127.0.0.1 --web-port 8080 --no-web-resources-cdn
 
 # Подсказка: два терминала для локального web
 dev:

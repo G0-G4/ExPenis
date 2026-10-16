@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from re import Pattern
 
@@ -33,13 +34,17 @@ def fill_textbox(page: Page, name: str, value: str, *, exact: bool = False) -> N
     expect(locator).to_be_visible()
     logger.info("fill %r (%d chars)", name, len(value))
     locator.click()
-    current = locator.input_value()
-    if current:
-        locator.press("ControlOrMeta+A")
-        locator.press("Backspace")
-    locator.press_sequentially(value, delay=30)
-    if "password" not in name.lower():
-        expect(locator).to_have_value(value)
+    # Flutter web sometimes swallows the first key while it swaps in its editing
+    # element, so type, check, and retype on mismatch.
+    for attempt in range(1, 4):
+        if locator.input_value():
+            locator.press("ControlOrMeta+A")
+            locator.press("Backspace")
+        locator.press_sequentially(value, delay=30)
+        if locator.input_value() == value:
+            return
+        logger.info("fill %r attempt %d mismatched, retyping", name, attempt)
+    expect(locator).to_have_value(value)
 
 
 def open_app(page: Page) -> None:
@@ -64,6 +69,14 @@ def expect_transactions_screen(page: Page) -> None:
     expect(page.get_by_role("heading", name="Transactions")).to_be_visible(
         timeout=30_000,
     )
+
+
+def open_section(page: Page, name: str) -> None:
+    """Switch the main section: bottom bar tabs on narrow, navigation rail from 840px."""
+    logger.info("open section %s", name)
+    bottom_tab = page.get_by_role("tab", name=name, exact=True)
+    rail_item = page.get_by_role("button", name=re.compile(rf"^{name} Tab \d+ of \d+$"))
+    bottom_tab.or_(rail_item).click()
 
 
 def login_via_ui(page: Page, username: str, password: str) -> None:

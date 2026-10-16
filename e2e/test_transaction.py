@@ -10,6 +10,7 @@ from e2e.helpers import (
     fill_textbox,
     log_snapshot,
     open_app,
+    open_section,
     pick_dropdown,
     register_via_ui,
     unique_username,
@@ -24,7 +25,7 @@ def test_register_create_account_create_expense_transaction(page: Page) -> None:
     register_via_ui(page, username, PASSWORD)
     expect_transactions_screen(page)
 
-    page.get_by_role("tab", name="Accounts").click()
+    open_section(page, "Accounts")
     expect(page.get_by_role("heading", name="Accounts")).to_be_visible()
     page.get_by_role("button", name="Add account").click()
     expect(page.get_by_role("heading", name="New Account")).to_be_visible()
@@ -37,7 +38,7 @@ def test_register_create_account_create_expense_transaction(page: Page) -> None:
     expect(page.get_by_role("heading", name="Accounts")).to_be_visible()
     expect(page.get_by_role("group", name=re.compile(r"^Cash"))).to_be_visible()
 
-    page.get_by_role("tab", name="Transactions").click()
+    open_section(page, "Transactions")
     expect_transactions_screen(page)
     page.get_by_role("button", name="Add transaction").click()
     expect(page.get_by_role("heading", name="New Transaction")).to_be_visible()

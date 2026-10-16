@@ -43,4 +43,8 @@ def page(page):
 
     page.on("console", _on_console)
     page.on("pageerror", lambda err: logger.info("pageerror: %s", err))
+    page.on(
+        "requestfailed",
+        lambda req: logger.info("request failed: %s %s", req.url, req.failure),
+    )
     return page
