@@ -47,7 +47,7 @@ flutter build ios            # iOS (requires macOS + Xcode)
 flutter build web            # Web
 
 just release-tag             # Tag vX.Y.Z from pubspec and push (triggers release CI: APK + web zip)
-just flutter-fetch-deploy    # Server: same as ./deploy.sh — curl latest zip, unpack, restart nginx
+just flutter-fetch-deploy    # Server: same as ./deploy.sh — curl latest zip, publish into Caddy's web root
 ./deploy.sh                  # Preferred on the server after the GitHub Release is published
 ```
 

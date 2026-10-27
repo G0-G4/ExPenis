@@ -10,7 +10,7 @@ This file gives coding agents practical commands and style conventions for this 
   - Async SQLite access via `playhouse.pwasyncio`
   - DTOs with Pydantic
 - Tests: `pytest`, `pytest-asyncio`
-- Infra helpers: `docker-compose`, `just`
+- Infra helpers: `just`; production is the box's shared Caddy + a systemd unit (see `docs/deployment.md`)
 Key paths:
 - `src/expenis/core/` — models, services, helpers, domain errors
 - `src/expenis/server/` — FastAPI app + API DTOs
@@ -26,7 +26,7 @@ Key paths:
 - `docs/openapi.json` — generated OpenAPI 3.1 spec (run `just openapi` after API changes). The `info.version` reflects the backend version from `pyproject.toml`.
 - Long-lived tokens for agents: `just generate-agent-token` or `uv run -m src.expenis.server token --username llm-agent --days 365`. The user must already exist (the command will error if the username is not found).
 ### Clients
-- Flutter app lives in `frontend/`. Built web bundle is produced by `just flutter-build` into `flutter_web/` (gitignored) and deployed via `Dockerfile.frontend` + nginx.
+- Flutter app lives in `frontend/`. Built web bundle is produced by `just flutter-build` into `flutter_web/` (gitignored). Production serves the release zip from `/var/www/expenis` via Caddy (`deploy.sh`, `deploy/Caddyfile.snippet`).
 ## 2) Setup / Build / Run
 Run commands from repo root.
 ### Environment setup
@@ -35,11 +35,6 @@ Run commands from repo root.
 - Run FastAPI server: `uv run -m src.expenis.server`
 - Run Flutter app (debug): `cd frontend && flutter run`
 - Build Flutter web bundle into `flutter_web/`: `just flutter-build`
-### Docker helpers
-- Start services: `just up`
-- Stop services: `just down`
-- Build images: `just build`
-- Follow logs: `just logs`
 ### Lockfile maintenance
 - Rebuild lockfile: `just lock`
 
@@ -98,16 +93,19 @@ when the access token expires. Default refresh is 90 days.
 
 ### Deploy web from GitHub Release (server, no Flutter SDK)
 Public repo — no auth. There is **no CI that deploys web to the server**; the
-workflow only uploads zips to the GitHub Release. After the release is published,
-on the server (repo root, typically `/home/gog4/ExPenis`):
+workflow only uploads zips to the GitHub Release. See `docs/deployment.md`
+for how the server is set up (the box's shared Caddy serves the web bundle
+and proxies `/api/*` to the backend; there is no docker/nginx anymore).
+After the release is published, on the server (repo root, typically
+`/home/gog4/ExPenis`):
 ```bash
 ./deploy.sh
 ```
 Same thing via just: `just flutter-fetch-deploy` (it calls `deploy.sh`).
-The script curls `ExPenis-web.zip`, unpacks into `flutter_web/`, and
-rebuilds/restarts the nginx frontend container.
+The script curls `ExPenis-web.zip` and rsyncs it into `/var/www/expenis`,
+which Caddy serves directly — no restart needed.
 
-Local build remains available: `just flutter-build` / `just flutter-deploy`.
+Local build remains available: `just flutter-build` (into `flutter_web/`).
 Auto-update behavior (Android): on startup in release mode, `UpdateService`
 fetches `/releases/latest` from GitHub and compares semver with the installed
 version; if newer, `UpdateDialog` offers to download the `.apk` asset and

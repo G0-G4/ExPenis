@@ -74,7 +74,10 @@ def main() -> None:
 
     # Normal server run
     log_config = setup_logging()
-    options = {"host": "0.0.0.0", "port": 8000, "log_config": log_config}
+    # Production sits behind the box's Caddy on loopback; DEV listens on all
+    # interfaces so a phone/emulator debug build can reach it over the LAN.
+    host = "0.0.0.0" if DEV else "127.0.0.1"
+    options = {"host": host, "port": 8000, "log_config": log_config}
     if DEV:
         options["reload"] = True
         options["reload_excludes"] = ["logs/"]

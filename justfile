@@ -1,15 +1,3 @@
-# Запустить docker-compose сервисы в фоне
-up:
-    docker-compose up -d
-
-# Остановить сервисы
-down:
-    docker-compose down
-
-# Пересобрать образы
-build:
-    docker-compose build
-
 # Перегенерировать uv.lock из pyproject.toml
 lock:
     uv lock
@@ -26,10 +14,6 @@ openapi:
 #   just generate-agent-token --username my-agent --days 90
 generate-agent-token *ARGS:
 	uv run -m src.expenis.server token --username llm-agent --days 365 {{ARGS}}
-
-# Следить за логами сервисов
-logs:
-    docker-compose logs -f
 
 # Локальный backend на :8000 (DEV: CORS *, reload).
 # Фронт в debug ходит сюда: http://localhost:8000
@@ -67,11 +51,6 @@ flutter-build:
 flutter-build-android:
 	cd frontend && flutter build apk --release
 
-# Полный деплой: сборка фронта + пересборка контейнера
-flutter-deploy: flutter-build
-    docker-compose build frontend
-    docker-compose up -d frontend
-
 # Создать git-тег версии из pubspec.yaml (например v1.2.3) и отправить его,
 # что запустит GitHub Actions workflow сборки релиза (APK + web zip).
 release-tag:
@@ -88,7 +67,7 @@ release-tag:
     git tag "v${version}"
     git push origin "v${version}"
 
-# Скачать latest web-бандл с GitHub Release и задеплоить nginx-контейнер.
-# На сервере то же самое: ./deploy.sh
+# На сервере: скачать latest web-бандл с GitHub Release и выложить его
+# в каталог, который раздаёт Caddy (то же самое, что ./deploy.sh).
 flutter-fetch-deploy:
     ./deploy.sh

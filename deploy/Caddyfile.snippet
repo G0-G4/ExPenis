@@ -1,0 +1,46 @@
+# Site block for the box's shared Caddy (/etc/caddy/Caddyfile). This file is
+# the source of truth for ExPenis's route: copy it into the Caddyfile, then
+# `caddy validate --config /etc/caddy/Caddyfile` and `systemctl reload caddy`.
+# Caddy terminates TLS (its own Let's Encrypt cert), serves the Flutter web
+# bundle that deploy.sh puts into /var/www/expenis, and proxies the API to the
+# backend on loopback.
+
+expenis.g0g4.ru {
+	encode zstd gzip
+
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		root * /var/www/expenis
+
+		# Entry points must not be cached, or a new release is not picked up.
+		@entry path /index.html /flutter_bootstrap.js /flutter.js /flutter_service_worker.js /main.dart.js /version.json
+		header @entry Cache-Control "no-cache"
+		# SPA routes fall back to index.html below, so they must not be cached either.
+		@spa not file
+		header @spa Cache-Control "no-cache"
+		# Hashed/versioned assets — only real files, never the SPA fallback.
+		@immutable {
+			path /assets/* /canvaskit/*
+			file
+		}
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+		@week {
+			path /icons/* /splash/* /favicon.png
+			file
+		}
+		header @week Cache-Control "public, max-age=604800"
+		header /manifest.json Cache-Control "public, max-age=3600"
+
+		try_files {path} /index.html
+		file_server
+	}
+}

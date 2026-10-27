@@ -53,7 +53,6 @@ cd frontend && flutter run
 ### Локально (нужен Flutter SDK)
 ```bash
 just flutter-build    # собрать в flutter_web/
-just flutter-deploy   # собрать + пересобрать nginx-контейнер
 ```
 
 ### С сервера (без Flutter) — артефакт с GitHub Release
@@ -63,6 +62,7 @@ CI **не** выкатывает web на сервер. После того ка
 ```bash
 ./deploy.sh
 ```
-Скрипт скачивает latest zip, распаковывает в `flutter_web/` и пересобирает nginx-контейнер.
+Скрипт скачивает latest zip и выкладывает его в `/var/www/expenis`, который раздаёт Caddy
+(конфиг сайта — `deploy/Caddyfile.snippet`).
 Эквивалент: `just flutter-fetch-deploy` (он вызывает тот же `deploy.sh`).
 Репозиторий публичный, авторизация не нужна.
