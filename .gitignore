@@ -2,8 +2,6 @@
 .env
 logs/
 flutter_web/
-backup-log.txt
-backup-log.txt.tmp
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/flutter,intellij,python

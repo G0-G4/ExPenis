@@ -11,7 +11,10 @@ update that, not this file, when the box changes.
   there too, so be careful with anything system-wide (`ufw`, the shared
   Caddy).
 - Repo checkout on the server: `/home/gog4/ExPenis` (backend code, `.env`,
-  `deploy.sh`, backups).
+  `deploy.sh`).
+- Backups: not part of this repo. The host backs up `data/expenis.db` (a
+  consistent SQLite copy) and `.env` nightly together with the rest of the box,
+  encrypted, off-site; restore instructions live with that host-level setup.
 - Web bundle served from: `/var/www/expenis` (owned by `gog4`).
 - Public URL: `https://expenis.g0g4.ru`.
 
