@@ -6,6 +6,23 @@ datasources:
     access: proxy
     url: http://127.0.0.1:9428
     jsonData:
+      # The line badge does not read OTel fields itself. Rules run in order
+      # on the labels of each line. severity_text is the string VictoriaLogs
+      # stores (Info, Warn, Error, Debug, Fatal, Trace). severity_number is
+      # only a fallback: its regex matches a string, not a JSON number.
+      logLevelRules:
+        - {field: severity_text, operator: equals, value: Fatal, level: critical, enabled: true}
+        - {field: severity_text, operator: equals, value: Error, level: error, enabled: true}
+        - {field: severity_text, operator: equals, value: Warn, level: warning, enabled: true}
+        - {field: severity_text, operator: equals, value: Info, level: info, enabled: true}
+        - {field: severity_text, operator: equals, value: Debug, level: debug, enabled: true}
+        - {field: severity_text, operator: equals, value: Trace, level: trace, enabled: true}
+        - {field: severity_number, operator: regex, value: '^([1-4])$', level: trace, enabled: true}
+        - {field: severity_number, operator: regex, value: '^([5-8])$', level: debug, enabled: true}
+        - {field: severity_number, operator: regex, value: '^(9|10|11|12)$', level: info, enabled: true}
+        - {field: severity_number, operator: regex, value: '^(1[3-6])$', level: warning, enabled: true}
+        - {field: severity_number, operator: regex, value: '^(1[7-9]|20)$', level: error, enabled: true}
+        - {field: severity_number, operator: regex, value: '^(2[1-4])$', level: critical, enabled: true}
       derivedFields:
         - name: TraceID
           matcherType: label

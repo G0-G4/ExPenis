@@ -141,3 +141,9 @@ See [review-resolution.md](review-resolution.md) for each finding and its dispos
 Latest local suites: backend 106 passed; Flutter 60 passed; Flutter analyzer clean;
 targeted observability/logging mypy clean. Full mypy retains its 10 baseline errors.
 No release or production deployment was performed during review fixes.
+
+## Production rollout — 2026-10-31
+
+Completed v1.2.1 rollout and production smoke checks; OpenSpec 31/31.
+See [rollout.md](rollout.md). One-off scripts/raw evidence are excluded
+from the maintained repository; normal regression tests and provisioning remain.

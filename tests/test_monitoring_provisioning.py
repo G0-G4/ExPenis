@@ -28,3 +28,15 @@ def test_project_provisioning_is_versioned_and_bounded():
         for target in panel["targets"]
     )
     assert any(panel["type"] == "logs" for panel in dashboard["panels"])
+    datasource = (ROOT / "datasources.yml").read_text()
+    assert datasource.index("field: severity_text") < datasource.index("field: severity_number")
+    for text, level in (
+        ("Fatal", "critical"),
+        ("Error", "error"),
+        ("Warn", "warning"),
+        ("Info", "info"),
+        ("Debug", "debug"),
+        ("Trace", "trace"),
+    ):
+        assert f"value: {text}, level: {level}" in datasource
+    assert "field: severity_number" in datasource
