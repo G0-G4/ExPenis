@@ -95,31 +95,6 @@ Infra notification policy must group ExPenis client alerts by fingerprint,
 platform and app_version, with the existing Telegram receiver/repeat/recovery.
 No duplicate backups, contact points or monitoring stack are created.
 
-## Reproducible isolated checks
-
-```bash
-docker compose -p expenis-observability-spike -f deploy/monitoring/compose.spike.yml up -d
-uv run python deploy/monitoring/check_pipeline.py
-# Optional disposable Grafana on http://127.0.0.1:13000 (synthetic lab password only):
-docker compose -p expenis-observability-spike -f deploy/monitoring/compose.spike.yml --profile ui up -d grafana
-# After Grafana becomes ready:
-uv run python deploy/monitoring/check_grafana.py
-uv run python deploy/monitoring/check_alerts.py
-# Use the synthetic trace ID printed by check_pipeline.py:
-uv run --group e2e python deploy/monitoring/check_navigation.py <trace-id>
-# Cleanup only this lab; no production volumes are attached:
-docker compose -p expenis-observability-spike -f deploy/monitoring/compose.spike.yml --profile ui down
-```
-
-Lab passwords are synthetic and local-only, never reuse them for production.
-The disposable Grafana's 1 GiB limit includes plugin/database tmpfs and is not
-the production resource allocation. A temporary VictoriaMetrics instance exists
-only to evaluate synthetic alert boundaries; shared production metrics stay intact.
-The lab mounts configs read-only and uses disposable tmpfs storage. Its internal
-container receivers bind all container interfaces for private service discovery;
-only loopback host ports are published. Infra configs bind actual listeners to
-127.0.0.1.
-
 ## Rollout and rollback
 
 1. Refresh resource/version baseline; validate the whole shared 30d log workload,
@@ -143,33 +118,9 @@ business operations continue. Inspect the guard/capacity, not business payloads;
 clear the marker only after budget verification. Client reports can be lost while
 paused. Never enlarge volumes/limits automatically or remove active Tempo WAL.
 
-## Isolated UI diagnostics
+## Verification
 
-`run_e2e_backend.py` explicitly creates a fresh temporary SQLite database and
-synthetic account in `/private/tmp/expenis-observability-e2e`, uses short-lived
-test JWTs and sends only to the local lab. It refuses an existing database. Its
-filesystem fault markers affect only that test process; it is not a production
-entrypoint and does not add test routes to the application.
-
-Compile a separate UI test build with `EXPENIS_API_BASE_URL=http://127.0.0.1:18000`
-(Web) or `http://10.0.2.2:18000` (emulator) and
-`EXPENIS_TELEMETRY_ENABLED=true`. The API origin override is build-time only;
-normal release builds still default to the production URL. Do not publish these
-test builds. Android UI tests use a distinct application ID and temporary AVD data.
-
-Client HTTP/latency panels describe accepted sampled observations, not total traffic, active users or a crash-free rate. Error counters are independent of trace sampling. Versions/fingerprints remain in logs, not metric labels. Request counters are initialized before traffic with bounded HTTP status classes so first 5xx bursts have a zero baseline.
-
-Additional acceptance helpers: `check_resilience.py` stops/restores only the lab
-Collector and owns a temporary backend; `check_ui_correlation.py` validates retained
-UI parent trees. `check_web_faults.py` requires a separately built fault Web bundle
-using `android_fault_entry.dart` and output `.../expenis-observability-e2e/fault-web`.
-Never publish that fault entrypoint. `check_telegram.py` sends real test messages
-through the existing bot/chat using an ephemeral lab receiver; run only when this
-delivery test is authorized. It reads secrets over SSH in memory, then removes test
-objects; destroy the lab tmpfs on cleanup. `check_storage.sh` is for a disposable
-Linux mount/loop-capable container with an empty `/work`; use 640 MiB memory and
-clean up any owned image after a forced kill. These checks do not replace native
-systemd, aggregate peak disk/RAM or application compaction acceptance.
-
-Native cloud acceptance lifecycle: [`native/README.md`](native/README.md). Measurements
-and evidence are in the OpenSpec change; production rollout remains separate.
+Regression tests live in `tests/test_observability.py`,
+`tests/test_monitoring_provisioning.py` and Flutter `test/telemetry_service_test.dart`.
+Acceptance results are recorded in the OpenSpec change. One-off lab, fault and
+native acceptance scripts are excluded from the maintained deployment files.

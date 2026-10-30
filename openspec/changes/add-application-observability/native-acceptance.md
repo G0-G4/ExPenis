@@ -92,9 +92,5 @@ fail-closed baseline и резервирование compaction. Source/config h
 backend → Web/Android с обновлением общей инфраструктуры и smoke после запуска.
 Этот этап не выполнялся в рамках проверки временного стенда.
 
-Доказательства: [профиль](evidence/native/acceptance-report.json),
-[восстановление](evidence/native/recovery-report.json),
-[хеши и размеры](evidence/native/artifacts.json),
-[effective units](evidence/native/unit-properties.txt),
-[validator](evidence/native/unit-validation.txt). Полные отчёты также сохранены
-локально в `/private/tmp/expenis-native-evidence`.
+Сырые отчёты и одноразовые helpers исключены из текущего дерева репозитория.
+Сводные измерения выше сохранены для оценки rollout gate.
