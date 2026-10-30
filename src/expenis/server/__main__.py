@@ -23,7 +23,7 @@ async def _generate_token(username: str, days: int) -> None:
         if user is None:
             print(f"Error: User with username '{username}' not found.", file=sys.stderr)
             print("The user must already exist in the database.", file=sys.stderr)
-            print("Create the account first using the web/app interface (register or Telegram login).", file=sys.stderr)
+            print("Create the account first using the web/app interface (register).", file=sys.stderr)
             sys.exit(1)
 
         uid = str(user.id)

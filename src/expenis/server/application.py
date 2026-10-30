@@ -3,8 +3,6 @@ from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from authx import AuthX, AuthXConfig, TokenPayload
 from authx import exceptions as authx_exceptions
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
@@ -22,7 +20,7 @@ from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, Account
     TagPeriodDto, TransactionCreateRequest, TransactionsResponse, UserTagsResponse
 from ..config import COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
-from ..core.service import authenticate_user, change_password, clear_old_sessions, create_account, create_category, \
+from ..core.service import authenticate_user, change_password, create_account, create_category, \
     create_default_categories, \
     delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction_by_id_and_user_id, \
     get_active_account_by_id, \
@@ -40,24 +38,14 @@ from ..version import __version__
 logger = logging.getLogger(__name__)
 
 
-async def clear_job():
-    logger.info("clearing old sessions")
-    await clear_old_sessions()
-
-
-scheduler = AsyncIOScheduler()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.aconnect()
-    scheduler.add_job(clear_job, IntervalTrigger(minutes=5))
-    scheduler.start()
-    await clear_old_sessions()
-    yield
-    scheduler.shutdown()
-    await db.aclose()
-    await db.close_pool()
+    try:
+        yield
+    finally:
+        await db.aclose()
+        await db.close_pool()
 
 
 tags_metadata = [

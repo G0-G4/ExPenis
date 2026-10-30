@@ -19,10 +19,9 @@ Key paths:
 - `tests/` — async tests and shared fixtures
 - `pyproject.toml` — dependencies, pytest settings, **and backend version** (see Releases below).
 - `src/expenis/version.py` — helper that provides `__version__` (used by FastAPI and the OpenAPI spec).
-- `justfile` — compose and lockfile commands (run via `just <recipe>`)
+- `justfile` — development, build, release and lockfile commands (run via `just <recipe>`)
 - `deploy.sh` — server web deploy from GitHub Release (`./deploy.sh` in repo root)
 - `migrations/` — schema migrations as numbered SQL files `NNN_description.sql`. When modifying peewee models in `src/expenis/core/models/`, add a new migration file here; do not edit existing migrations.
-- `migration.py` — one-off data migration script (transactions from legacy schema), not used for schema changes.
 - `docs/openapi.json` — generated OpenAPI 3.1 spec (run `just openapi` after API changes). The `info.version` reflects the backend version from `pyproject.toml`.
 - Long-lived tokens for agents: `just generate-agent-token` or `uv run -m src.expenis.server token --username llm-agent --days 365`. The user must already exist (the command will error if the username is not found).
 ### Clients
@@ -132,10 +131,10 @@ Pytest settings (from `pyproject.toml`):
 ### Run one test function (most important)
 - `uv run pytest tests/test_account_service.py::test_basic_crud`
 - Examples:
-  - `uv run pytest tests/session_service_test.py::test_create_session`
+  - `uv run pytest tests/auth_service_test.py::test_register_user_creates_user_with_hashed_password`
   - `uv run pytest tests/transaction_service_test.py::test_get_transactions_for_period`
 ### Filter tests by keyword
-- `uv run pytest -k session`
+- `uv run pytest -k auth`
 - `uv run pytest -k "basic_crud and not category"`
 ### UI e2e (Playwright, Python)
 Needs local debug stack: `just dev-backend` and `just dev-web-server`.
@@ -172,7 +171,7 @@ Follow existing local patterns first. Prefer minimal, focused diffs.
 ### Types and annotations
 - Keep explicit parameter and return type hints on public functions.
 - Prefer concrete types (`list[Transaction]`, `dict[int, AccountDto]`).
-- Use `Literal[...]` for closed value sets (e.g., category/session status).
+- Use `Literal[...]` for closed value sets (e.g., category/transaction type).
 - Avoid `Any` unless unavoidable.
 ### Naming
 - Functions/variables/modules: `snake_case`

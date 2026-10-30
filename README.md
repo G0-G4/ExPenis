@@ -20,7 +20,6 @@
 │   ├── core/                 # Основная бизнес-логика
 │   │   ├── models/           # Модели базы данных
 │   │   ├── service/          # Бизнес-сервисы
-│   │   └── helpers.py        # Вспомогательные функции
 │   ├── server/               # Веб-сервер
 │   └── config.py             # Конфигурация
 └── flutter_web/              # Собранный web-бандл (gitignored, через `just flutter-build`)

@@ -14,7 +14,9 @@ update that, not this file, when the box changes.
   `deploy.sh`).
 - Backups: not part of this repo. The host backs up `data/expenis.db` (a
   consistent SQLite copy) and `.env` nightly together with the rest of the box,
-  encrypted, off-site; restore instructions live with that host-level setup.
+  encrypted, off-site via `g0g4-backup.timer`; restore instructions live with
+  that host-level setup. Legacy `expenis-backup.*` units and the per-project
+  backup cron job are obsolete and should be removed from existing hosts.
 - Web bundle served from: `/var/www/expenis` (owned by `gog4`).
 - Public URL: `https://expenis.g0g4.ru`.
 

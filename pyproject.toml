@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiosqlite>=0.21.0",
-    "apscheduler>=3.11.2",
     "authx>=1.5.0",
     "bcrypt>=4.2.0",
     "fastapi>=0.128.0",
@@ -17,10 +16,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
-    "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.1",
-    "passlib[bcrypt]>=1.7.4",
-    "tabulate>=0.9.0",
     "uvicorn>=0.40.0",
     "watchfiles>=1.1.1",
 ]

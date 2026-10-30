@@ -11,8 +11,9 @@ from src.expenis.server.application import app, auth
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
 
 async def _register_and_login(client: AsyncClient, username: str = "alice") -> dict:
