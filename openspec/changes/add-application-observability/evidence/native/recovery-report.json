@@ -1,0 +1,14 @@
+{
+  "safe_stopped_trace_reset": true,
+  "native_database_fault_recovery": true,
+  "flushed_log_survived_enospc_restart": true,
+  "final_guard_pressure_and_recovery": true,
+  "aggregate_pressure_disk_bytes": 1817591808,
+  "host_free_disk_under_pressure": 10394591232,
+  "aggregate_budget_pause_and_resume": true,
+  "native_collector_outage_business_ready": true,
+  "recovered_trace_id": "744d06bf1d7a04fc8f82860c0f6f9870",
+  "recovered_parent_tree": true,
+  "recovered_log_correlation": true,
+  "passed": true
+}

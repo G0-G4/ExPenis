@@ -34,21 +34,31 @@ from ..core.errors import NotFoundException
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
 from ..core.utils.currency_codes import CODES
 from ..version import __version__
+from ..observability import runtime
+from ..observability.api import router as observability_router
+from ..observability.middleware import ObservabilityMiddleware
+from ..observability.safety import log_unhandled_error
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if runtime.telemetry.settings.configuration_invalid:
+        logger.warning("telemetry_config_invalid")
     await db.aconnect()
+    runtime.telemetry.initialize_http_metrics(app.routes)
+    await runtime.telemetry.start()
     try:
         yield
     finally:
+        await runtime.telemetry.stop()
         await db.aclose()
         await db.close_pool()
 
 
 tags_metadata = [
+    {"name": "observability", "description": "Готовность приложения и безопасная техническая телеметрия."},
     {"name": "auth", "description": "Регистрация, вход, обновление токенов, профиль пользователя."},
     {"name": "accounts", "description": "Управление счетами, балансами и валютами."},
     {"name": "transactions", "description": "Создание, просмотр, обновление и удаление транзакций."},
@@ -65,6 +75,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(observability_router)
+app.add_middleware(ObservabilityMiddleware)
+
 if DEV:
     app.add_middleware(
         CORSMiddleware,
@@ -72,6 +85,7 @@ if DEV:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
     )
 
 
@@ -98,6 +112,21 @@ def custom_openapi():
         "description": "JWT access token. Pass as 'Authorization: Bearer <token>' header. "
                        "The API also accepts tokens via httpOnly cookies set on login/register.",
     }
+    from ..observability.dto import TelemetryBatch
+    batch_schema = TelemetryBatch.model_json_schema(ref_template="#/components/schemas/{model}")
+    components = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
+    components.update(batch_schema.pop("$defs", {}))
+    components["TelemetryBatch"] = batch_schema
+    for path, operations in openapi_schema["paths"].items():
+        if path.startswith("/api/") and path not in {"/api/telemetry", "/api/health/ready"}:
+            for operation in operations.values():
+                if not isinstance(operation, dict):
+                    continue
+                for response in operation.get("responses", {}).values():
+                    response.setdefault("headers", {})["X-Request-ID"] = {
+                        "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                        "schema": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+                    }
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
@@ -106,12 +135,7 @@ app.openapi = custom_openapi
 
 
 if REFRESH_TIME_SECONDS <= EXPIRATION_TIME_SECONDS:
-    logger.warning(
-        "refresh_time_seconds (%s) <= expiration_time_seconds (%s); "
-        "refresh tokens will already be expired when access tokens expire",
-        REFRESH_TIME_SECONDS,
-        EXPIRATION_TIME_SECONDS,
-    )
+    logger.warning("token_lifetime_invalid")
 
 config = AuthXConfig(
     JWT_SECRET_KEY=SECRET,
@@ -130,22 +154,7 @@ auth.handle_errors(app)
 
 @app.exception_handler(authx_exceptions.JWTDecodeError)
 async def jwt_decode_error_handler(request: Request, exc: authx_exceptions.JWTDecodeError) -> JSONResponse:
-    logger.error(
-        "auth failure (invalid/expired token): %s | method=%s path=%s query=%s client=%s",
-        exc,
-        request.method,
-        request.url.path,
-        request.url.query,
-        getattr(request.client, "host", None),
-    )
-    logging.getLogger("uvicorn.error").error(
-        "auth failure (invalid/expired token): %s | method=%s path=%s query=%s client=%s",
-        exc,
-        request.method,
-        request.url.path,
-        request.url.query,
-        getattr(request.client, "host", None),
-    )
+    logger.warning("auth_rejected")
     # Return 401 (correct semantics for bad/expired credentials) instead of authx's 422.
     # Preserves the payload shape so clients see error_type/message.
     return JSONResponse(
@@ -156,32 +165,19 @@ async def jwt_decode_error_handler(request: Request, exc: authx_exceptions.JWTDe
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    logger.error(
-        "request validation error: path=%s query=%s client=%s errors=%s",
-        request.url.path,
-        request.url.query,
-        getattr(request.client, "host", None),
-        exc.errors(),
-    )
-    logging.getLogger("uvicorn.error").error(
-        "request validation error: path=%s query=%s client=%s errors=%s",
-        request.url.path,
-        request.url.query,
-        getattr(request.client, "host", None),
-        exc.errors(),
-    )
+    logger.warning("validation_rejected")
     return await request_validation_exception_handler(request, exc)
 
 
 @app.exception_handler(NotFoundException)
 async def not_found_handler(request: Request, exc: NotFoundException) -> JSONResponse:
-    logger.warning("resource not found: %s | path=%s", exc, request.url.path)
+    logger.warning("resource_not_found")
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("unhandled exception: method=%s path=%s", request.method, request.url.path)
+    log_unhandled_error(request.scope, exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
@@ -341,7 +337,7 @@ async def register_endpoint(
     except UsernameTakenError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     access_token, refresh_token = _issue_token_pair(user.id)
-    logger.info("tokens issued for registered user: id=%d username=%s cookie=%s", user.id, body.username, cookie)
+    logger.info("registered")
     return _deliver_tokens(access_token, refresh_token, response, cookie)
 
 
@@ -360,7 +356,7 @@ async def login_endpoint(
     if user is None:
         raise HTTPException(status_code=401, detail="invalid credentials")
     access_token, refresh_token = _issue_token_pair(user.id)
-    logger.info("tokens issued for login: id=%d username=%s cookie=%s", user.id, body.username, cookie)
+    logger.info("logged_in")
     return _deliver_tokens(access_token, refresh_token, response, cookie)
 
 
@@ -377,7 +373,7 @@ async def refresh_endpoint(
 ) -> AuthResponse:
     user_id = int(payload.sub)
     access_token, refresh_token = _issue_token_pair(user_id)
-    logger.info("tokens refreshed for user_id=%d cookie=%s", user_id, cookie)
+    logger.info("tokens_refreshed")
     return _deliver_tokens(access_token, refresh_token, response, cookie)
 
 
@@ -422,7 +418,7 @@ async def change_password_endpoint(
         raise HTTPException(status_code=401, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    logger.info("password changed via api: user_id=%d", user.id)
+    logger.info("password_changed")
     return MeResponse(id=user.id, username=user.username, telegram_id=user.telegram_id)
 
 

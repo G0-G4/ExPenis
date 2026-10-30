@@ -49,3 +49,7 @@ client ─HTTPS─► Caddy (box, ports 80/443, its own Let's Encrypt cert)
 - Backend: `git pull`, `uv sync`, `sudo systemctl restart expenis-server`.
 - One-time setup on a new box: `sudo install -d -o gog4 -g gog4 -m 755 /var/www/expenis`,
   add the Caddy block, install the systemd unit.
+
+## Application observability
+
+See [`deploy/monitoring/README.md`](../deploy/monitoring/README.md) for the privacy contract, runtime flags, readiness/metrics endpoints, project Grafana provisioning and checks. Shared service and bounded storage installation belongs to the private infra repo. Keep common logs at 30 days initially; if capacity requires it, the authorized fallback is 14 days for all log sources. Trace retention targets 7 days and existing metric retention remains 3 months. New observability must pass the 1 GB RAM / 2 GB additional disk gate before rollout. Collector failure does not make the application unready.

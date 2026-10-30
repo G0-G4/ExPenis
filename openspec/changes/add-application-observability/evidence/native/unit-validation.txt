@@ -1,0 +1,2 @@
+exit=0
+/lib/systemd/system/snapd.service:23: Unknown key name 'RestartMode' in section 'Service', ignoring.

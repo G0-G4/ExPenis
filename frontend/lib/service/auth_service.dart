@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import 'package:dio/dio.dart';
 import 'package:expenis_mobile/service/base_service.dart';
 
@@ -55,13 +56,16 @@ class AuthService extends BaseService {
         return AuthSession.fromJson(response.data as Map<String, dynamic>);
       }
       if (response.statusCode == 401) {
-        throw Exception("Invalid username or password");
+        throw telemetryException("Invalid username or password");
       }
-      throw Exception(
+      throw telemetryException(
         "Login failed with status ${response.statusCode}: ${response.data}",
       );
     } on DioException catch (e) {
-      throw Exception("Login request failed: ${e.message}");
+      throw telemetryException("Login request failed: ${e.message}");
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -76,16 +80,19 @@ class AuthService extends BaseService {
         return AuthSession.fromJson(response.data as Map<String, dynamic>);
       }
       if (response.statusCode == 409) {
-        throw Exception("Username is already taken");
+        throw telemetryException("Username is already taken");
       }
       if (response.statusCode == 422) {
-        throw Exception("Invalid input: ${response.data}");
+        throw telemetryException("Invalid input: ${response.data}");
       }
-      throw Exception(
+      throw telemetryException(
         "Registration failed with status ${response.statusCode}: ${response.data}",
       );
     } on DioException catch (e) {
-      throw Exception("Registration request failed: ${e.message}");
+      throw telemetryException("Registration request failed: ${e.message}");
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -101,11 +108,14 @@ class AuthService extends BaseService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return AuthSession.fromJson(response.data as Map<String, dynamic>);
       }
-      throw Exception(
+      throw telemetryException(
         "Token refresh failed with status ${response.statusCode}",
       );
     } on DioException catch (e) {
-      throw Exception("Token refresh request failed: ${e.message}");
+      throw telemetryException("Token refresh request failed: ${e.message}");
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -119,7 +129,10 @@ class AuthService extends BaseService {
         ),
       );
     } on DioException catch (e) {
-      throw Exception("Logout request failed: ${e.message}");
+      throw telemetryException("Logout request failed: ${e.message}");
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -134,11 +147,14 @@ class AuthService extends BaseService {
       if (response.statusCode == 200) {
         return UserProfile.fromJson(response.data as Map<String, dynamic>);
       }
-      throw Exception(
+      throw telemetryException(
         "Failed to load profile with status ${response.statusCode}",
       );
     } on DioException catch (e) {
-      throw Exception("Failed to load profile: ${e.message}");
+      throw telemetryException("Failed to load profile: ${e.message}");
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -160,18 +176,21 @@ class AuthService extends BaseService {
         return UserProfile.fromJson(response.data as Map<String, dynamic>);
       }
       if (response.statusCode == 401) {
-        throw Exception("Current password is incorrect");
+        throw telemetryException("Current password is incorrect");
       }
       if (response.statusCode == 400) {
-        throw Exception(
+        throw telemetryException(
           "Invalid new password: ${response.data?["detail"] ?? response.data}",
         );
       }
-      throw Exception(
+      throw telemetryException(
         "Password change failed with status ${response.statusCode}: ${response.data}",
       );
     } on DioException catch (e) {
-      throw Exception("Password change request failed: ${e.message}");
+      throw telemetryException("Password change request failed: ${e.message}");
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 }

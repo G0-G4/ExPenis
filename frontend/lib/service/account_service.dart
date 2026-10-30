@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import 'package:dio/dio.dart';
 import 'package:expenis_mobile/models/account.dart';
 import 'package:expenis_mobile/service/base_service.dart';
@@ -29,11 +30,14 @@ class AccountService extends BaseService {
           totalAmountRubles: totalAmountRubles,
         );
       }
-      throw Exception(
+      throw telemetryException(
         'Failed to load accounts with status: ${response.statusCode}',
       );
     } on DioException catch (e) {
-      throw Exception('Failed to load accounts: ${e.message}');
+      throw telemetryException('Failed to load accounts: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -42,7 +46,10 @@ class AccountService extends BaseService {
       final response = await dio.get('$baseUrl/api/accounts/account/$id');
       return Account.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to load account: ${e.message}');
+      throw telemetryException('Failed to load account: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -53,7 +60,10 @@ class AccountService extends BaseService {
         data: account.toJson(),
       );
     } on DioException catch (e) {
-      throw Exception('Failed to update account: ${e.message}');
+      throw telemetryException('Failed to update account: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -63,7 +73,10 @@ class AccountService extends BaseService {
       final codesMap = response.data['codes'] as Map<String, dynamic>;
       return codesMap.keys.toList();
     } on DioException catch (e) {
-      throw Exception('Failed to load currency codes: ${e.message}');
+      throw telemetryException('Failed to load currency codes: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -71,7 +84,10 @@ class AccountService extends BaseService {
     try {
       await dio.delete('$baseUrl/api/accounts/account/$id');
     } on DioException catch (e) {
-      throw Exception('Failed to delete account: ${e.message}');
+      throw telemetryException('Failed to delete account: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -87,7 +103,10 @@ class AccountService extends BaseService {
       );
       return Account.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to create account: ${e.message}');
+      throw telemetryException('Failed to create account: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 }

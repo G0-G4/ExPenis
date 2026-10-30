@@ -65,13 +65,13 @@ async def get_user_account_with_balance(user_id: int, account_id) -> tuple[Accou
 
 async def create_account(user_id: int, name: str, adjustment_amount: float, currency_code="RUB"):
     if currency_code not in CODES:
-        logger.warning("unknown currency code: %s", currency_code)
+        logger.warning("unknown_currency")
         raise HTTPException(status_code=400, detail="Unknown currency code")
     now = datetime.now(UTC)
     account = Account(user_id=user_id, name=name, adjustment_amount=adjustment_amount, currency_code=currency_code,
                       created_at=now, updated_at=now)
     await db.run(account.save)
-    logger.info("account created: id=%d user_id=%d name=%s currency=%s", account.id, user_id, name, currency_code)
+    logger.info("account_created")
     return account
 
 
@@ -83,7 +83,7 @@ async def update_account(user_id: int, account: Account, new_balance: float | No
             account.adjustment_amount = new_balance - balance + account.adjustment_amount
         account.updated_at = now
         await db.run(account.save)
-    logger.info("account updated: id=%d user_id=%d", account.id, user_id)
+    logger.info("account_updated")
     return account
 
 async def _has_transactions(account_id: int) -> bool:
@@ -100,10 +100,10 @@ async def delete_account_by_id(account_id: int) -> Literal["soft", "hard"]:
             account.is_deleted = True
             account.deleted_at = now
             await db.run(account.save)
-        logger.info("account soft-deleted: id=%d", account_id)
+        logger.info("account_soft_deleted")
         return "soft"
     await db.run(account.delete_instance)
-    logger.info("account deleted: id=%d", account_id)
+    logger.info("account_deleted")
     return "hard"
 
 
@@ -117,8 +117,8 @@ async def delete_account_by_id_and_user_id(user_id: int, account_id: int) -> Lit
             account.is_deleted = True
             account.deleted_at = now
             await db.run(account.save)
-        logger.info("account soft-deleted: id=%d user_id=%d", account_id, user_id)
+        logger.info("account_soft_deleted")
         return "soft"
     await db.run(account.delete_instance)
-    logger.info("account deleted: id=%d user_id=%d", account_id, user_id)
+    logger.info("account_deleted")
     return "hard"

@@ -62,12 +62,12 @@ async def save_transaction(transaction: Transaction) -> Transaction:
     transaction.created_at = now if transaction.created_at is None else transaction.created_at
     transaction.updated_at = now if transaction.updated_at is None else transaction.updated_at
     await db.run(transaction.save)
-    logger.info("transaction saved: id=%d user_id=%d amount=%s", transaction.id, transaction.user_id, transaction.amount)
+    logger.info("transaction_saved")
     return transaction
 
 async def update_transaction(transaction: Transaction) -> Transaction:
     await db.run(transaction.save)
-    logger.info("transaction updated: id=%d user_id=%d", transaction.id, transaction.user_id)
+    logger.info("transaction_updated")
     return transaction
 
 async def delete_transaction(transaction: Transaction):
@@ -79,7 +79,7 @@ async def delete_transaction_by_id(transaction_id: int):
     await db.run(lambda: Transaction.delete_by_id(transaction_id))
 
 async def delete_transaction_by_id_and_user_id(user_id: int, transaction_id: int):
-    logger.info("transaction deleted: id=%d user_id=%d", transaction_id, user_id)
+    logger.info("transaction_deleted")
     await db.run(lambda: Transaction.delete().where((Transaction.id == transaction_id) & (Transaction.user_id == user_id)).execute())
 
 

@@ -1,3 +1,5 @@
+import "dart:ui";
+import "package:expenis_mobile/service/telemetry_service.dart";
 import "dart:async";
 
 import "package:flutter/foundation.dart";
@@ -25,7 +27,45 @@ import "package:expenis_mobile/widgets/update_dialog.dart";
 SemanticsHandle? _debugSemanticsHandle;
 
 void main() {
+  final supported = kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+  final enabled = telemetryEnabled && supported;
+  if (enabled) {
+    runZonedGuarded(() => _startApplication(true), (error, stack) {
+      TelemetryService.instance.capture(error, stack);
+    });
+  } else {
+    _startApplication(false);
+  }
+}
+
+void _startApplication(bool enabled) {
   WidgetsFlutterBinding.ensureInitialized();
+  TelemetryService.instance = TelemetryService(
+    enabled: enabled,
+    platform: kIsWeb ? "web" : "android",
+    baseUrl: resolveBaseUrl(),
+  );
+  if (enabled) {
+    TelemetryService.instance.start();
+    unawaited(
+      loadAppVersion().then((version) {
+        if (version != null) {
+          TelemetryService.instance.version = version.display;
+        }
+      }),
+    );
+    FlutterError.onError = (details) {
+      TelemetryService.instance.capture(
+        details.exception,
+        details.stack,
+        code: "client_framework",
+      );
+    };
+    PlatformDispatcher.instance.onError = (error, stack) {
+      TelemetryService.instance.capture(error, stack);
+      return true;
+    };
+  }
   if (kDebugMode) {
     _debugSemanticsHandle = SemanticsBinding.instance.ensureSemantics();
     assert(_debugSemanticsHandle != null);

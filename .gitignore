@@ -1,4 +1,12 @@
 .aider*
+# Local data, signing material and private generated diagnostics
+/data/
+/frontend/android/app/base64_output.txt
+.DS_Store
+.idea/
+*.iml
+/.playwright-mcp/
+/*.png
 .env
 logs/
 flutter_web/

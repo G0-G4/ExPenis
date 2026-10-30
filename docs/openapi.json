@@ -3,9 +3,99 @@
   "info": {
     "title": "ExPenis API",
     "description": "API сервиса для учёта личных доходов и расходов. Поддерживает работу с пользователями, счетами, категориями и транзакциями.",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "paths": {
+    "/api/telemetry": {
+      "post": {
+        "tags": [
+          "observability"
+        ],
+        "summary": "Отправить техническую телеметрию",
+        "description": "Публичный bounded JSON ingestion без JWT. 64 KiB/batch, 50 records, extra fields запрещены. 202 означает очередь, не сохранение. Повторы 429/503 ограничены Retry-After.",
+        "operationId": "submitTelemetry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryAcceptedResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Сбор выключен"
+          },
+          "400": {
+            "description": "Неверный JSON"
+          },
+          "408": {
+            "description": "Таймаут чтения batch"
+          },
+          "413": {
+            "description": "Превышен размер"
+          },
+          "415": {
+            "description": "Неподдерживаемый media type"
+          },
+          "422": {
+            "description": "Неверная схема"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After"
+          },
+          "503": {
+            "description": "Недостаточно capacity; Retry-After"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": [
+          "observability"
+        ],
+        "summary": "Проверить готовность приложения и SQLite",
+        "description": "Bounded read существующей таблицы. Не зависит от exporter, не меняет данные, не раскрывает внутренние ошибки.",
+        "operationId": "getReadiness",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SQLite недоступна",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/transactions": {
       "get": {
         "tags": [
@@ -48,6 +138,15 @@
                   "$ref": "#/components/schemas/TransactionsResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -56,6 +155,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -87,6 +195,15 @@
                   "$ref": "#/components/schemas/Transaction"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -95,6 +212,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -129,6 +255,15 @@
                   "$ref": "#/components/schemas/Transaction"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -137,6 +272,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -179,6 +323,15 @@
                   "$ref": "#/components/schemas/Transaction"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -187,6 +340,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -217,6 +379,15 @@
               "application/json": {
                 "schema": {}
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -225,6 +396,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -246,6 +426,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserTagsResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -291,6 +480,15 @@
                   "$ref": "#/components/schemas/AuthResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -299,6 +497,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -344,6 +551,15 @@
                   "$ref": "#/components/schemas/AuthResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -352,6 +568,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -387,6 +612,15 @@
                   "$ref": "#/components/schemas/AuthResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -395,6 +629,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -418,6 +661,15 @@
                   "$ref": "#/components/schemas/LogoutResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           }
         }
@@ -437,6 +689,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -470,6 +731,15 @@
                   "$ref": "#/components/schemas/MeResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -478,6 +748,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -499,6 +778,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AccountsResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -533,6 +821,15 @@
                   "$ref": "#/components/schemas/AccountDto"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -541,6 +838,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -583,6 +889,15 @@
                   "$ref": "#/components/schemas/AccountDto"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -591,6 +906,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -623,6 +947,15 @@
                   "$ref": "#/components/schemas/DeleteAccountResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -631,6 +964,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -664,6 +1006,15 @@
                   "$ref": "#/components/schemas/AccountDto"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -672,6 +1023,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -695,6 +1055,15 @@
                   "$ref": "#/components/schemas/CurrencyCodes"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           }
         }
@@ -714,6 +1083,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CategoriesResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -745,6 +1123,15 @@
                   "$ref": "#/components/schemas/CategoryDto"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -753,6 +1140,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -787,6 +1183,15 @@
                   "$ref": "#/components/schemas/CategoryDto"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -795,6 +1200,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -837,6 +1251,15 @@
                   "$ref": "#/components/schemas/CategoryDto"
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -845,6 +1268,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -875,6 +1307,15 @@
               "application/json": {
                 "schema": {}
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
             }
           },
           "422": {
@@ -883,6 +1324,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
                 }
               }
             }
@@ -1247,6 +1697,24 @@
         ],
         "title": "PasswordChangeRequest"
       },
+      "ReadinessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ReadinessResponse"
+      },
       "RegisterRequest": {
         "properties": {
           "username": {
@@ -1298,6 +1766,20 @@
           "last_at"
         ],
         "title": "TagPeriodDto"
+      },
+      "TelemetryAcceptedResponse": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "accepted"
+        ],
+        "title": "TelemetryAcceptedResponse"
       },
       "Transaction": {
         "properties": {
@@ -1521,6 +2003,311 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ErrorRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Trace Id"
+          },
+          "span_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{16}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Span Id"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          },
+          "kind": {
+            "const": "error",
+            "title": "Kind",
+            "type": "string"
+          },
+          "code": {
+            "enum": [
+              "client_unhandled",
+              "client_framework",
+              "client_operation",
+              "client_network",
+              "client_http",
+              "client_update",
+              "client_version"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/Frame"
+            },
+            "maxItems": 30,
+            "title": "Frames",
+            "type": "array"
+          }
+        },
+        "required": [
+          "event_id",
+          "timestamp",
+          "kind",
+          "code"
+        ],
+        "title": "ErrorRecord",
+        "type": "object"
+      },
+      "Frame": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "maxLength": 160,
+            "pattern": "^(?:lib/[a-z0-9_/]+\\.dart|main\\.dart\\.js)$",
+            "title": "File",
+            "type": "string"
+          },
+          "function": {
+            "pattern": "^[A-Za-z_$][A-Za-z0-9_.$<>/-]{0,159}$",
+            "title": "Function",
+            "type": "string"
+          },
+          "line": {
+            "maximum": 10000000,
+            "minimum": 0,
+            "title": "Line",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file",
+          "function",
+          "line"
+        ],
+        "title": "Frame",
+        "type": "object"
+      },
+      "SpanLink": {
+        "additionalProperties": false,
+        "properties": {
+          "trace_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "span_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Span Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "span_id"
+        ],
+        "title": "SpanLink",
+        "type": "object"
+      },
+      "SpanRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "trace_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "span_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Span Id",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          },
+          "kind": {
+            "const": "span",
+            "title": "Kind",
+            "type": "string"
+          },
+          "parent_span_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{16}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Span Id"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/SpanLink"
+            },
+            "maxItems": 4,
+            "title": "Links",
+            "type": "array"
+          },
+          "operation": {
+            "enum": [
+              "api",
+              "refresh",
+              "update",
+              "version"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "start_ns": {
+            "exclusiveMinimum": 0,
+            "title": "Start Ns",
+            "type": "integer"
+          },
+          "end_ns": {
+            "exclusiveMinimum": 0,
+            "title": "End Ns",
+            "type": "integer"
+          },
+          "status": {
+            "maximum": 599,
+            "minimum": 0,
+            "title": "Status",
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "ok",
+              "error"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "timestamp",
+          "trace_id",
+          "span_id",
+          "kind",
+          "operation",
+          "start_ns",
+          "end_ns",
+          "status",
+          "outcome"
+        ],
+        "title": "SpanRecord",
+        "type": "object"
+      },
+      "TelemetryBatch": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "platform": {
+            "enum": [
+              "web",
+              "android"
+            ],
+            "title": "Platform",
+            "type": "string"
+          },
+          "app_version": {
+            "maxLength": 32,
+            "pattern": "^\\d{1,5}\\.\\d{1,5}\\.\\d{1,5}(?:\\+\\d{1,10})?$",
+            "title": "App Version",
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "error": "#/components/schemas/ErrorRecord",
+                  "span": "#/components/schemas/SpanRecord"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/SpanRecord"
+                }
+              ]
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "platform",
+          "app_version",
+          "records"
+        ],
+        "title": "TelemetryBatch",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1533,6 +2320,10 @@
     }
   },
   "tags": [
+    {
+      "name": "observability",
+      "description": "Готовность приложения и безопасная техническая телеметрия."
+    },
     {
       "name": "auth",
       "description": "Регистрация, вход, обновление токенов, профиль пользователя."

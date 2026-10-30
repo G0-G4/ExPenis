@@ -1,0 +1,214 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "expenis",
+      "folder": "ExPenis",
+      "interval": "30s",
+      "rules": [
+        {
+          "uid": "expenis-not-ready",
+          "title": "ExPenis: backend/SQLite недоступен",
+          "condition": "C",
+          "for": "3m",
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "labels": {
+            "project": "expenis",
+            "environment": "production"
+          },
+          "annotations": {
+            "summary": "ExPenis: backend/SQLite недоступен"
+          },
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "P4169E866C3094E38",
+              "model": {
+                "refId": "A",
+                "expr": "1 - probe_success{job=\"expenis-readiness\"}",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        0.5
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "uid": "expenis-server-errors",
+          "title": "ExPenis: повторяющиеся 5xx",
+          "condition": "C",
+          "for": "0s",
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "labels": {
+            "project": "expenis",
+            "environment": "production"
+          },
+          "annotations": {
+            "summary": "ExPenis: повторяющиеся 5xx"
+          },
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "P4169E866C3094E38",
+              "model": {
+                "refId": "A",
+                "expr": "(((sum(increase(expenis_http_requests_total{environment=\"production\",status=~\"5..\"}[5m])) or vector(0)) >= bool 5) * (((sum(increase(expenis_http_requests_total{environment=\"production\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min((sum(increase(expenis_http_requests_total{environment=\"production\"}[5m])) or vector(0)), 1)) >= bool 0.20))",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        0.5
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "uid": "expenis-client-errors",
+          "title": "ExPenis: повторяющаяся клиентская ошибка",
+          "condition": "C",
+          "for": "0s",
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "labels": {
+            "project": "expenis",
+            "environment": "production"
+          },
+          "annotations": {
+            "summary": "ExPenis: повторяющаяся клиентская ошибка"
+          },
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "expenis-logs",
+              "model": {
+                "refId": "A",
+                "expr": "environment:=production origin:=client code:~\"client_.*\" | stats by (fingerprint, platform, app_version) count_uniq(event_id) as errors | sort by (errors desc) | limit 100",
+                "instant": true,
+                "range": false,
+                "queryType": "stats"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        2.5
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "uid": "expenis-scrape-missing",
+          "title": "ExPenis: метрики недоступны",
+          "condition": "C",
+          "for": "3m",
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "labels": {
+            "project": "expenis",
+            "environment": "production"
+          },
+          "annotations": {
+            "summary": "ExPenis: метрики недоступны"
+          },
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "P4169E866C3094E38",
+              "model": {
+                "refId": "A",
+                "expr": "1 - up{job=\"expenis\"}",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        0.5
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

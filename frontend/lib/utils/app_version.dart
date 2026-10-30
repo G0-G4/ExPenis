@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import "dart:convert";
 
 import "package:dio/dio.dart";
@@ -58,11 +59,12 @@ Future<AppVersion?> _loadFromVersionJson() async {
       "cachebuster": DateTime.now().millisecondsSinceEpoch.toString(),
     },
   );
-  final response = await Dio(
+  final client = Dio(
     BaseOptions(
       validateStatus: (status) =>
           status != null && status >= 200 && status < 300,
     ),
-  ).getUri(url);
+  )..interceptors.add(TelemetryInterceptor(operation: "version"));
+  final response = await client.getUri(url);
   return parseVersionJson(response.data);
 }

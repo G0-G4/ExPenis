@@ -1,0 +1,100 @@
+# Нативная приёмка — 31 октября 2026, Europe/Moscow
+
+Временный стенд на `cloud` прошёл приёмку. Production не развёртывался.
+Стенд, runtime units, mounts и loop devices после проверки удалены; рабочие
+ExPenis, Caddy, Grafana, VictoriaMetrics и VictoriaLogs не перезапускались.
+
+## Что проверялось
+
+Отдельная копия backend с новой SQLite и синтетической учётной записью, Collector
+Contrib 0.140.0 и Tempo 2.9.0 (Linux amd64, архивы проверены по SHA-256), отдельные
+тестовые VictoriaLogs 1.52.0 и VictoriaMetrics 1.151.0. Зависимости установлены из
+`uv.lock` в отдельную venv; существующий Python переиспользован без изменений.
+Плагин VictoriaLogs 0.33.1 распакован только в стенд для учёта диска, установленный
+в рабочей Grafana 0.32.0 не менялся. Доставка Telegram и Grafana navigation ранее
+прошли отдельные изолированные проверки, описанные в `verification.md`.
+
+Новые core services работали в отдельной slice с `MemoryMax=1000000000` и
+`CPUQuota=50%`. Тестовые backend/хранилища/генератор имели отдельные ограничения.
+Все новые listeners, включая gRPC/memberlist, проверены как loopback-only.
+`systemd-analyze verify` завершился с кодом 0; предупреждение о `RestartMode`
+относилось к существующему `snapd.service` хоста. Проверены mount dependencies.
+
+Для traces и logs смонтированы новые ext4-образы по 400 000 000 байт. Рабочие
+storage paths не использовались и не переносились. Бюджет стенда учитывал полную
+копию venv/плагина, а не только их прирост относительно production.
+
+## Результаты
+
+| Проверка | Результат |
+| --- | --- |
+| Effective kernel memory limit core slice | 999 997 440 B, округление вниз до страниц |
+| Наблюдаемый максимум core RAM | 365 092 864 B |
+| Одновременный максимум core + всех вспомогательных тестовых процессов | 552 628 224 B |
+| OOM / memory limit events | 0 |
+| Минимальный MemAvailable хоста во время профиля | 2 327 851 008 B |
+| Максимальный диск до искусственного давления на общий бюджет | 1 597 169 664 B |
+| Диск при проверке общего admission budget | 1 817 591 808 B |
+| Свободный root disk при этом давлении | 10 394 591 232 B |
+| Production HTTP probes | Все 317 наблюдений — 200; максимум 0,1005 с |
+| Tempo compaction | Обработано 8 блоков; записано 2 572 048 B |
+| VictoriaLogs merges | Наблюдались завершённые слияния; также вызван forced merge |
+| Retention логов 30d | Запись 20-дневной давности сохранена, 31-дневная отброшена |
+| Переполнение обоих томов | ENOSPC; размеры образов не увеличились |
+| Volume/aggregate guard | Приём/экспорт и scrape приостановлены; business/readiness работали; после освобождения сбор возобновился |
+| DB fault и Collector outage | Подтверждены ожидаемый 503 readiness только при отказе DB и восстановление |
+| Безопасная очистка traces | Writer остановлен; очищены только тестовые WAL/blocks; SQLite сохранила прежний SHA-256 |
+| Конвейер после reset/restart | Client → server → SQLite с полным parent tree и связанным логом |
+
+Ступени генератора: 25/100/250/500 событий в секунду на 10/30/90/90 секунд.
+Фактически создано 250/2998/20882/20971 событий — всего 45 101. Это нагрузка
+на bounded, best-effort delivery, а не обещание доставки всех событий или
+производительности 500 событий/с. На верхних ступенях генератор ограничивался CPU.
+RAM измерялась периодическими samples; абсолютную границу задавали cgroups.
+Проверка целевой trace retention 7d — конфигурационная, ожидание семи суток
+не проводилось. Нагрузочный профиль конечный, не многодневный soak test.
+
+При принудительном полном заполнении во время merge тестовый VictoriaLogs
+завершился с ошибкой записи. После освобождения места и старта writer сохранил
+предварительно flushed-событие. Рабочий VictoriaLogs имеет `Restart=always`;
+его состояние и настройки не менялись. Это ожидаемая потеря доступности
+диагностики за пределами admission guard; бизнес-API оставался доступным.
+
+Первый проход измерителя прервался на исчезающем нулевом `paused`-файле при
+`du`; добавлены исключение этого файла и bounded retries. Compaction/квоты
+проверены после продолжения с сохранёнными блоками. В recovery checker заменён
+невалидный batch на валидный для проверки capacity 503; восстановление writer
+после полного ENOSPC теперь проверяется явно.
+
+## Исправления по результатам
+
+- `mkfs.ext4 -E nodiscard` сохраняет предварительное выделение backing files.
+- Guard резервирует полную логическую ёмкость sparse images, проверяет размер
+  образов и геометрию смонтированных файловых систем.
+- При расчёте бюджета дополнительно резервируется временная копия всего shared
+  metrics store, включая baseline, и учитывается прирост journal. Baseline теперь
+  требует `journal_bytes`; stdout/stderr production guard отключены.
+- Memberlist Tempo явно привязан к loopback; порты добавлены в runbook.
+
+Guard tests: 3 прошли, включая sparse image accounting, ошибочную геометрию,
+fail-closed baseline и резервирование compaction. Source/config helpers прошли
+проверки форматирования/импортов и shell syntax. Retention остаётся 30d:
+снижение до 14d по результатам этого профиля не потребовалось.
+
+## Очистка и следующий шаг
+
+После удаления стенда production HTTP — 200; MemAvailable — 2 811 252 736 B,
+свободный root disk — 12 212 019 200 B. Тестовых listeners и loop devices нет.
+Файлы текущего кода, dependency environment, synthetic DB и plugin стенда удалены.
+Бэкапы и общие provisioning/storage paths не менялись.
+
+Завершены 1.3, 6.3 и 7.4; OpenSpec — 30/31. Остался 7.5: controlled release/rollout
+backend → Web/Android с обновлением общей инфраструктуры и smoke после запуска.
+Этот этап не выполнялся в рамках проверки временного стенда.
+
+Доказательства: [профиль](evidence/native/acceptance-report.json),
+[восстановление](evidence/native/recovery-report.json),
+[хеши и размеры](evidence/native/artifacts.json),
+[effective units](evidence/native/unit-properties.txt),
+[validator](evidence/native/unit-validation.txt). Полные отчёты также сохранены
+локально в `/private/tmp/expenis-native-evidence`.

@@ -50,7 +50,7 @@ def _validate_new_password(password: str) -> None:
 async def register_user(username: str, password: str) -> User:
     existing = await db.run(lambda: User.get_or_none(User.username == username))
     if existing is not None:
-        logger.warning("registration rejected, username taken: %s", username)
+        logger.warning("registration_rejected")
         raise UsernameTakenError(f"username '{username}' is already taken")
     now = datetime.now(UTC)
     user = User(
@@ -61,17 +61,17 @@ async def register_user(username: str, password: str) -> User:
         updated_at=now,
     )
     await db.run(lambda: user.save(force_insert=True))
-    logger.info("user registered: id=%d username=%s", user.id, username)
+    logger.info("user_registered")
     return user
 
 
 async def authenticate_user(username: str, password: str) -> User | None:
     user = await db.run(lambda: User.get_or_none(User.username == username))
     if user is None:
-        logger.warning("auth failed, no such username: %s", username)
+        logger.warning("auth_unknown_user")
         return None
     if not _verify_password(password, user.password_hash):
-        logger.warning("auth failed, bad password: username=%s", username)
+        logger.warning("auth_bad_password")
         return None
     return user
 
@@ -89,7 +89,7 @@ async def get_or_create_user_by_telegram_id(telegram_id: int) -> User:
         updated_at=now,
     )
     await db.run(lambda: user.save(force_insert=True))
-    logger.info("telegram-linked user created: id=%d telegram_id=%d", user.id, telegram_id)
+    logger.info("telegram_user_created")
     return user
 
 
@@ -103,11 +103,11 @@ async def get_user_by_id(user_id: int) -> User:
 async def change_password(user_id: int, old_password: str, new_password: str) -> User:
     user = await get_user_by_id(user_id)
     if not _verify_password(old_password, user.password_hash):
-        logger.warning("change_password rejected, bad old password: user_id=%d", user_id)
+        logger.warning("password_change_rejected")
         raise InvalidPasswordError("invalid current password")
     _validate_new_password(new_password)
     user.password_hash = _hash_password(new_password)
     user.updated_at = datetime.now(UTC)
     await db.run(user.save)
-    logger.info("password changed: user_id=%d", user_id)
+    logger.info("password_changed")
     return user

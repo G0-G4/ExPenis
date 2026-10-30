@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import 'package:dio/dio.dart';
 import 'package:expenis_mobile/models/tag_period.dart';
 import 'package:expenis_mobile/models/transaction.dart';
@@ -12,11 +13,14 @@ class TransactionService extends BaseService {
             .map((tag) => tag as String)
             .toList();
       }
-      throw Exception(
+      throw telemetryException(
         'Failed to load tags with status: ${response.statusCode}',
       );
     } on DioException catch (e) {
-      throw Exception('Failed to load tags: ${e.message}');
+      throw telemetryException('Failed to load tags: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -28,11 +32,14 @@ class TransactionService extends BaseService {
             .map((json) => TagPeriod.fromJson(json as Map<String, dynamic>))
             .toList();
       }
-      throw Exception(
+      throw telemetryException(
         'Failed to load tag periods with status: ${response.statusCode}',
       );
     } on DioException catch (e) {
-      throw Exception('Failed to load tag periods: ${e.message}');
+      throw telemetryException('Failed to load tag periods: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -60,11 +67,14 @@ class TransactionService extends BaseService {
             .map((json) => Transaction.fromJson(json))
             .toList();
       }
-      throw Exception(
+      throw telemetryException(
         'Failed to load transactions with status: ${response.statusCode}',
       );
     } on DioException catch (e) {
-      throw Exception('Failed to load transactions: ${e.message}');
+      throw telemetryException('Failed to load transactions: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -73,7 +83,10 @@ class TransactionService extends BaseService {
       final response = await dio.get('$baseUrl/api/transactions/$id');
       return Transaction.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to load transaction: ${e.message}');
+      throw telemetryException('Failed to load transaction: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -87,7 +100,10 @@ class TransactionService extends BaseService {
       );
       return Transaction.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to create transaction: ${e.message}');
+      throw telemetryException('Failed to create transaction: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -101,7 +117,10 @@ class TransactionService extends BaseService {
         data: request.toJson(),
       );
     } on DioException catch (e) {
-      throw Exception('Failed to update transaction: ${e.message}');
+      throw telemetryException('Failed to update transaction: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -109,7 +128,10 @@ class TransactionService extends BaseService {
     try {
       await dio.delete('$baseUrl/api/transactions/$id');
     } on DioException catch (e) {
-      throw Exception('Failed to delete transaction: ${e.message}');
+      throw telemetryException('Failed to delete transaction: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 }

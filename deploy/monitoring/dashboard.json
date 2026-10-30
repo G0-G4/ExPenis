@@ -1,0 +1,503 @@
+{
+  "uid": "expenis-overview",
+  "title": "ExPenis — состояние приложения",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "expenis"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "environment",
+        "type": "custom",
+        "query": "production,development,test",
+        "current": {
+          "text": "production",
+          "value": "production"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Backend scrape / readiness (нет данных ≠ OK)",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"expenis\"}",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "title": "Готовность SQLite",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "expenis_ready{job=\"expenis\"}",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "title": "Запросы / сек",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (rate(expenis_http_requests_total{environment=\"$environment\"}[5m]))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "5xx / 5 минут",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(expenis_http_requests_total{environment=\"$environment\",status=~\"5..\"}[5m]))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Доля 5xx",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(expenis_http_requests_total{environment=\"$environment\",status=~\"5..\"}[5m])) / sum(rate(expenis_http_requests_total{environment=\"$environment\"}[5m]))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Latency p50/p95/p99",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(expenis_http_request_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(expenis_http_request_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(expenis_http_request_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Время зависимостей p95",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, operation, outcome) (rate(expenis_dependency_duration_seconds_bucket{job=\"expenis\"}[5m])))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Память backend",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_resident_memory_bytes{job=\"expenis\"}",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "Потери / ошибки отправки",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(expenis_telemetry_records_total{job=\"expenis\"}[5m]))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "title": "Клиентские ошибки по версии и платформе",
+      "type": "table",
+      "datasource": {
+        "uid": "expenis-logs"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "environment:=\"$environment\" origin:=client | stats by (fingerprint, platform, app_version) count() as errors | sort by (errors desc) | limit 100",
+          "datasource": {
+            "uid": "expenis-logs"
+          },
+          "range": true,
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 11,
+      "title": "Технические логи и переход к trace",
+      "type": "logs",
+      "datasource": {
+        "uid": "expenis-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "environment:=\"$environment\"",
+          "datasource": {
+            "uid": "expenis-logs"
+          },
+          "range": true,
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 12,
+      "title": "In-flight запросы",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "expenis_http_inflight{job=\"expenis\"}",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 13,
+      "title": "Клиентские HTTP попытки (доставленная выборка)",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (platform, operation, status) (rate(expenis_client_http_requests_total{environment=\"$environment\"}[5m]))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 14,
+      "title": "Клиентская latency p95 (доставленная выборка)",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, platform) (rate(expenis_client_operation_duration_seconds_bucket{environment=\"$environment\"}[5m])))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 15,
+      "title": "Принятые ошибки клиентов",
+      "type": "timeseries",
+      "datasource": {
+        "uid": "P4169E866C3094E38"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (platform, code) (increase(expenis_client_errors_total{environment=\"$environment\"}[10m]))",
+          "datasource": {
+            "uid": "P4169E866C3094E38"
+          },
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

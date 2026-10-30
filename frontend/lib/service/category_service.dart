@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import 'package:dio/dio.dart';
 import 'package:expenis_mobile/models/category.dart';
 import 'package:expenis_mobile/service/base_service.dart';
@@ -13,11 +14,14 @@ class CategoryService extends BaseService {
             .map((catJson) => Category.fromJson(catJson))
             .toList();
       }
-      throw Exception(
+      throw telemetryException(
         'Failed to load categories with status: ${response.statusCode}',
       );
     } on DioException catch (e) {
-      throw Exception('Failed to load categories: ${e.message}');
+      throw telemetryException('Failed to load categories: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -26,7 +30,10 @@ class CategoryService extends BaseService {
       final response = await dio.get('$baseUrl/api/categories/$id');
       return Category.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to load category: ${e.message}');
+      throw telemetryException('Failed to load category: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -37,7 +44,10 @@ class CategoryService extends BaseService {
         data: category.toJson(),
       );
     } on DioException catch (e) {
-      throw Exception('Failed to update category: ${e.message}');
+      throw telemetryException('Failed to update category: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -45,7 +55,10 @@ class CategoryService extends BaseService {
     try {
       await dio.delete('$baseUrl/api/categories/$id');
     } on DioException catch (e) {
-      throw Exception('Failed to delete category: ${e.message}');
+      throw telemetryException('Failed to delete category: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 
@@ -60,7 +73,10 @@ class CategoryService extends BaseService {
       );
       return Category.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to create category: ${e.message}');
+      throw telemetryException('Failed to create category: ${e.message}');
+    } on Object catch (error, stack) {
+      TelemetryService.instance.capture(error, stack, code: "client_operation");
+      rethrow;
     }
   }
 }

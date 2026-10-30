@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import "package:dio/dio.dart";
 import "package:flutter/foundation.dart";
 import "package:expenis_mobile/service/navigator_service.dart";
@@ -8,6 +9,8 @@ import "package:expenis_mobile/service/settings_service.dart";
 enum TokenRefreshResult { success, unauthorized, failed }
 
 String resolveBaseUrl() {
+  const configured = String.fromEnvironment("EXPENIS_API_BASE_URL");
+  if (configured.isNotEmpty) return configured;
   if (kReleaseMode) {
     return "https://expenis.g0g4.ru";
   }
@@ -15,6 +18,7 @@ String resolveBaseUrl() {
 }
 
 Future<TokenRefreshResult>? _refreshInFlight;
+TraceOperation? _refreshOwner;
 Dio? _refreshDio;
 
 Dio _plainDio({HttpClientAdapter? adapter}) {
@@ -24,6 +28,9 @@ Dio _plainDio({HttpClientAdapter? adapter}) {
           status != null && status >= 200 && status < 500,
     ),
   );
+  client.interceptors.add(
+    TelemetryInterceptor(firstPartyOrigin: resolveBaseUrl()),
+  );
   if (adapter != null) {
     client.httpClientAdapter = adapter;
   }
@@ -31,13 +38,34 @@ Dio _plainDio({HttpClientAdapter? adapter}) {
 }
 
 /// Refresh using a Dio without the auth interceptor to avoid a queued-interceptor deadlock.
-Future<TokenRefreshResult> refreshStoredTokens() {
-  return _refreshInFlight ??= _refreshStoredTokens().whenComplete(() {
+Future<TokenRefreshResult> refreshStoredTokens({TraceOperation? operation}) {
+  if (_refreshInFlight != null) {
+    final owner = _refreshOwner;
+    if (operation != null &&
+        owner != null &&
+        !identical(operation, owner) &&
+        operation.links.length < 4) {
+      operation.links.add({"trace_id": owner.traceId, "span_id": owner.spanId});
+    }
+    return _refreshInFlight!;
+  }
+  final owner =
+      operation ??
+      (TelemetryService.instance.enabled ? TraceOperation("refresh") : null);
+  _refreshOwner = owner;
+  _refreshInFlight = _refreshStoredTokens(operation: owner).whenComplete(() {
+    if (operation == null && owner != null) {
+      TelemetryService.instance.finish(owner, owner.lastStatus);
+    }
     _refreshInFlight = null;
+    _refreshOwner = null;
   });
+  return _refreshInFlight!;
 }
 
-Future<TokenRefreshResult> _refreshStoredTokens() async {
+Future<TokenRefreshResult> _refreshStoredTokens({
+  TraceOperation? operation,
+}) async {
   try {
     final settingsService = await SettingsService.getInstance();
     final refreshToken = await settingsService.getRefreshToken();
@@ -46,7 +74,14 @@ Future<TokenRefreshResult> _refreshStoredTokens() async {
     }
     final response = await (_refreshDio ?? _plainDio()).post(
       "${resolveBaseUrl()}/api/refresh",
-      options: Options(headers: {"Authorization": "Bearer $refreshToken"}),
+      options: Options(
+        headers: {"Authorization": "Bearer $refreshToken"},
+        extra: {
+          "skipAuth": true,
+          "telemetryOperation": ?operation,
+          "telemetryRefreshChild": operation != null,
+        },
+      ),
     );
     if (response.statusCode != 200 && response.statusCode != 201) {
       return response.statusCode == 401
@@ -108,6 +143,9 @@ Dio createAuthedDio() {
   );
 
   dio.interceptors.add(
+    TelemetryInterceptor(firstPartyOrigin: resolveBaseUrl()),
+  );
+  dio.interceptors.add(
     QueuedInterceptorsWrapper(
       onRequest: (options, handler) async {
         if (options.extra["skipAuth"] == true) {
@@ -126,8 +164,17 @@ Dio createAuthedDio() {
           handler.next(response);
           return;
         }
-        final result = await refreshStoredTokens();
+        final operation =
+            response.requestOptions.extra["telemetryOperation"]
+                as TraceOperation?;
+        final result = await refreshStoredTokens(operation: operation);
         if (result != TokenRefreshResult.success) {
+          if (operation != null) {
+            TelemetryService.instance.finish(
+              operation,
+              response.statusCode ?? 0,
+            );
+          }
           if (result == TokenRefreshResult.unauthorized) {
             await forceLogout();
           }
@@ -164,6 +211,7 @@ abstract class BaseService {
   static void debugReset() {
     _sharedDio = null;
     _refreshInFlight = null;
+    _refreshOwner = null;
     _refreshDio = null;
   }
 

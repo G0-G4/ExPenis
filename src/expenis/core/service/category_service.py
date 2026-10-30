@@ -44,7 +44,7 @@ async def create_category(user_id: int, name: str, type: CategoryType) -> Catego
     now = datetime.now(UTC)
     category = Category(user_id=user_id, name=name, type=type, created_at=now, updated_at=now)
     await db.run(category.save)
-    logger.info("category created: id=%d user_id=%d name=%s type=%s", category.id, user_id, name, type)
+    logger.info("category_created")
     return category
 
 
@@ -52,7 +52,7 @@ async def update_category(category: Category) -> Category:
     now = datetime.now(UTC)
     category.updated_at = now
     await db.run(category.save)
-    logger.info("category updated: id=%d name=%s", category.id, category.name)
+    logger.info("category_updated")
     return category
 
 
@@ -64,7 +64,7 @@ async def delete_category_by_id(category_id: int):
     await db.run(lambda: Category.delete_by_id(category_id))
 
 async def delete_category_by_id_and_user_id(user_id: int, category_id: int):
-    logger.info("category deleted: id=%d user_id=%d", category_id, user_id)
+    logger.info("category_deleted")
     await db.run(lambda: Category.delete().where((Category.id == category_id) & (Category.user_id == user_id)).execute())
 
 
@@ -73,7 +73,7 @@ async def create_default_categories(user_id: int):
     async with db.atomic():
         income, expense = await get_user_categories(user_id)
         if not income and not expense:
-            logger.info("creating default categories for user_id=%d", user_id)
+            logger.info("default_categories_created")
             incomes = [
                 Category(
                     user_id=user_id,

@@ -1,0 +1,41 @@
+Slice=expenisacceptance.slice
+MemoryMax=671088640
+ProtectHome=yes
+Id=expenis-acceptance-tempo.service
+RequiresMountsFor=/var/lib/expenis-obs-acceptance-20261030/app /var/tmp /var/lib/expenis-obs-acceptance-20261030/data/traces
+ActiveState=active
+
+Slice=expenisacceptance.slice
+MemoryMax=167772160
+ProtectHome=yes
+Id=expenis-acceptance-collector.service
+RequiresMountsFor=/var/tmp /var/lib/expenis-obs-acceptance-20261030/app
+ActiveState=active
+
+Slice=expenisacceptance.slice
+MemoryMax=33554432
+ProtectHome=read-only
+Id=expenis-acceptance-guard.service
+RequiresMountsFor=/var/lib/expenis-obs-acceptance-20261030/app /var/lib/expenis-obs-acceptance-20261030/data/traces /var/tmp /var/lib/expenis-obs-acceptance-20261030/data/logs
+ActiveState=active
+
+Slice=expenisacceptanceaux.slice
+MemoryMax=201326592
+ProtectHome=read-only
+Id=expenis-acceptance-backend.service
+RequiresMountsFor=/var/tmp /var/lib/expenis-obs-acceptance-20261030/app
+ActiveState=active
+
+Slice=expenisacceptanceaux.slice
+MemoryMax=134217728
+ProtectHome=read-only
+Id=expenis-acceptance-logs.service
+RequiresMountsFor=/var/lib/expenis-obs-acceptance-20261030/data/logs /var/tmp /var/lib/expenis-obs-acceptance-20261030/app
+ActiveState=active
+
+Slice=expenisacceptanceaux.slice
+MemoryMax=134217728
+ProtectHome=read-only
+Id=expenis-acceptance-metrics.service
+RequiresMountsFor=/var/tmp /var/lib/expenis-obs-acceptance-20261030/app
+ActiveState=active

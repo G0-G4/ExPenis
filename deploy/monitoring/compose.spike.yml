@@ -1,0 +1,47 @@
+# Isolated compatibility lab. No production endpoints or data volumes.
+services:
+  metrics:
+    image: victoriametrics/victoria-metrics:v1.151.0
+    command: [-retentionPeriod=3, -storageDataPath=/data, -storage.minFreeDiskSpaceBytes=10MB]
+    ports: ["127.0.0.1:18428:8428"]
+    mem_limit: 160m
+    tmpfs: [/data:size=100000000]
+  logs:
+    image: victoriametrics/victoria-logs:v1.52.0
+    command: [-retentionPeriod=30d, -storageDataPath=/data, -retention.maxDiskSpaceUsageBytes=250MB]
+    ports: ["127.0.0.1:19428:9428"]
+    mem_limit: 160m
+    tmpfs: [/data:size=400000000]
+  tempo:
+    image: grafana/tempo:2.9.0
+    user: "0:0"
+    command: [-config.file=/etc/tempo.yml]
+    volumes: ["./tempo.yml:/etc/tempo.yml:ro"]
+    ports: ["127.0.0.1:13200:3200"]
+    mem_limit: 640m
+    tmpfs: [/data:size=400000000]
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.140.0
+    command: [--config=/etc/otel.yml]
+    environment:
+      VL_LOGS_ENDPOINT: http://logs:9428/insert/opentelemetry/v1/logs
+      TEMPO_TRACES_ENDPOINT: http://tempo:4318/v1/traces
+    volumes: ["./collector.yml:/etc/otel.yml:ro"]
+    ports: ["127.0.0.1:14318:4318"]
+    mem_limit: 160m
+  grafana:
+    image: grafana/grafana:13.2.1
+    profiles: [ui]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: expenis-spike-only
+      GF_PLUGINS_PREINSTALL: ''
+      GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource@0.33.1
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+    volumes:
+      - ./spike-datasources.json:/etc/grafana/provisioning/datasources/spike.yml:ro
+      - ./dashboard-provider.yml:/etc/grafana/provisioning/dashboards/expenis.yml:ro
+      - ./dashboard.json:/etc/grafana/provisioning/dashboards/expenis/dashboard.json:ro
+    ports: ["127.0.0.1:13000:3000"]
+    # Includes the plugin/database tmpfs; this is a disposable UI lab limit.
+    mem_limit: 1g
+    tmpfs: ["/var/lib/grafana:exec,uid=472,gid=472"]

@@ -1,0 +1,16 @@
+- job_name: expenis
+  scrape_interval: 30s
+  sample_limit: 5000
+  static_configs:
+    - targets: [127.0.0.1:8000]
+      labels: {project: expenis}
+- job_name: expenis-readiness
+  metrics_path: /probe
+  params: {module: [http_2xx]}
+  static_configs:
+    - targets: [https://expenis.g0g4.ru/api/health/ready]
+      labels: {project: expenis}
+  relabel_configs:
+    - {source_labels: [__address__], target_label: __param_target}
+    - {source_labels: [__param_target], target_label: instance}
+    - {target_label: __address__, replacement: '127.0.0.1:9115'}

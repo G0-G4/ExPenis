@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: expenis
+    orgId: 1
+    folder: ExPenis
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards/expenis

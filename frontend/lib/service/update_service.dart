@@ -1,3 +1,4 @@
+import "package:expenis_mobile/service/telemetry_service.dart";
 import "dart:io";
 
 import "package:dio/dio.dart";
@@ -47,7 +48,7 @@ class UpdateService {
       validateStatus: (status) =>
           status != null && status >= 200 && status < 300,
     ),
-  );
+  )..interceptors.add(TelemetryInterceptor(operation: "update"));
 
   Future<UpdateInfo?> checkForUpdate() async {
     try {

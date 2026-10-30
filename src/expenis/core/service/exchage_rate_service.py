@@ -7,11 +7,13 @@ from pathlib import Path
 import httpx
 
 from .. import cache
+from ...observability.runtime import operation
+from opentelemetry.trace import SpanKind, Status, StatusCode
 from ...config import ALPHAVANTAGE_KEY
 
 logger = logging.getLogger(__name__)
 
-crypto_list = ['BTC', 'ETH']
+crypto_list = ["BTC", "ETH"]
 
 # Free tier (alphavantage.co/premium): 5 requests/minute, 25 requests/day.
 AV_TIMEOUT_SECONDS = 3.0
@@ -26,6 +28,28 @@ CRYPTO_RATES_PATH = Path("data/crypto_rates.json")
 
 _av_calls: deque[float] = deque()
 _last_rates: dict | None = None
+
+
+async def _observed_get(client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+    provider = (
+        "cbr"
+        if url.startswith("https://www.cbr-xml-daily.ru/")
+        else "binance"
+        if url.startswith("https://api.binance.com/")
+        else "alphavantage"
+    )
+    response: httpx.Response | None = None
+    with operation(
+        f"http.{provider}",
+        SpanKind.CLIENT,
+        failed=lambda: response is not None and not response.is_success,
+    ) as span:
+        response = await client.get(url, **kwargs)
+        if span is not None:
+            span.set_attributes({"provider": provider, "status": response.status_code})
+            if not response.is_success:
+                span.set_status(Status(StatusCode.ERROR))
+        return response
 
 
 def _prune_av_calls(now: float) -> None:
@@ -65,9 +89,7 @@ def _saved_crypto_rates() -> dict:
     if not isinstance(payload, dict):
         return {}
     return {
-        code: {"Value": value}
-        for code, value in payload.items()
-        if isinstance(value, (int, float))
+        code: {"Value": value} for code, value in payload.items() if isinstance(value, (int, float))
     }
 
 
@@ -92,7 +114,7 @@ def _persist_crypto(rates: dict) -> None:
         CRYPTO_RATES_PATH.parent.mkdir(parents=True, exist_ok=True)
         CRYPTO_RATES_PATH.write_text(json.dumps(payload))
     except OSError:
-        logger.warning("failed to persist crypto rates to %s", CRYPTO_RATES_PATH)
+        logger.warning("rates_persist_failed")
 
 
 async def _fill_crypto_from_binance(
@@ -104,27 +126,26 @@ async def _fill_crypto_from_binance(
     symbols = [_BINANCE_SYMBOLS[code] for code in missing if code in _BINANCE_SYMBOLS]
     if not symbols:
         return []
-    logger.warning("alphavantage missing %s, requesting binance", ",".join(missing))
+    logger.warning("rates_fallback")
     try:
-        res = await client.get(
+        res = await _observed_get(
+            client,
             _BINANCE_URL,
             params={"symbols": json.dumps(symbols, separators=(",", ":"))},
             timeout=AV_TIMEOUT_SECONDS,
         )
-    except httpx.TransportError as exc:
-        logger.warning("binance crypto quote failed: %r", exc)
+    except httpx.TransportError:
+        logger.warning("provider_transport_error")
         return []
     if res.status_code != 200:
-        logger.warning("binance crypto quote failed with status %d", res.status_code)
+        logger.warning("provider_http_error")
         return []
     payload = res.json()
     if not isinstance(payload, list):
-        logger.warning("binance crypto quote returned unexpected payload")
+        logger.warning("provider_payload_error")
         return []
     by_symbol = {
-        item.get("symbol"): item.get("price")
-        for item in payload
-        if isinstance(item, dict)
+        item.get("symbol"): item.get("price") for item in payload if isinstance(item, dict)
     }
     fetched: list[str] = []
     for code in missing:
@@ -146,9 +167,9 @@ async def get_course():
     url = "https://www.cbr-xml-daily.ru/daily_json.js"
     crypto_url = "https://www.alphavantage.co/query"
     async with httpx.AsyncClient() as client:
-        res = await client.get(url)
+        res = await _observed_get(client, url)
         if res.status_code != 200:
-            logger.error("CBR API request failed with status %d", res.status_code)
+            logger.error("provider_http_error")
             raise RuntimeError(f"request ended with code {res.status_code}")
         rates = res.json()
         usd_rub = (rates.get("Valute") or {}).get("USD", {}).get("Value")
@@ -156,19 +177,15 @@ async def get_course():
         for crypto in crypto_list:
             now = time.monotonic()
             if usd_rub is None:
-                logger.error("CBR payload has no USD rate, skipping crypto quotes")
+                logger.error("provider_payload_error")
                 break
             if not _av_call_allowed(now):
-                logger.warning(
-                    "alphavantage limit reached (%d/min, %d/day), skipping %s",
-                    AV_MAX_REQUESTS_PER_MINUTE,
-                    AV_MAX_REQUESTS_PER_DAY,
-                    crypto,
-                )
+                logger.warning("provider_rate_limited")
                 break
             _record_av_call(now)
             try:
-                res = await client.get(
+                res = await _observed_get(
+                    client,
                     crypto_url,
                     params={
                         "apikey": ALPHAVANTAGE_KEY,
@@ -178,42 +195,31 @@ async def get_course():
                     },
                     timeout=AV_TIMEOUT_SECONDS,
                 )
-            except httpx.TransportError as exc:
+            except httpx.TransportError:
                 # Timeouts and dropped connections alike: crypto is optional.
-                logger.warning("alphavantage request failed for %s: %r", crypto, exc)
+                logger.warning("provider_transport_error")
                 break
             if res.status_code != 200:
-                logger.error(
-                    "alphavantage API request failed for %s with status %d",
-                    crypto,
-                    res.status_code,
-                )
+                logger.error("provider_http_error")
                 break
             payload = res.json()
             if not isinstance(payload, dict):
-                logger.warning("alphavantage returned unexpected payload for %s", crypto)
+                logger.warning("provider_payload_error")
                 break
             rub_rate = _crypto_rub_rate(payload, float(usd_rub))
             if rub_rate is None:
-                note = payload.get("Note") or payload.get("Information")
-                logger.warning("alphavantage returned no quote for %s: %s", crypto, note)
+                logger.warning("provider_quote_missing")
                 break
             rates.setdefault("Valute", {})[crypto] = {"Value": rub_rate}
             fetched.append(crypto)
         missing = [code for code in crypto_list if code not in (rates.get("Valute") or {})]
         if missing and usd_rub is not None:
-            fetched.extend(
-                await _fill_crypto_from_binance(client, rates, float(usd_rub), missing)
-            )
+            fetched.extend(await _fill_crypto_from_binance(client, rates, float(usd_rub), missing))
         _apply_previous_crypto(rates)
         _last_rates = rates
         _persist_crypto(rates)
         available = [code for code in crypto_list if code in (rates.get("Valute") or {})]
-        logger.info(
-            "exchange rates fetched, fresh crypto: %s, available: %s",
-            ",".join(fetched) or "none",
-            ",".join(available) or "none",
-        )
+        logger.info("rates_fetched")
         return rates
 
 
@@ -225,6 +231,7 @@ async def get_currency_exchange_rate(currency_code: str) -> float:
     if "Value" not in valute:
         raise RuntimeError(f"exchange rate not found for {currency_code}")
     return valute.get("Value")
+
 
 async def convert_to_rubles(amount: float, currency_code: str) -> float | None:
     if amount is None:
