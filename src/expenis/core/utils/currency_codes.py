@@ -1,4 +1,17 @@
-CODES = {
+from typing import NotRequired, TypedDict
+
+
+class CurrencyInfo(TypedDict):
+    CharCode: str
+    ID: NotRequired[str]
+    NumCode: NotRequired[str]
+    Nominal: NotRequired[int]
+    Name: NotRequired[str]
+    Value: NotRequired[float]
+    Previous: NotRequired[float]
+
+
+CODES: dict[str, CurrencyInfo] = {
     "AUD": {
         "ID": "R01010",
         "NumCode": "036",

@@ -37,3 +37,12 @@ e2e = [
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+
+[tool.mypy]
+explicit_package_bases = true
+
+# The pinned Peewee checkout includes pwasyncio, which has no published typing.
+# Keep this exception at the external ORM boundary; project modules stay checked.
+[[tool.mypy.overrides]]
+module = ["peewee", "playhouse.pwasyncio"]
+ignore_missing_imports = true

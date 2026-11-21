@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..core.utils.category_colors import CATEGORY_COLORS
 
-from src.expenis.core.utils.currency_codes import CODES
+from ..core.utils.currency_codes import CODES
 
 
 class PersonalGreetingDto(BaseModel):

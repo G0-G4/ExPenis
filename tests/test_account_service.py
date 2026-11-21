@@ -6,6 +6,7 @@ from src.expenis.core.service import create_account, get_account_by_id, get_acti
     delete_account_by_id, delete_account_by_id_and_user_id, get_user_account_with_balance, get_user_accounts, \
     get_user_accounts_with_balance
 from src.expenis.core.service.transaction_service import save_transaction
+from src.expenis.core.service.account_service import update_account
 
 
 @pytest.mark.asyncio
@@ -164,3 +165,15 @@ async def test_delete_account_by_id_without_user_id_raises_when_missing():
     async with db:
         with pytest.raises(NotFoundException):
             await delete_account_by_id(999)
+
+
+@pytest.mark.asyncio
+async def test_balance_update_rejects_an_account_deleted_since_it_was_loaded():
+    async with db:
+        account = await create_account(user_id=1, name="cash", adjustment_amount=10.0)
+        await delete_account_by_id_and_user_id(1, account.id)
+
+        with pytest.raises(NotFoundException):
+            await update_account(1, account, new_balance=20.0)
+
+        assert await get_account_by_id(1, account.id) is None

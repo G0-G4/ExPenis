@@ -6,7 +6,7 @@ The script imports the FastAPI app (no server start, no DB connection) and
 writes docs/openapi.json.
 
 All operationId, summary, description, tags etc. come from the route
-decorators in src/expenis/server/application.py (see custom_openapi + explicit
+decorators in src/expenis/server/application.py (see ExpenisAPI.openapi + explicit
 operation_id / summary on each @app.xxx).
 
 Run via: just openapi

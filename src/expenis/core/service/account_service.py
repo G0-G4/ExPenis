@@ -54,7 +54,7 @@ async def get_user_accounts_with_balance(user_id: int) -> list[tuple[Account, fl
     return [(a, a.balance) for a in accounts]
 
 
-async def get_user_account_with_balance(user_id: int, account_id) -> tuple[Account, float] | tuple[None, None]:
+async def get_user_account_with_balance(user_id: int, account_id: int) -> tuple[Account, float] | tuple[None, None]:
     accounts = await db.list(
         _accounts_with_balance_query(
             (Account.id == account_id) & (Account.user_id == user_id) & (Account.is_deleted == False)
@@ -80,6 +80,8 @@ async def update_account(user_id: int, account: Account, new_balance: float | No
     async with db.atomic():
         if new_balance is not None:
             _, balance = await get_user_account_with_balance(user_id, account.id)
+            if balance is None:
+                raise NotFoundException(f"account {account.id} not found")
             account.adjustment_amount = new_balance - balance + account.adjustment_amount
         account.updated_at = now
         await db.run(account.save)

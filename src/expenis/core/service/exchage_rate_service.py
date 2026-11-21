@@ -3,6 +3,7 @@ import logging
 import time
 from collections import deque
 from pathlib import Path
+from typing import overload
 
 import httpx
 
@@ -233,7 +234,15 @@ async def get_currency_exchange_rate(currency_code: str) -> float:
     return valute.get("Value")
 
 
-async def convert_to_rubles(amount: float, currency_code: str) -> float | None:
+@overload
+async def convert_to_rubles(amount: float, currency_code: str) -> float: ...
+
+
+@overload
+async def convert_to_rubles(amount: None, currency_code: str) -> None: ...
+
+
+async def convert_to_rubles(amount: float | None, currency_code: str) -> float | None:
     if amount is None:
         return amount
     rate = await get_currency_exchange_rate(currency_code)

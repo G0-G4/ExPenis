@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from authx import AuthX, AuthXConfig, TokenPayload
@@ -9,6 +9,7 @@ from authx import exceptions as authx_exceptions
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -22,7 +23,7 @@ from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, Account
 from .dto import PersonalGreetingDto, PersonalGreetingResponse
 from .export_response import ExportFileResponse, build_export_response
 from ..config import COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
-from ..core.models import Account, Category, Transaction as ModelTransaction, db
+from ..core.models import Account, Category, User, Transaction as ModelTransaction, db
 from ..core.service import authenticate_user, change_password, create_account, create_category, \
     create_default_categories, \
     delete_account_by_id_and_user_id, delete_category_by_id_and_user_id, delete_transaction_by_id_and_user_id, \
@@ -74,7 +75,47 @@ tags_metadata = [
     {"name": "other", "description": "Вспомогательные данные: теги пользователя, коды валют."},
 ]
 
-app = FastAPI(
+
+class ExpenisAPI(FastAPI):
+    """Expose the same custom schema to HTTP clients and the spec generator."""
+
+    def openapi(self) -> dict[str, Any]:
+        if self.openapi_schema:
+            return self.openapi_schema
+        openapi_schema = get_openapi(
+            title=self.title,
+            version=self.version,
+            description=self.description,
+            routes=self.routes,
+            tags=self.openapi_tags,
+        )
+        openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})["BearerAuth"] = {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT access token. Pass as 'Authorization: Bearer <token>' header. "
+                           "The API also accepts tokens via httpOnly cookies set on login/register.",
+        }
+        from ..observability.dto import TelemetryBatch
+        batch_schema = TelemetryBatch.model_json_schema(ref_template="#/components/schemas/{model}")
+        components = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
+        components.update(batch_schema.pop("$defs", {}))
+        components["TelemetryBatch"] = batch_schema
+        for path, operations in openapi_schema["paths"].items():
+            if path.startswith("/api/") and path not in {"/api/telemetry", "/api/health/ready"}:
+                for operation in operations.values():
+                    if not isinstance(operation, dict):
+                        continue
+                    for response in operation.get("responses", {}).values():
+                        response.setdefault("headers", {})["X-Request-ID"] = {
+                            "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                            "schema": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+                        }
+        self.openapi_schema = openapi_schema
+        return self.openapi_schema
+
+
+app = ExpenisAPI(
     title="ExPenis API",
     description="API сервиса для учёта личных доходов и расходов. "
                 "Поддерживает работу с пользователями, счетами, категориями и транзакциями.",
@@ -97,51 +138,6 @@ if DEV:
     )
 
 
-# Customize OpenAPI generation so that the security scheme is present both
-# when the server serves /openapi.json and in the committed docs/openapi.json.
-# This removes the need for post-processing in the generator script.
-from fastapi.openapi.utils import get_openapi
-
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-        tags=app.openapi_tags,
-    )
-    openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})["BearerAuth"] = {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "JWT access token. Pass as 'Authorization: Bearer <token>' header. "
-                       "The API also accepts tokens via httpOnly cookies set on login/register.",
-    }
-    from ..observability.dto import TelemetryBatch
-    batch_schema = TelemetryBatch.model_json_schema(ref_template="#/components/schemas/{model}")
-    components = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
-    components.update(batch_schema.pop("$defs", {}))
-    components["TelemetryBatch"] = batch_schema
-    for path, operations in openapi_schema["paths"].items():
-        if path.startswith("/api/") and path not in {"/api/telemetry", "/api/health/ready"}:
-            for operation in operations.values():
-                if not isinstance(operation, dict):
-                    continue
-                for response in operation.get("responses", {}).values():
-                    response.setdefault("headers", {})["X-Request-ID"] = {
-                        "description": "Идентификатор попытки запроса при включённой телеметрии.",
-                        "schema": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
-                    }
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-
-app.openapi = custom_openapi
-
-
 if REFRESH_TIME_SECONDS <= EXPIRATION_TIME_SECONDS:
     logger.warning("token_lifetime_invalid")
 
@@ -156,7 +152,7 @@ config = AuthXConfig(
     JWT_REFRESH_TOKEN_EXPIRES=timedelta(seconds=REFRESH_TIME_SECONDS),
     JWT_COOKIE_CSRF_PROTECT=False,
 )
-auth = AuthX(config)
+auth: AuthX[User] = AuthX(config)
 auth.handle_errors(app)
 
 
@@ -283,6 +279,8 @@ async def get_transaction(
 ) -> Transaction:
     user_id = int(payload.sub)
     transaction = await get_transaction_by_id_and_user_id(user_id, transaction_id)
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="transaction not found")
     tags_by_transaction_id = await get_transaction_tags_by_transaction_ids(user_id, [transaction_id])
     return convert_transaction_to_dto(transaction, tags_by_transaction_id.get(transaction_id, []))
 
@@ -301,6 +299,8 @@ async def create_transaction_endpoint(
     if account is None:
         raise HTTPException(status_code=400, detail="account not found or deleted")
     category = await get_category_by_id(user_id, transaction_create.category_id)
+    if category is None:
+        raise HTTPException(status_code=400, detail="category not found")
     transaction = convert_transaction_create_to_model(user_id, transaction_create, account, category,
                                                       await get_currency_exchange_rate(account.currency_code))
     transaction = await save_transaction(transaction)
@@ -323,7 +323,11 @@ async def update_transaction_endpoint(
     if account is None:
         raise HTTPException(status_code=400, detail="account not found or deleted")
     category = await get_category_by_id(user_id, transaction_create.category_id)
+    if category is None:
+        raise HTTPException(status_code=400, detail="category not found")
     transaction = await get_transaction_by_id_and_user_id(user_id, transaction_id)
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="transaction not found")
     transaction.account = account
     transaction.category = category
     transaction.amount = transaction_create.amount
@@ -556,7 +560,7 @@ async def get_user_account(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
     account, balance = await get_user_account_with_balance(int(payload.sub), account_id)
-    if account is None:
+    if account is None or balance is None:
         raise HTTPException(status_code=404, detail="account not found")
     return await convert_account_with_balance_to_dto(account, balance)
 
@@ -572,7 +576,7 @@ async def update_account_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> AccountDto:
     account, balance = await get_user_account_with_balance(int(payload.sub), account_id)
-    if account is None:
+    if account is None or balance is None:
         raise HTTPException(status_code=404, detail="account not found")
     account.name = update_request.name
     updated_account = await update_account(int(payload.sub), account, update_request.amount)
@@ -611,11 +615,15 @@ async def create_account_endpoint(
     summary="Получить поддерживаемые коды валют",
 )
 async def get_currency_codes() -> CurrencyCodes:
-    return CurrencyCodes(
-        codes={code.get("CharCode"): CurrencyCode(
-            num_code=int(code.get("NumCode", None)) if code.get("NumCode", None) is not None else None,
-            char_code=code.get("CharCode")) for code in CODES.values()}
-    )
+    codes: dict[str, CurrencyCode] = {}
+    for code in CODES.values():
+        num_code = code.get("NumCode")
+        codes[code["CharCode"]] = CurrencyCode(
+            num_code=int(num_code) if num_code is not None else None,
+            char_code=code["CharCode"],
+        )
+    return CurrencyCodes(codes=codes)
+
 
 @app.get(
     "/api/categories",
@@ -695,7 +703,7 @@ async def delete_category_endpoint(
 ):
     await delete_category_by_id_and_user_id(int(payload.sub), category_id)
 
-async def convert_account_with_balance_to_dto(account: Account, balance: float):
+async def convert_account_with_balance_to_dto(account: Account, balance: float) -> AccountDto:
     return AccountDto(
         id=account.id,
         user_id=account.user_id,
