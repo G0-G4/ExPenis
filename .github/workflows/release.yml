@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag to build (vX.Y.Z)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,14 +18,21 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Check release notes
         run: |
-          notes="release-notes/${GITHUB_REF_NAME}.md"
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid release tag"; exit 1; }
+          version=$(awk '/^version:/ {split($2, parts, "+"); print parts[1]}' frontend/pubspec.yaml)
+          test "$RELEASE_TAG" = "v$version" || { echo "::error::Tag does not match pubspec version"; exit 1; }
+          notes="release-notes/${RELEASE_TAG}.md"
           test -s "$notes" || { echo "::error::$notes is missing or empty"; exit 1; }
 
       - name: Setup Java
@@ -32,6 +45,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: "3.41.4"
 
       - name: Decode release keystore
         run: |
@@ -52,7 +66,7 @@ jobs:
 
       - name: Read version from tag
         id: version
-        run: echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build release APK
         run: flutter build apk --release
@@ -77,7 +91,8 @@ jobs:
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
-          body_path: release-notes/${{ github.ref_name }}.md
+          tag_name: ${{ env.RELEASE_TAG }}
+          body_path: release-notes/${{ env.RELEASE_TAG }}.md
           files: |
             ExPenis-${{ steps.version.outputs.tag }}.apk
             ExPenis-${{ steps.version.outputs.tag }}-web.zip
