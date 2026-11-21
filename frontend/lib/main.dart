@@ -229,10 +229,12 @@ class _HomeScreenState extends State<HomeScreen> {
       controller: _pageController,
       physics: const NeverScrollableScrollPhysics(),
       onPageChanged: (index) => setState(() => _currentPageIndex = index),
-      children: const [
-        ResponsiveCenter(child: AccountScreen()),
-        ResponsiveCenter(child: TransactionScreen()),
-        ResponsiveCenter(child: CategoryScreen()),
+      children: [
+        const ResponsiveCenter(child: AccountScreen()),
+        ResponsiveCenter(
+          child: TransactionScreen(isActive: _currentPageIndex == 1),
+        ),
+        const ResponsiveCenter(child: CategoryScreen()),
       ],
     );
 

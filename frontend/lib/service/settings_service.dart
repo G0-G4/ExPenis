@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import "package:expenis_mobile/utils/jwt.dart";
 
 class SettingsService {
+  // Token rotation for the same user does not change the session identity.
+  static final ValueNotifier<int> sessionRevision = ValueNotifier(0);
   static const String _accessTokenKey = "access_token";
   static const String _refreshTokenKey = "refresh_token";
   static const String _usernameKey = "username";
@@ -28,7 +31,14 @@ class SettingsService {
   }
 
   Future<bool> setAccessToken(String accessToken) async {
-    return await _prefs?.setString(_accessTokenKey, accessToken) ?? false;
+    final previous = await getAccessToken();
+    final saved =
+        await _prefs?.setString(_accessTokenKey, accessToken) ?? false;
+    if (saved &&
+        (previous == null || jwtSubject(previous) != jwtSubject(accessToken))) {
+      sessionRevision.value++;
+    }
+    return saved;
   }
 
   Future<String?> getRefreshToken() async {
@@ -59,6 +69,7 @@ class SettingsService {
     await _prefs?.remove(_accessTokenKey);
     await _prefs?.remove(_refreshTokenKey);
     await _prefs?.remove(_usernameKey);
+    sessionRevision.value++;
   }
 
   Future<Set<String>> getExcludedAccountIds(int userId) async {

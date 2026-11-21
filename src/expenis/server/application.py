@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
+from uuid import UUID
 
 from authx import AuthX, AuthXConfig, TokenPayload
 from authx import exceptions as authx_exceptions
@@ -18,6 +19,7 @@ from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, Account
     LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, \
     RegisterRequest, Transaction, \
     TagPeriodDto, TransactionCreateRequest, TransactionsResponse, UserTagsResponse
+from .dto import PersonalGreetingDto, PersonalGreetingResponse
 from ..config import COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
 from ..core.service import authenticate_user, change_password, create_account, create_category, \
@@ -29,6 +31,7 @@ from ..core.service import authenticate_user, change_password, create_account, c
     get_user_account_with_balance, get_user_accounts_with_balance, get_user_categories, get_user_by_id, register_user, \
     save_transaction, set_transaction_tags, update_account, update_category, update_transaction, get_user_tags, \
     get_user_tag_periods
+from ..core.service.personal_greeting_service import dismiss_greeting, get_active_greeting
 from ..core.service.auth_service import InvalidPasswordError, UsernameTakenError
 from ..core.errors import NotFoundException
 from ..core.service.exchage_rate_service import convert_to_rubles, get_currency_exchange_rate
@@ -400,6 +403,44 @@ async def me_endpoint(
 ) -> MeResponse:
     user = await get_user_by_id(int(payload.sub))
     return MeResponse(id=user.id, username=user.username, telegram_id=user.telegram_id)
+
+
+@app.get(
+    "/api/me/greeting",
+    tags=["auth"],
+    operation_id="getPersonalGreeting",
+    openapi_extra={"security": [{"BearerAuth": []}]},
+    responses={401: {"description": "Требуется авторизация"}},
+    summary="Получить активное персональное сообщение",
+    description="Возвращает сообщение текущего пользователя или greeting: null, если его нет, "
+                "оно закрыто или срок показа закончился.",
+)
+async def personal_greeting_endpoint(
+    payload: TokenPayload = Depends(auth.access_token_required),
+) -> PersonalGreetingResponse:
+    greeting = await get_active_greeting(int(payload.sub))
+    return PersonalGreetingResponse(greeting=None if greeting is None else PersonalGreetingDto(
+        id=UUID(greeting.assignment_id), text=greeting.text, expires_at=greeting.expires_at,
+    ))
+
+
+@app.post(
+    "/api/me/greeting/{assignment_id}/dismiss",
+    tags=["auth"],
+    operation_id="dismissPersonalGreeting",
+    openapi_extra={"security": [{"BearerAuth": []}]},
+    responses={401: {"description": "Требуется авторизация"}},
+    summary="Закрыть персональное сообщение",
+    description="Закрывает только указанное назначение текущего пользователя. Повторный, "
+                "устаревший или чужой идентификатор не меняет другие сообщения.",
+    status_code=204,
+)
+async def dismiss_personal_greeting_endpoint(
+    assignment_id: UUID,
+    payload: TokenPayload = Depends(auth.access_token_required),
+) -> Response:
+    await dismiss_greeting(int(payload.sub), str(assignment_id))
+    return Response(status_code=204)
 
 
 @app.put(
