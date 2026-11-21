@@ -9,6 +9,8 @@ import 'package:expenis_mobile/service/account_service.dart'
 import 'package:expenis_mobile/service/category_service.dart';
 import 'package:expenis_mobile/service/transaction_service.dart';
 import 'package:expenis_mobile/theme.dart';
+import "package:expenis_mobile/utils/amount_expression.dart";
+import "package:expenis_mobile/widgets/amount_expression_field.dart";
 import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
 import 'package:expenis_mobile/widgets/delete_dialog.dart';
 import 'package:expenis_mobile/widgets/responsive.dart';
@@ -72,7 +74,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
         if (!mounted) return;
         setState(() {
           _descriptionController.text = transaction.description ?? '';
-          _amountController.text = transaction.amount.toString();
+          _amountController.text = amountExpressionText(transaction.amount);
           _transactionType = transaction.type == TransactionType.income
               ? CategoryType.income
               : CategoryType.expense;
@@ -180,7 +182,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
       final request = TransactionCreateRequest(
         accountId: _selectedAccountId!,
         categoryId: _selectedCategoryId!,
-        amount: double.parse(_amountController.text),
+        amount: evaluateAmountExpression(_amountController.text).amount!,
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
@@ -288,7 +290,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
               const SizedBox(height: AppTheme.space16),
 
               // ── Amount ────────────────────────────────────────────────
-              TextFormField(
+              AmountExpressionField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: 'Amount',
@@ -297,18 +299,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                       ? null
                       : _selectedCurrencyCode,
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: AppTheme.space16),
 

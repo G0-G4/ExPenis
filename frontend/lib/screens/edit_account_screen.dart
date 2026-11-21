@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:expenis_mobile/models/account.dart';
 import 'package:expenis_mobile/service/account_service.dart';
 import 'package:expenis_mobile/theme.dart';
+import "package:expenis_mobile/utils/amount_expression.dart";
+import "package:expenis_mobile/widgets/amount_expression_field.dart";
 import 'package:expenis_mobile/widgets/app_error_state.dart';
 import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
 import 'package:expenis_mobile/widgets/delete_dialog.dart';
@@ -46,7 +48,7 @@ class _EditAccountScreenState extends State<EditAccountScreen> {
       setState(() {
         _account = account;
         _nameController.text = account.name;
-        _amountController.text = account.amount.toString();
+        _amountController.text = amountExpressionText(account.amount);
         _isLoading = false;
       });
     } catch (e) {
@@ -64,7 +66,7 @@ class _EditAccountScreenState extends State<EditAccountScreen> {
     try {
       final updated = _account!.copyWith(
         name: _nameController.text.trim(),
-        amount: double.parse(_amountController.text),
+        amount: evaluateAmountExpression(_amountController.text).amount!,
       );
       await _accountService.updateAccount(updated);
       if (!mounted) return;
@@ -143,25 +145,13 @@ class _EditAccountScreenState extends State<EditAccountScreen> {
                           : null,
                     ),
                     const SizedBox(height: AppTheme.space16),
-                    TextFormField(
+                    AmountExpressionField(
                       controller: _amountController,
                       decoration: InputDecoration(
                         labelText: 'Balance',
                         prefixIcon: const Icon(Icons.attach_money_outlined),
                         suffixText: _account?.currencyCode,
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter an amount';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return 'Please enter a valid number';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: AppTheme.space16),
                     TextFormField(

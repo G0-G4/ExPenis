@@ -3,6 +3,8 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 
 import 'package:expenis_mobile/service/account_service.dart';
 import 'package:expenis_mobile/theme.dart';
+import "package:expenis_mobile/utils/amount_expression.dart";
+import "package:expenis_mobile/widgets/amount_expression_field.dart";
 import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
 import 'package:expenis_mobile/widgets/responsive.dart';
 
@@ -34,7 +36,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     try {
       final newAccount = await _accountService.createAccount(
         _nameController.text.trim(),
-        double.parse(_amountController.text),
+        evaluateAmountExpression(_amountController.text).amount!,
         _currencyController.text.trim(),
       );
       if (!mounted) return;
@@ -79,24 +81,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     : null,
               ),
               const SizedBox(height: AppTheme.space16),
-              TextFormField(
+              AmountExpressionField(
                 controller: _amountController,
                 decoration: const InputDecoration(
                   labelText: 'Initial Balance',
                   prefixIcon: Icon(Icons.currency_ruble),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: AppTheme.space16),
               FutureBuilder<List<String>>(
