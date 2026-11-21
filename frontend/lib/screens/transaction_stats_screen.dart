@@ -894,12 +894,8 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
       totalByKey[key] = (totalByKey[key] ?? 0) + transaction.amountRubles;
     }
 
-    // Small categories are merged into "Other" so every colour stays unique.
-    // One palette slot is held back: a lone leftover key keeps its own colour.
-    final topKeys = topKeysByTotal(
-      totalByKey,
-      AppTheme.chartPalette.length - 1,
-    );
+    // Keep the existing display limit independently of the category palette.
+    final topKeys = topKeysByTotal(totalByKey, categoryChartLeaderLimit);
     final topKeySet = topKeys.toSet();
     final hasOther = topKeys.length < totalByKey.length;
 
@@ -939,7 +935,9 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
         _LegendEntry(
           key: topKeys[i],
           label: labelsByKey[topKeys[i]] ?? topKeys[i],
-          color: AppTheme.chartPalette[i],
+          color: _categories
+              .firstWhere((category) => category.id.toString() == topKeys[i])
+              .displayColor,
         ),
       if (hasOther)
         const _LegendEntry(
@@ -984,6 +982,9 @@ class _TransactionStatsScreenState extends State<TransactionStatsScreen> {
           categoryId: item.categoryId,
           name: name,
           total: item.amountRubles,
+          color: _categories
+              .firstWhere((category) => category.id == item.categoryId)
+              .displayColor,
         );
       } else {
         totalsById[item.categoryId] = existing.copyWith(
@@ -2196,6 +2197,9 @@ class _CategoryBreakdownCardState extends State<_CategoryBreakdownCard> {
         ? data.take(_CategoryBreakdownCard._collapsedRowCount).toList()
         : data;
     final largest = data.first.total;
+    final topIds = topKeysByTotal({
+      for (final row in data) row.categoryId: row.total,
+    }, categoryChartLeaderLimit).toSet();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2211,7 +2215,7 @@ class _CategoryBreakdownCardState extends State<_CategoryBreakdownCard> {
                 touched != null &&
                 (touched.categoryId == item.categoryId ||
                     (touched.categoryId == _otherCategoryId &&
-                        item.color == AppTheme.chartOtherColor)),
+                        !topIds.contains(item.categoryId))),
           ),
         if (canCollapse)
           Align(
@@ -2232,22 +2236,18 @@ class _CategoryBreakdownCardState extends State<_CategoryBreakdownCard> {
     );
   }
 
-  /// Colours the top categories from the palette and the rest grey, and
-  /// returns the donut slices with the grey tail merged into one "Other".
+  /// Keeps category colors and merges the tail into a separate gray slice.
   List<_CategoryTotal> _buildSlices(List<_CategoryTotal> totals) {
-    final palette = AppTheme.chartPalette;
     final totalsById = {for (final item in totals) item.categoryId: item.total};
-    // One palette slot is held back: a lone leftover key keeps its own colour.
-    final topIds = topKeysByTotal(totalsById, palette.length - 1).toSet();
+    // A single leftover category keeps its individual segment.
+    final topIds = topKeysByTotal(totalsById, categoryChartLeaderLimit).toSet();
 
     final slices = <_CategoryTotal>[];
     double otherTotal = 0;
     for (final item in totals) {
       if (topIds.contains(item.categoryId)) {
-        item.color = palette[slices.length];
         slices.add(item);
       } else {
-        item.color = AppTheme.chartOtherColor;
         otherTotal += item.total;
       }
     }
@@ -2364,7 +2364,7 @@ class _CategoryTotal {
   final int categoryId;
   final String name;
   final double total;
-  Color color;
+  final Color color;
 
   _CategoryTotal copyWith({double? total}) {
     return _CategoryTotal(
