@@ -13,7 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, AuthResponse, \
-    CategoriesResponse, CategoryCreateRequest, CategoryDto, CurrencyCode, \
+    CategoriesResponse, CategoryCreateRequest, CategoryUpdateRequest, CategoryDto, CurrencyCode, \
     CurrencyCodes, DeleteAccountResponse, \
     LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, \
     RegisterRequest, Transaction, \
@@ -541,6 +541,8 @@ async def get_user_category_endpoint(
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> CategoryDto:
     category = await get_category_by_id(int(payload.sub), category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
     return convert_category_to_dto(category)
 
 @app.post(
@@ -564,13 +566,16 @@ async def create_category_endpoint(
 )
 async def update_category_endpoint(
         category_id: int,
-        create_request: CategoryCreateRequest,
+        update_request: CategoryUpdateRequest,
         payload: TokenPayload = Depends(auth.access_token_required)
 ) -> CategoryDto:
     category = await get_category_by_id(int(payload.sub), category_id)
-    category.name = create_request.name
-    category.type = create_request.type
-    category = await update_category(category)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    category = await update_category(
+        category, name=update_request.name, type=update_request.type,
+        color=update_request.color,
+    )
     return convert_category_to_dto(category)
 
 @app.delete(
@@ -618,6 +623,7 @@ def convert_transaction_to_dto(transaction: ModelTransaction, tags: list[str] | 
 
 def convert_category_to_dto(category: Category) -> CategoryDto:
     return CategoryDto(
+        color=category.color,
         id=category.id,
         name=category.name,
         type=category.type

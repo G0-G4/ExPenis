@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+from ..core.utils.category_colors import CATEGORY_COLORS
 
 from src.expenis.core.utils.currency_codes import CODES
 
@@ -93,6 +95,7 @@ class CurrencyCodes(BaseModel):
 
 
 class CategoryDto(BaseModel):
+    color: str
     id: int
     type: Literal['income', 'expense']
     name: str
@@ -104,6 +107,22 @@ class CategoriesResponse(BaseModel):
 class CategoryCreateRequest(BaseModel):
     type: Literal['income', 'expense']
     name: str
+
+
+class CategoryUpdateRequest(CategoryCreateRequest):
+    color: str | None = Field(
+        default=None,
+        description="Цвет из палитры; отсутствие поля сохраняет текущий цвет. null запрещён.",
+        json_schema_extra={"enum": list(CATEGORY_COLORS)},
+    )
+
+    @field_validator("color")
+    @classmethod
+    def supported_color(cls, value: str | None) -> str:
+        if value not in CATEGORY_COLORS:
+            raise ValueError("Unsupported category color")
+        assert value is not None
+        return value
 
 
 class LoginRequest(BaseModel):

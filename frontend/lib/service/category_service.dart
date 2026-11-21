@@ -1,24 +1,24 @@
 import "package:expenis_mobile/service/telemetry_service.dart";
-import 'package:dio/dio.dart';
-import 'package:expenis_mobile/models/category.dart';
-import 'package:expenis_mobile/service/base_service.dart';
+import "package:dio/dio.dart";
+import "package:expenis_mobile/models/category.dart";
+import "package:expenis_mobile/service/base_service.dart";
 
 class CategoryService extends BaseService {
   Future<List<Category>> fetchCategories() async {
     try {
-      final response = await dio.get('$baseUrl/api/categories');
+      final response = await dio.get("$baseUrl/api/categories");
       if (response.statusCode == 200) {
         final categoriesMap =
-            response.data['categories'] as Map<String, dynamic>;
+            response.data["categories"] as Map<String, dynamic>;
         return categoriesMap.values
             .map((catJson) => Category.fromJson(catJson))
             .toList();
       }
       throw telemetryException(
-        'Failed to load categories with status: ${response.statusCode}',
+        "Failed to load categories with status: ${response.statusCode}",
       );
     } on DioException catch (e) {
-      throw telemetryException('Failed to load categories: ${e.message}');
+      throw telemetryException("Failed to load categories: ${e.message}");
     } on Object catch (error, stack) {
       TelemetryService.instance.capture(error, stack, code: "client_operation");
       rethrow;
@@ -27,24 +27,39 @@ class CategoryService extends BaseService {
 
   Future<Category> fetchCategory(int id) async {
     try {
-      final response = await dio.get('$baseUrl/api/categories/$id');
+      final response = await dio.get("$baseUrl/api/categories/$id");
+      if (response.statusCode != 200) {
+        throw telemetryException(
+          "Category request failed: ${response.statusCode}",
+        );
+      }
       return Category.fromJson(response.data);
     } on DioException catch (e) {
-      throw telemetryException('Failed to load category: ${e.message}');
+      throw telemetryException("Failed to load category: ${e.message}");
     } on Object catch (error, stack) {
       TelemetryService.instance.capture(error, stack, code: "client_operation");
       rethrow;
     }
   }
 
-  Future<void> updateCategory(Category category) async {
+  Future<void> updateCategory(
+    Category category, {
+    required String originalColor,
+  }) async {
     try {
-      await dio.put(
-        '$baseUrl/api/categories/${category.id}',
-        data: category.toJson(),
+      final data = category.toJson();
+      if (category.color == originalColor) data.remove("color");
+      final response = await dio.put(
+        "$baseUrl/api/categories/${category.id}",
+        data: data,
       );
+      if (response.statusCode != 200) {
+        throw telemetryException(
+          "Failed to update category: ${response.statusCode}",
+        );
+      }
     } on DioException catch (e) {
-      throw telemetryException('Failed to update category: ${e.message}');
+      throw telemetryException("Failed to update category: ${e.message}");
     } on Object catch (error, stack) {
       TelemetryService.instance.capture(error, stack, code: "client_operation");
       rethrow;
@@ -53,9 +68,9 @@ class CategoryService extends BaseService {
 
   Future<void> deleteCategory(int id) async {
     try {
-      await dio.delete('$baseUrl/api/categories/$id');
+      await dio.delete("$baseUrl/api/categories/$id");
     } on DioException catch (e) {
-      throw telemetryException('Failed to delete category: ${e.message}');
+      throw telemetryException("Failed to delete category: ${e.message}");
     } on Object catch (error, stack) {
       TelemetryService.instance.capture(error, stack, code: "client_operation");
       rethrow;
@@ -65,15 +80,20 @@ class CategoryService extends BaseService {
   Future<Category> createCategory(String name, CategoryType type) async {
     try {
       final response = await dio.post(
-        '$baseUrl/api/categories',
+        "$baseUrl/api/categories",
         data: {
-          'name': name,
-          'type': type == CategoryType.income ? 'income' : 'expense',
+          "name": name,
+          "type": type == CategoryType.income ? "income" : "expense",
         },
       );
+      if (response.statusCode != 200) {
+        throw telemetryException(
+          "Category request failed: ${response.statusCode}",
+        );
+      }
       return Category.fromJson(response.data);
     } on DioException catch (e) {
-      throw telemetryException('Failed to create category: ${e.message}');
+      throw telemetryException("Failed to create category: ${e.message}");
     } on Object catch (error, stack) {
       TelemetryService.instance.capture(error, stack, code: "client_operation");
       rethrow;

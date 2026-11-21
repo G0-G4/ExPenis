@@ -1,0 +1,39 @@
+import "package:flutter/material.dart";
+
+const categoryColorPalette = <String>[
+  "#4E79A7",
+  "#F28E2B",
+  "#B07AA1",
+  "#76B7B2",
+  "#EDC948",
+  "#9C755F",
+  "#FF9DA7",
+  "#264653",
+  "#7B2CBF",
+  "#0077B6",
+  "#BC6C25",
+  "#D4A373",
+  "#5A189A",
+  "#0096C7",
+  "#A44A3F",
+  "#6D597A",
+  "#E9C46A",
+  "#457B9D",
+  "#C77DFF",
+  "#3D5A80",
+  "#EE6C4D",
+  "#8D6A9F",
+  "#00B4D8",
+  "#A98467",
+  "#8338EC",
+  "#FFBE0B",
+  "#6096BA",
+  "#B56576",
+  "#6F4518",
+  "#48CAE4",
+  "#DDA15E",
+  "#7209B7",
+];
+
+Color categoryDisplayColor(String value) =>
+    Color(0xFF000000 | int.parse(value.substring(1), radix: 16));

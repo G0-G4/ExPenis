@@ -1,5 +1,8 @@
 import "dart:math" as math;
 
+/// Leading categories before merging the tail; one leftover stays separate.
+const categoryChartLeaderLimit = 6;
+
 /// Y-axis bounds and tick step rounded to human-friendly values.
 class AxisScale {
   const AxisScale({required this.min, required this.max, required this.step});

@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
 
-import 'package:expenis_mobile/models/category.dart';
-import 'package:expenis_mobile/service/category_service.dart';
-import 'package:expenis_mobile/theme.dart';
-import 'package:expenis_mobile/widgets/app_loading_spinner.dart';
-import 'package:expenis_mobile/widgets/delete_dialog.dart';
-import 'package:expenis_mobile/widgets/responsive.dart';
+import "package:expenis_mobile/models/category.dart";
+import "package:expenis_mobile/service/category_service.dart";
+import "package:expenis_mobile/theme.dart";
+import "package:expenis_mobile/utils/category_colors.dart";
+import "package:expenis_mobile/widgets/app_loading_spinner.dart";
+import "package:expenis_mobile/widgets/delete_dialog.dart";
+import "package:expenis_mobile/widgets/responsive.dart";
 
 class EditCategoryScreen extends StatefulWidget {
   final int categoryId;
@@ -21,6 +22,8 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
   final _formKey = GlobalKey<FormState>();
   TextEditingController? _nameController;
   CategoryType? _type;
+  String? _color;
+  String? _originalColor;
   bool _isSaving = false;
 
   @override
@@ -36,12 +39,14 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
       setState(() {
         _nameController = TextEditingController(text: category.name);
         _type = category.type;
+        _color = category.color;
+        _originalColor = category.color;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load category: $e')));
+      ).showSnackBar(SnackBar(content: Text("Failed to load category: $e")));
     }
   }
 
@@ -55,7 +60,9 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
           id: widget.categoryId,
           name: _nameController!.text.trim(),
           type: _type!,
+          color: _color!,
         ),
+        originalColor: _originalColor!,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -63,7 +70,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update category: $e')));
+      ).showSnackBar(SnackBar(content: Text("Failed to update category: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -72,7 +79,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
   Future<void> _deleteCategory() async {
     final confirmed = await showDeleteDialog(
       context: context,
-      resourceName: 'category',
+      resourceName: "category",
     );
     if (!confirmed || !mounted) return;
     try {
@@ -83,7 +90,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete category: $e')));
+      ).showSnackBar(SnackBar(content: Text("Failed to delete category: $e")));
     }
   }
 
@@ -97,7 +104,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Category'),
+        title: const Text("Edit Category"),
         actions: [
           if (_nameController != null)
             IconButton(
@@ -105,7 +112,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
                 Icons.delete_outline,
                 color: Theme.of(context).colorScheme.error,
               ),
-              tooltip: 'Delete',
+              tooltip: "Delete",
               onPressed: _deleteCategory,
             ),
         ],
@@ -121,17 +128,17 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
                     TextFormField(
                       controller: _nameController,
                       decoration: const InputDecoration(
-                        labelText: 'Category Name',
+                        labelText: "Category Name",
                         prefixIcon: Icon(Icons.folder_outlined),
                       ),
                       textCapitalization: TextCapitalization.words,
                       validator: (value) => (value == null || value.isEmpty)
-                          ? 'Please enter a name'
+                          ? "Please enter a name"
                           : null,
                     ),
                     const SizedBox(height: AppTheme.space24),
                     Text(
-                      'Type',
+                      "Type",
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -141,12 +148,12 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
                       segments: const [
                         ButtonSegment(
                           value: CategoryType.income,
-                          label: Text('Income'),
+                          label: Text("Income"),
                           icon: Icon(Icons.arrow_downward_rounded, size: 16),
                         ),
                         ButtonSegment(
                           value: CategoryType.expense,
-                          label: Text('Expense'),
+                          label: Text("Expense"),
                           icon: Icon(Icons.arrow_upward_rounded, size: 16),
                         ),
                       ],
@@ -154,12 +161,76 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
                       onSelectionChanged: (selection) =>
                           setState(() => _type = selection.first),
                     ),
+                    const SizedBox(height: AppTheme.space24),
+                    Text(
+                      "Chart color",
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: AppTheme.space8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (
+                          var index = 0;
+                          index < categoryColorPalette.length;
+                          index++
+                        )
+                          Semantics(
+                            label: "Chart color ${index + 1}",
+                            selected: _color == categoryColorPalette[index],
+                            button: true,
+                            child: Tooltip(
+                              message: "Color ${index + 1}",
+                              child: InkWell(
+                                key: ValueKey(categoryColorPalette[index]),
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: _isSaving
+                                    ? null
+                                    : () => setState(
+                                        () => _color =
+                                            categoryColorPalette[index],
+                                      ),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: categoryDisplayColor(
+                                      categoryColorPalette[index],
+                                    ),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
+                                    ),
+                                  ),
+                                  child: _color == categoryColorPalette[index]
+                                      ? Icon(
+                                          Icons.check_rounded,
+                                          color:
+                                              ThemeData.estimateBrightnessForColor(
+                                                    categoryDisplayColor(
+                                                      categoryColorPalette[index],
+                                                    ),
+                                                  ) ==
+                                                  Brightness.dark
+                                              ? Colors.white
+                                              : Colors.black,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: AppTheme.space32),
                     FilledButton(
                       onPressed: _isSaving ? null : _updateCategory,
                       child: _isSaving
                           ? const AppLoadingSpinner()
-                          : const Text('Save Changes'),
+                          : const Text("Save Changes"),
                     ),
                   ],
                 ),
