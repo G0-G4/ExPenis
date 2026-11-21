@@ -50,7 +50,7 @@ def test_register_create_account_create_expense_transaction(page: Page) -> None:
     fill_textbox(page, "Amount", "40+5/2")
     fill_textbox(page, "Description (optional)", description)
     log_snapshot(page, "before Add Transaction")
-    pick_dropdown(page, re.compile(r"^Account\b"), "Cash")
+    pick_dropdown(page, re.compile(r"^Account"), "Cash")
     pick_dropdown(page, re.compile(r"^Category"), re.compile(r"Cafe"))
     page.get_by_role("button", name="Add Transaction").click()
 
