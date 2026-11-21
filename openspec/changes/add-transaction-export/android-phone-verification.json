@@ -1,0 +1,34 @@
+{
+  "device": "Pixel 6a",
+  "android": "17",
+  "checks": {
+    "csv_cancel_and_retry": true,
+    "xlsx_cancel_and_retry": true,
+    "uri_permission_read": true,
+    "saf_saved_to_downloads": true,
+    "content_integrity": true,
+    "xlsx_typed_cells": true
+  },
+  "files": {
+    "csv": {
+      "name": "ExPenis-transactions.csv",
+      "mime": "text/csv",
+      "bytes": 696,
+      "sha256": "ea78d16a6e0284eaa6a763eced484f2b95d6de947748257c7673d07382a4ad32",
+      "operations": 3,
+      "columns": 10,
+      "saved_to": "Download/ExPenis-phone-check-csv.csv",
+      "validated": true
+    },
+    "xlsx": {
+      "name": "ExPenis-transactions.xlsx",
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "bytes": 5585,
+      "sha256": "7d9eeb35c9cc687c9603e41dffc83a8ad07fcabf8640103bb272918225ce362f",
+      "operations": 3,
+      "columns": 10,
+      "saved_to": "Download/ExPenis-phone-check-xlsx.xlsx",
+      "validated": true
+    }
+  }
+}

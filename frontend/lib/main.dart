@@ -14,6 +14,7 @@ import "package:expenis_mobile/screens/settings_screen.dart";
 import "package:expenis_mobile/screens/transaction_screen.dart";
 import "package:expenis_mobile/screens/transaction_stats_screen.dart";
 import "package:expenis_mobile/service/base_service.dart";
+import "package:expenis_mobile/service/export_delivery.dart";
 import "package:expenis_mobile/service/navigator_service.dart";
 import "package:expenis_mobile/service/settings_service.dart";
 import "package:expenis_mobile/service/update_service.dart";
@@ -66,6 +67,17 @@ void _startApplication(bool enabled) {
       return true;
     };
   }
+  unawaited(
+    cleanupExportFiles().catchError((Object error, StackTrace stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: "export file cleanup",
+        ),
+      );
+    }),
+  );
   if (kDebugMode) {
     _debugSemanticsHandle = SemanticsBinding.instance.ensureSemantics();
     assert(_debugSemanticsHandle != null);

@@ -1,3 +1,4 @@
+import "package:expenis_mobile/screens/export_screen.dart";
 import "package:flutter/material.dart";
 
 import "package:expenis_mobile/service/auth_service.dart";
@@ -136,6 +137,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     const SizedBox(height: AppTheme.space24),
+                    ListTile(
+                      leading: const Icon(Icons.download_outlined),
+                      title: const Text("Экспорт операций"),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ExportScreen(),
+                        ),
+                      ),
+                    ),
                     ListTile(
                       leading: const Icon(Icons.lock_outline),
                       title: const Text("Change password"),

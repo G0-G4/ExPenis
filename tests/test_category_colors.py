@@ -29,7 +29,10 @@ def test_palette_matches_migration_and_client():
 def test_migration_assigns_colors_per_user_without_changing_transactions():
     with sqlite3.connect(":memory:") as conn:
         migrations = sorted((ROOT / "migrations").glob("*.sql"))
-        for migration in migrations[:-1]:
+        color_migration = ROOT / "migrations/008_category_colors.sql"
+        for migration in migrations:
+            if migration == color_migration:
+                break
             conn.executescript(migration.read_text())
         for user in (1, 2):
             conn.executemany(
@@ -39,7 +42,7 @@ def test_migration_assigns_colors_per_user_without_changing_transactions():
         conn.execute("INSERT INTO accounts(user_id, name, currency_code) VALUES (1, 'Cash', 'RUB')")
         conn.execute("INSERT INTO transactions(user_id, account_id, category_id, amount) VALUES (1, 1, 1, 123)")
         before = conn.execute("SELECT * FROM transactions").fetchall()
-        conn.executescript(migrations[-1].read_text())
+        conn.executescript(color_migration.read_text())
         for user in (1, 2):
             rows = conn.execute("SELECT color FROM categories WHERE user_id = ? ORDER BY id", (user,)).fetchall()
             assert [row[0] for row in rows] == [CATEGORY_COLORS[i % 32] for i in range(35)]

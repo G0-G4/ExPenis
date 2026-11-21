@@ -73,7 +73,7 @@ uv run -m src.expenis.server greeting set --help
 (один раз; предыдущие миграции уже должны быть применены):
 
 ```bash
-sqlite3 "${EXPENIS_DB_PATH:-./data/expenis.db}" < migrations/008_personal_greetings.sql
+sqlite3 "${EXPENIS_DB_PATH:-./data/expenis.db}" < migrations/009_personal_greetings.sql
 ```
 
 Затем обновите backend и только после этого frontend; команды развёртывания

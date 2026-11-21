@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from authx import AuthX, AuthXConfig, TokenPayload
@@ -15,11 +15,12 @@ from starlette.responses import JSONResponse
 
 from .dto import AccountCreateRequest, AccountDto, AccountUpdateRequest, AccountsResponse, AuthResponse, \
     CategoriesResponse, CategoryCreateRequest, CategoryUpdateRequest, CategoryDto, CurrencyCode, \
-    CurrencyCodes, DeleteAccountResponse, \
+    CurrencyCodes, DeleteAccountResponse, ExportAccountDto, ExportAccountsResponse, \
     LoginRequest, LogoutResponse, MeResponse, PasswordChangeRequest, \
     RegisterRequest, Transaction, \
     TagPeriodDto, TransactionCreateRequest, TransactionsResponse, UserTagsResponse
 from .dto import PersonalGreetingDto, PersonalGreetingResponse
+from .export_response import ExportFileResponse, build_export_response
 from ..config import COOKIE_DOMAIN, DEV, EXPIRATION_TIME_SECONDS, REFRESH_TIME_SECONDS, SECRET
 from ..core.models import Account, Category, Transaction as ModelTransaction, db
 from ..core.service import authenticate_user, change_password, create_account, create_category, \
@@ -41,6 +42,10 @@ from ..observability import runtime
 from ..observability.api import router as observability_router
 from ..observability.middleware import ObservabilityMiddleware
 from ..observability.safety import log_unhandled_error
+
+from ..core.service.transaction_export_service import (
+    ExportFilter, ExportValidationError, get_export_accounts, get_export_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +187,65 @@ async def not_found_handler(request: Request, exc: NotFoundException) -> JSONRes
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     log_unhandled_error(request.scope, exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
+@app.get(
+    "/api/exports/accounts",
+    tags=["transactions"],
+    operation_id="listExportAccounts",
+    summary="Получить счета для экспорта",
+    description="Собственные активные и удалённые счета без расчёта балансов.",
+)
+async def list_export_accounts(
+    payload: TokenPayload = Depends(auth.access_token_required),
+) -> ExportAccountsResponse:
+    accounts = await get_export_accounts(int(payload.sub))
+    return ExportAccountsResponse(accounts=[
+        ExportAccountDto(
+            id=account.id, name=account.name, currency_code=account.currency_code,
+            is_deleted=account.is_deleted,
+        )
+        for account in accounts
+    ])
+
+
+@app.get(
+    "/api/exports/transactions",
+    tags=["transactions"],
+    operation_id="exportTransactions",
+    summary="Экспортировать историю операций",
+    description=(
+        "CSV или XLSX собственных операций, включая удалённые счета. Без дат — вся история; "
+        "обе границы периода включительны, без пересчёта часового пояса. "
+        "Без account_ids — все счета; для выбора повторите параметр account_ids."
+    ),
+    response_class=ExportFileResponse,
+    responses={
+        200: {"description": "Файл операций", "content": {
+            "text/csv": {"schema": {"type": "string", "format": "binary"}},
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {"type": "string", "format": "binary"},
+            },
+        }},
+        404: {"description": "Счёт не найден"},
+        422: {"description": "Некорректные фильтры, формат или превышены ограничения XLSX"},
+    },
+)
+async def export_transactions(
+    format: Annotated[Literal["csv", "xlsx"], Query(description="Формат файла")],
+    date_from: Annotated[date | None, Query(description="Начальная дата включительно")] = None,
+    date_to: Annotated[date | None, Query(description="Конечная дата включительно")] = None,
+    account_ids: Annotated[list[int] | None, Query(description="ID выбранных счетов")] = None,
+    payload: TokenPayload = Depends(auth.access_token_required),
+) -> ExportFileResponse:
+    try:
+        filters = ExportFilter(
+            date_from, date_to, None if account_ids is None else tuple(account_ids),
+        )
+        rows = await get_export_rows(int(payload.sub), filters)
+        return await build_export_response(rows, format)
+    except ExportValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get(

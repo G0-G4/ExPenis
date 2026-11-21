@@ -76,7 +76,12 @@ void main() {
           } else if (path == "/api/categories") {
             data = {
               "categories": {
-                "1": {"id": 1, "name": "Cafe", "type": "expense"},
+                "1": {
+                  "id": 1,
+                  "name": "Cafe",
+                  "type": "expense",
+                  "color": "#4E79A7",
+                },
               },
             };
           } else if (path == "/api/tags") {
