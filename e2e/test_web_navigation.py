@@ -38,7 +38,6 @@ def test_web_side_menu_survives_routes_resize_and_logout(page: Page, tmp_path) -
     page.get_by_role("button", name="Экспорт операций", exact=True).click()
     expect(page.get_by_role("heading", name="Экспорт операций")).to_be_visible()
     expect_side_menu(page)
-    page.wait_for_timeout(350)  # Capture after the Material route animation.
     page.screenshot(path=str(tmp_path / "export-with-side-menu.png"))
     page.get_by_role("button", name="Back", exact=True).click()
     expect(page.get_by_role("heading", name=re.compile(r"^Settings(?: Settings)?$"))).to_be_visible()

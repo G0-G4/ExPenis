@@ -212,11 +212,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onDestinationSelected(int index) {
     _contentNavigatorKey.currentState?.popUntil((route) => route.isFirst);
     setState(() => _selectedTab.value = index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeInOut,
-    );
+    if (kIsWeb && MediaQuery.sizeOf(context).width >= Breakpoints.medium) {
+      _pageController.jumpToPage(index);
+    } else {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   NavigatorState get _contentNavigator =>
@@ -388,26 +392,39 @@ class _HomeScreenState extends State<HomeScreen> {
     final isWide = MediaQuery.sizeOf(context).width >= Breakpoints.medium;
     // Keep web navigation inside the content pane, even across window resizes.
     // Forms still use their nearest Navigator and return results to the lists.
+    final theme = Theme.of(context);
     final content = kIsWeb
-        ? Semantics(
-            // Modal routes must only block semantics inside the content pane.
-            container: true,
-            explicitChildNodes: true,
-            child: NavigatorPopHandler<Object?>(
-              onPopWithResult: (result) =>
-                  _contentNavigatorKey.currentState!.pop(result),
-              child: Navigator(
-                key: _contentNavigatorKey,
-                onGenerateRoute: (settings) => MaterialPageRoute<void>(
-                  settings: settings,
-                  builder: (context) => switch (settings.name) {
-                    "/" => _buildWebHome(context),
-                    "/settings" => const SettingsScreen(),
-                    "/change-password" => const ChangePasswordScreen(),
-                    _ => throw StateError(
-                      "Unknown content route: ${settings.name}",
+        ? Theme(
+            data: isWide
+                ? theme.copyWith(
+                    pageTransitionsTheme: PageTransitionsTheme(
+                      builders: {
+                        for (final platform in TargetPlatform.values)
+                          platform: const _NoPageTransitionsBuilder(),
+                      },
                     ),
-                  },
+                  )
+                : theme,
+            child: Semantics(
+              // Modal routes must only block semantics inside the content pane.
+              container: true,
+              explicitChildNodes: true,
+              child: NavigatorPopHandler<Object?>(
+                onPopWithResult: (result) =>
+                    _contentNavigatorKey.currentState!.pop(result),
+                child: Navigator(
+                  key: _contentNavigatorKey,
+                  onGenerateRoute: (settings) => MaterialPageRoute<void>(
+                    settings: settings,
+                    builder: (context) => switch (settings.name) {
+                      "/" => _buildWebHome(context),
+                      "/settings" => const SettingsScreen(),
+                      "/change-password" => const ChangePasswordScreen(),
+                      _ => throw StateError(
+                        "Unknown content route: ${settings.name}",
+                      ),
+                    },
+                  ),
                 ),
               ),
             ),
@@ -428,4 +445,20 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: kIsWeb || isWide ? null : _buildBottomNavigation(),
     );
   }
+}
+
+class _NoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _NoPageTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration => Duration.zero;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => child;
 }
