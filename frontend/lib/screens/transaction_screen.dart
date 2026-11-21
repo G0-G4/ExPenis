@@ -8,9 +8,11 @@ import 'package:expenis_mobile/theme.dart';
 import 'package:expenis_mobile/utils/format.dart';
 import 'package:expenis_mobile/widgets/app_empty_state.dart';
 import 'package:expenis_mobile/widgets/app_error_state.dart';
+import "package:expenis_mobile/widgets/personal_greeting_banner.dart";
 
 class TransactionScreen extends StatefulWidget {
-  const TransactionScreen({super.key});
+  final bool isActive;
+  const TransactionScreen({super.key, this.isActive = true});
 
   @override
   State<TransactionScreen> createState() => _TransactionScreenState();
@@ -23,6 +25,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
   List<Transaction> _transactions = [];
   bool _isFirstLoad = true;
   bool _isLoading = false;
+  int _greetingRefreshRevision = 0;
   String? _loadError;
 
   @override
@@ -79,7 +82,10 @@ class _TransactionScreenState extends State<TransactionScreen> {
     _loadTransactions();
   }
 
-  void _refresh() => _loadTransactions();
+  void _refresh() {
+    setState(() => _greetingRefreshRevision++);
+    _loadTransactions();
+  }
 
   String _formatDate(DateTime date) {
     const months = [
@@ -121,6 +127,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
         title: const Text('Transactions'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: "Refresh",
+            onPressed: _refresh,
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add transaction',
             onPressed: () async {
@@ -154,6 +165,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
               onTap: _selectDate,
             ),
 
+            PersonalGreetingBanner(
+              active: widget.isActive,
+              refreshRevision: _greetingRefreshRevision,
+            ),
+
             // ── Loading indicator (outside AnimatedSwitcher) ──────────
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -177,14 +193,18 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
   Widget _buildContent() {
     if (_loadError != null) {
-      return AppErrorState(message: _loadError!, onRetry: _refresh);
+      return _scrollableState(
+        AppErrorState(message: _loadError!, onRetry: _refresh),
+      );
     }
 
     if (_transactions.isEmpty) {
-      return const AppEmptyState(
-        icon: Icons.swap_horiz_outlined,
-        title: 'No transactions',
-        subtitle: 'Tap + to record a transaction',
+      return _scrollableState(
+        const AppEmptyState(
+          icon: Icons.swap_horiz_outlined,
+          title: 'No transactions',
+          subtitle: 'Tap + to record a transaction',
+        ),
       );
     }
 
@@ -242,6 +262,17 @@ class _TransactionScreenState extends State<TransactionScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _scrollableState(Widget child) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
+      ),
     );
   }
 

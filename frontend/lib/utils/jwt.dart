@@ -1,5 +1,18 @@
 import "dart:convert";
 
+String? jwtSubject(String token) {
+  try {
+    final parts = token.split(".");
+    if (parts.length != 3) return null;
+    final payload = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    );
+    return payload is Map<String, dynamic> ? payload["sub"]?.toString() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 DateTime? jwtExpiry(String token) {
   try {
     final parts = token.split(".");

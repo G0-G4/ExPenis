@@ -3,7 +3,7 @@
   "info": {
     "title": "ExPenis API",
     "description": "API сервиса для учёта личных доходов и расходов. Поддерживает работу с пользователями, счетами, категориями и транзакциями.",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "paths": {
     "/api/telemetry": {
@@ -703,6 +703,126 @@
             }
           }
         }
+      }
+    },
+    "/api/me/greeting": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Получить активное персональное сообщение",
+        "description": "Возвращает сообщение текущего пользователя или greeting: null, если его нет, оно закрыто или срок показа закончился.",
+        "operationId": "getPersonalGreeting",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalGreetingResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется авторизация",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/me/greeting/{assignment_id}/dismiss": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Закрыть персональное сообщение",
+        "description": "Закрывает только указанное назначение текущего пользователя. Повторный, устаревший или чужой идентификатор не меняет другие сообщения.",
+        "operationId": "dismissPersonalGreeting",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется авторизация",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "description": "Идентификатор попытки запроса при включённой телеметрии.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/me/password": {
@@ -1696,6 +1816,57 @@
           "new_password"
         ],
         "title": "PasswordChangeRequest"
+      },
+      "PersonalGreetingDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "expires_at"
+        ],
+        "title": "PersonalGreetingDto"
+      },
+      "PersonalGreetingResponse": {
+        "properties": {
+          "greeting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonalGreetingDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "greeting"
+        ],
+        "title": "PersonalGreetingResponse"
       },
       "ReadinessResponse": {
         "properties": {

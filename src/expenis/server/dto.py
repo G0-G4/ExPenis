@@ -1,9 +1,20 @@
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
 from src.expenis.core.utils.currency_codes import CODES
+
+
+class PersonalGreetingDto(BaseModel):
+    id: UUID
+    text: str
+    expires_at: datetime | None
+
+
+class PersonalGreetingResponse(BaseModel):
+    greeting: PersonalGreetingDto | None
 
 
 class Transaction(BaseModel):

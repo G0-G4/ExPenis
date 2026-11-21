@@ -21,7 +21,7 @@ def _create_test_database() -> str:
 os.environ["EXPENIS_DB_PATH"] = _create_test_database()
 
 from src.expenis.core.models import (  # noqa: E402
-    Account, Category, Tag, Transaction, TransactionTag, User, db,
+    Account, Category, PersonalGreeting, Tag, Transaction, TransactionTag, User, db,
 )
 from src.expenis.core.models.database import DEFAULT_DB_PATH  # noqa: E402
 
@@ -34,9 +34,10 @@ assert Path(db.database).resolve() != Path(DEFAULT_DB_PATH).resolve(), (
 async def run_before_each_test():
     async with db:
         await db.run(lambda: db.create_tables(
-            [User, Account, Category, Transaction, Tag, TransactionTag],
+            [User, Account, Category, Transaction, Tag, TransactionTag, PersonalGreeting],
             safe=True,
         ))
+        await db.run(PersonalGreeting.truncate_table)
         await db.run(TransactionTag.truncate_table)
         await db.run(Tag.truncate_table)
         await db.run(Transaction.truncate_table)

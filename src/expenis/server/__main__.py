@@ -53,6 +53,12 @@ async def _generate_token(username: str, days: int) -> None:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "greeting":
+        from .greeting_cli import greeting_main
+
+        greeting_main(sys.argv[2:])
+        return
+
     if len(sys.argv) > 1 and sys.argv[1] == "token":
         parser = argparse.ArgumentParser(
             description="Generate a long-lived JWT token for LLM agents or automation."
