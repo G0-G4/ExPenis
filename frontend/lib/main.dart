@@ -182,7 +182,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _pageController = PageController(
     initialPage: _defaultTabIndex,
   );
-  int _currentPageIndex = _defaultTabIndex;
+  final _selectedTab = ValueNotifier<int>(_defaultTabIndex);
+  final _contentNavigatorKey = GlobalKey<NavigatorState>();
+  int get _currentPageIndex => _selectedTab.value;
   // Keeps the PageView (and its pages' state) alive when the window crosses
   // the rail/bottom-bar breakpoint and the widget moves in the tree.
   final GlobalKey _pagesKey = GlobalKey();
@@ -202,12 +204,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _selectedTab.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
   void _onDestinationSelected(int index) {
-    setState(() => _currentPageIndex = index);
+    _contentNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+    setState(() => _selectedTab.value = index);
     _pageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 250),
@@ -215,11 +219,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  NavigatorState get _contentNavigator =>
+      _contentNavigatorKey.currentState ?? Navigator.of(context);
+
   void _openAnalytics() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TransactionStatsScreen(
+    if (kIsWeb) _contentNavigator.popUntil((route) => route.isFirst);
+    _contentNavigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => TransactionStatsScreen(
           initialEndDate: DateTime.now(),
           initialGroupByMonth: true,
         ),
@@ -228,154 +235,197 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openSettings() {
-    Navigator.pushNamed(context, "/settings");
+    if (kIsWeb) _contentNavigator.popUntil((route) => route.isFirst);
+    _contentNavigator.pushNamed("/settings");
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Wide windows (desktop, web, tablets in landscape) get a side rail
-    // instead of the bottom bar, and the pages stop stretching edge to edge.
-    final isWide = MediaQuery.sizeOf(context).width >= Breakpoints.medium;
-    final pages = PageView(
+  Widget _buildPages() => ValueListenableBuilder<int>(
+    valueListenable: _selectedTab,
+    builder: (context, selectedTab, _) => PageView(
       key: _pagesKey,
       controller: _pageController,
       physics: const NeverScrollableScrollPhysics(),
-      onPageChanged: (index) => setState(() => _currentPageIndex = index),
+      onPageChanged: (index) => setState(() => _selectedTab.value = index),
       children: [
         const ResponsiveCenter(child: AccountScreen()),
-        ResponsiveCenter(
-          child: TransactionScreen(isActive: _currentPageIndex == 1),
-        ),
+        ResponsiveCenter(child: TransactionScreen(isActive: selectedTab == 1)),
         const ResponsiveCenter(child: CategoryScreen()),
       ],
-    );
+    ),
+  );
 
-    return Scaffold(
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+  Widget _buildDrawer() => Drawer(
+    child: ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        DrawerHeader(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                "My Pennies",
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    "My Pennies",
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
+              if (_appVersion != null)
+                Text(
+                  _appVersion!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onPrimary.withValues(alpha: 0.8),
                   ),
-                  if (_appVersion != null)
-                    Text(
-                      _appVersion!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary.withValues(alpha: 0.8),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+            ],
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.insights_outlined),
+          title: const Text("Monthly analytics"),
+          onTap: () {
+            Navigator.pop(context);
+            _openAnalytics();
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.settings_outlined),
+          title: const Text("Settings"),
+          onTap: () {
+            Navigator.pop(context);
+            _openSettings();
+          },
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildRail() => SafeArea(
+    right: false,
+    child: NavigationRail(
+      selectedIndex: _currentPageIndex,
+      onDestinationSelected: _onDestinationSelected,
+      labelType: NavigationRailLabelType.all,
+      groupAlignment: -1,
+      destinations: const [
+        NavigationRailDestination(
+          icon: Icon(Icons.account_balance_outlined),
+          selectedIcon: Icon(Icons.account_balance),
+          label: Text("Accounts"),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.swap_horiz_outlined),
+          selectedIcon: Icon(Icons.swap_horiz),
+          label: Text("Transactions"),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.folder_outlined),
+          selectedIcon: Icon(Icons.folder),
+          label: Text("Categories"),
+        ),
+      ],
+      trailing: Padding(
+        padding: const EdgeInsets.only(top: AppTheme.space24),
+        child: Column(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.insights_outlined),
+              tooltip: "Monthly analytics",
+              onPressed: _openAnalytics,
             ),
-            ListTile(
-              leading: const Icon(Icons.insights_outlined),
-              title: const Text("Monthly analytics"),
-              onTap: () {
-                Navigator.pop(context);
-                _openAnalytics();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text("Settings"),
-              onTap: () {
-                Navigator.pop(context);
-                _openSettings();
-              },
+            const SizedBox(height: AppTheme.space8),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: "Settings",
+              onPressed: _openSettings,
             ),
           ],
         ),
       ),
+    ),
+  );
+
+  Widget _buildBottomNavigation() => NavigationBar(
+    selectedIndex: _currentPageIndex,
+    onDestinationSelected: _onDestinationSelected,
+    destinations: const [
+      NavigationDestination(
+        icon: Icon(Icons.account_balance_outlined),
+        selectedIcon: Icon(Icons.account_balance),
+        label: "Accounts",
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.swap_horiz_outlined),
+        selectedIcon: Icon(Icons.swap_horiz),
+        label: "Transactions",
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.folder_outlined),
+        selectedIcon: Icon(Icons.folder),
+        label: "Categories",
+      ),
+    ],
+  );
+
+  Widget _buildWebHome(BuildContext context) {
+    final isWide = MediaQuery.sizeOf(context).width >= Breakpoints.medium;
+    return ValueListenableBuilder<int>(
+      valueListenable: _selectedTab,
+      builder: (context, _, _) => Scaffold(
+        body: _buildPages(),
+        bottomNavigationBar: isWide ? null : _buildBottomNavigation(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.sizeOf(context).width >= Breakpoints.medium;
+    // Keep web navigation inside the content pane, even across window resizes.
+    // Forms still use their nearest Navigator and return results to the lists.
+    final content = kIsWeb
+        ? Semantics(
+            // Modal routes must only block semantics inside the content pane.
+            container: true,
+            explicitChildNodes: true,
+            child: NavigatorPopHandler<Object?>(
+              onPopWithResult: (result) =>
+                  _contentNavigatorKey.currentState!.pop(result),
+              child: Navigator(
+                key: _contentNavigatorKey,
+                onGenerateRoute: (settings) => MaterialPageRoute<void>(
+                  settings: settings,
+                  builder: (context) => switch (settings.name) {
+                    "/" => _buildWebHome(context),
+                    "/settings" => const SettingsScreen(),
+                    "/change-password" => const ChangePasswordScreen(),
+                    _ => throw StateError(
+                      "Unknown content route: ${settings.name}",
+                    ),
+                  },
+                ),
+              ),
+            ),
+          )
+        : _buildPages();
+
+    return Scaffold(
+      drawer: _buildDrawer(),
       body: isWide
           ? Row(
               children: [
-                SafeArea(
-                  right: false,
-                  child: NavigationRail(
-                    selectedIndex: _currentPageIndex,
-                    onDestinationSelected: _onDestinationSelected,
-                    labelType: NavigationRailLabelType.all,
-                    groupAlignment: -1,
-                    destinations: const [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.account_balance_outlined),
-                        selectedIcon: Icon(Icons.account_balance),
-                        label: Text("Accounts"),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.swap_horiz_outlined),
-                        selectedIcon: Icon(Icons.swap_horiz),
-                        label: Text("Transactions"),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.folder_outlined),
-                        selectedIcon: Icon(Icons.folder),
-                        label: Text("Categories"),
-                      ),
-                    ],
-                    trailing: Padding(
-                      padding: const EdgeInsets.only(top: AppTheme.space24),
-                      child: Column(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.insights_outlined),
-                            tooltip: "Monthly analytics",
-                            onPressed: _openAnalytics,
-                          ),
-                          const SizedBox(height: AppTheme.space8),
-                          IconButton(
-                            icon: const Icon(Icons.settings_outlined),
-                            tooltip: "Settings",
-                            onPressed: _openSettings,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                _buildRail(),
                 const VerticalDivider(width: 1),
-                Expanded(child: pages),
+                Expanded(child: content),
               ],
             )
-          : pages,
-      bottomNavigationBar: isWide
-          ? null
-          : NavigationBar(
-              selectedIndex: _currentPageIndex,
-              onDestinationSelected: _onDestinationSelected,
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.account_balance_outlined),
-                  selectedIcon: Icon(Icons.account_balance),
-                  label: "Accounts",
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.swap_horiz_outlined),
-                  selectedIcon: Icon(Icons.swap_horiz),
-                  label: "Transactions",
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.folder_outlined),
-                  selectedIcon: Icon(Icons.folder),
-                  label: "Categories",
-                ),
-              ],
-            ),
+          : content,
+      bottomNavigationBar: kIsWeb || isWide ? null : _buildBottomNavigation(),
     );
   }
 }

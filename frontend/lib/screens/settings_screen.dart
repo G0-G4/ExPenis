@@ -69,7 +69,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       await settingsService.clearAuth();
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil("/login", (_) => false);
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil("/login", (_) => false);
     } finally {
       if (mounted) setState(() => _isLoggingOut = false);
     }
