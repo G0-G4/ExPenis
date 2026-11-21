@@ -1,6 +1,6 @@
 ## Purpose
 
-Позволяет вычислять денежные суммы непосредственно в полях ввода операций и баланса счёта, проверять итог до сохранения и набирать выражения на единой клавиатуре калькулятора на телефоне.
+Позволяет вычислять денежные суммы непосредственно в полях ввода операций и баланса счёта, проверять итог до сохранения и набирать выражения через системную клавиатуру телефона или физическую клавиатуру.
 
 ## ADDED Requirements
 
@@ -87,28 +87,33 @@ The application SHALL prevent saving empty, incomplete, invalid, or non-finite e
 - **WHEN** the user corrects `100/0` to `100/2`
 - **THEN** the error is cleared and the preview represents `50`
 
-### Requirement: Unified calculator keyboard on phones
-On phones, including phone browsers, focusing a monetary field SHALL present one in-app bottom keyboard containing digits, decimal separator, arithmetic operators, parentheses, delete and Done. The system software keyboard SHALL NOT appear simultaneously. Button input SHALL insert at the caret or replace the selection; delete SHALL remove the selection or the preceding character. The field and preview SHALL remain visible above the keyboard. Done SHALL dismiss the keyboard without saving the form or replacing the expression; leaving the field or using the platform back action SHALL also allow dismissal. Desktop users SHALL be able to type expressions with a physical keyboard and paste expressions.
+### Requirement: Native keyboard input
+The application SHALL request ordinary text input for monetary fields on phones and in browsers, allowing arithmetic operators and decimal separators. The application SHALL NOT show an in-app calculator keyboard or force a particular internal layout of the installed system keyboard. Users SHALL be able to switch their keyboard to its symbols or numeric layout manually. Native caret, selection, deletion and paste behavior SHALL remain available. The field and result preview SHALL remain visible above the system keyboard. The keyboard Done action SHALL finish editing without saving the form or replacing the expression. Desktop users SHALL be able to type or paste expressions with a physical keyboard.
 
-#### Scenario: Unified phone input
+#### Scenario: Phone input
 - **WHEN** a phone user focuses a monetary field
-- **THEN** digits and arithmetic operators are available together in the bottom keyboard and the field and preview remain visible
+- **THEN** the application requests the system text keyboard and shows no custom calculator panel
+- **AND** the field and preview remain visible when the software keyboard occupies screen space
 
-#### Scenario: Caret insertion and selection replacement
-- **WHEN** the user positions the caret inside an expression or selects part of it and taps a calculator key
-- **THEN** input is inserted at that caret or replaces the selection
+#### Scenario: System keyboard layout choice
+- **WHEN** the user switches the system keyboard to symbols or its numeric panel
+- **THEN** arithmetic input is accepted without the application replacing or controlling that keyboard layout
+
+#### Scenario: Native selection and replacement
+- **WHEN** the user selects part of an expression and types or pastes replacement text
+- **THEN** the selection is replaced and the preview is recomputed from the resulting expression
 
 #### Scenario: Finish input without submitting
-- **WHEN** the user taps Done after entering `120+80`
-- **THEN** the keyboard closes, the expression remains in the field, and the form is not submitted
+- **WHEN** the user activates the keyboard Done action after entering `120+80`
+- **THEN** editing finishes, the expression remains in the field, and the form is not submitted
 
 #### Scenario: Switch to a text field
-- **WHEN** the user moves focus from a monetary field to the description field on a phone
-- **THEN** the calculator keyboard closes and ordinary text input is available
+- **WHEN** the user moves focus from a monetary field to the description field
+- **THEN** ordinary text input is available through the same system keyboard
 
 #### Scenario: Desktop input
 - **WHEN** a desktop user types or pastes `(120+80)/2` into a monetary field
-- **THEN** the preview represents `100` without requiring the on-screen calculator keyboard
+- **THEN** the preview represents `100`
 
 ### Requirement: Persist only the evaluated amount
 The application SHALL send only the rounded numeric amount through the existing monetary API fields. The original expression SHALL NOT be persisted. Reopening a saved operation or account SHALL populate the field with the stored numeric amount or current account balance.

@@ -4,7 +4,6 @@ import "package:flutter/services.dart";
 import "package:flutter_test/flutter_test.dart";
 
 import "package:expenis_mobile/utils/amount_expression.dart";
-import "package:expenis_mobile/widgets/amount_calculator_keyboard.dart";
 import "package:expenis_mobile/widgets/amount_expression_field.dart";
 
 void main() {
@@ -36,34 +35,32 @@ void main() {
           child: child!,
         ),
         home: Scaffold(
-          body: AmountInputScope(
-            child: Form(
-              key: form,
-              child: ListView(
-                children: [
-                  const SizedBox(height: 40),
-                  AmountExpressionField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: "Amount",
-                      suffixText: "RUB",
-                    ),
+          body: Form(
+            key: form,
+            child: ListView(
+              children: [
+                const SizedBox(height: 40),
+                AmountExpressionField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: "Amount",
+                    suffixText: "RUB",
                   ),
-                  const TextField(
-                    decoration: InputDecoration(labelText: "Description"),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      if (form.currentState!.validate()) {
-                        saved.add(
-                          evaluateAmountExpression(controller.text).amount!,
-                        );
-                      }
-                    },
-                    child: const Text("Save"),
-                  ),
-                ],
-              ),
+                ),
+                const TextField(
+                  decoration: InputDecoration(labelText: "Description"),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (form.currentState!.validate()) {
+                      saved.add(
+                        evaluateAmountExpression(controller.text).amount!,
+                      );
+                    }
+                  },
+                  child: const Text("Save"),
+                ),
+              ],
             ),
           ),
         ),
@@ -73,7 +70,6 @@ void main() {
   }
 
   Finder amount() => find.byType(TextField).first;
-  Finder key(String value) => find.byKey(ValueKey("calculator-$value"));
 
   testWidgets("preview preserves expression, currency and submitted rounding", (
     tester,
@@ -87,7 +83,6 @@ void main() {
     await tester.tap(find.text("Save"));
     await tester.pump();
     expect(saved, [1.01]);
-    expect(find.byType(AmountCalculatorKeyboard), findsNothing);
     await tester.pumpWidget(const SizedBox());
     controller.dispose();
   });
@@ -132,142 +127,83 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets(
-    "phone keypad inserts at caret, replaces selection, deletes and keeps focus",
-    (tester) async {
-      await mount(tester, size: const Size(390, 844));
-      await tester.tap(amount());
-      await tester.pumpAndSettle();
-      expect(find.byType(AmountCalculatorKeyboard), findsOneWidget);
-      expect(
-        tester.widget<TextField>(amount()).keyboardType,
-        TextInputType.none,
-      );
-      for (final value in [
-        "7",
-        "8",
-        "9",
-        "÷",
-        "(",
-        "×",
-        ")",
-        "−",
-        "+",
-        ".",
-        "⌫",
-        "Done",
-      ]) {
-        expect(key(value), findsOneWidget);
-      }
-      controller.value = const TextEditingValue(
-        text: "12+3",
-        selection: TextSelection.collapsed(offset: 2),
-      );
-      await tester.tap(key("0"));
-      await tester.pump();
-      expect(controller.text, "120+3");
-      controller.selection = const TextSelection(
-        baseOffset: 0,
-        extentOffset: 3,
-      );
-      await tester.tap(key("4"));
-      await tester.pump();
-      expect(controller.text, "4+3");
-      expect(tester.widget<TextField>(amount()).focusNode!.hasFocus, isTrue);
-      controller.selection = const TextSelection(
-        baseOffset: 1,
-        extentOffset: 3,
-      );
-      await tester.tap(key("⌫"));
-      await tester.pump();
-      expect(controller.text, "4");
-      await tester.tap(key("⌫"));
-      await tester.pump();
-      expect(controller.text, "");
-      await tester.tap(key("⌫"));
-      await tester.pump();
-      expect(controller.text, "");
-      controller.text = "120+80";
-      await tester.tap(key("Done"));
-      await tester.pumpAndSettle();
-      expect(find.byType(AmountCalculatorKeyboard), findsNothing);
-      expect(controller.text, "120+80");
-      expect(saved, isEmpty);
-      await tester.pumpWidget(const SizedBox());
-      controller.dispose();
-    },
-  );
-
-  testWidgets("phone focus switch, back, resize, landscape and text scaling", (
+  testWidgets("phone requests native text input and Done does not submit", (
     tester,
   ) async {
-    await mount(tester, size: const Size(844, 390), scale: 2);
+    await mount(tester, size: const Size(390, 844));
     await tester.tap(amount());
+    await tester.enterText(amount(), "120+80");
     await tester.pumpAndSettle();
-    controller.text = "100/3";
-    await tester.pumpAndSettle();
-    final preview = find.text("= 33.33");
-    expect(preview, findsOneWidget);
-    expect(
-      tester.getBottomLeft(preview).dy,
-      lessThan(tester.getTopLeft(find.byType(AmountCalculatorKeyboard)).dy),
-    );
-    expect(tester.takeException(), isNull);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byType(AmountCalculatorKeyboard), findsNothing);
-    await tester.tap(amount());
-    await tester.pumpAndSettle();
-    // Scroll the remaining form into view while the keyboard is open.
-    await tester.ensureVisible(find.byType(TextField).last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(TextField).last);
-    await tester.pumpAndSettle();
-    expect(find.byType(AmountCalculatorKeyboard), findsNothing);
-    await tester.ensureVisible(amount());
-    await tester.pumpAndSettle();
-    await tester.tap(amount());
-    await tester.pumpAndSettle();
-    tester.view.physicalSize = const Size(1000, 900);
-    await tester.pumpAndSettle();
-    expect(find.byType(AmountCalculatorKeyboard), findsNothing);
     expect(tester.widget<TextField>(amount()).keyboardType, TextInputType.text);
-    await tester.enterText(amount(), "(120+80)/2");
-    await tester.sendKeyEvent(LogicalKeyboardKey.end);
-    await tester.pump();
-    expect(controller.text, "(120+80)/2");
-    expect(find.text("= 100"), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(find.text("= 200"), findsOneWidget);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, "120+80");
+    expect(saved, isEmpty);
+    expect(tester.widget<TextField>(amount()).focusNode!.hasFocus, isFalse);
     await tester.pumpWidget(const SizedBox());
     controller.dispose();
   });
+
+  testWidgets("native selection replacement and deletion recompute result", (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await mount(tester, size: const Size(390, 844));
+    await tester.enterText(amount(), "100/3");
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pumpAndSettle();
+    expect(
+      controller.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 5),
+    );
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: "2/4",
+        selection: TextSelection.collapsed(offset: 3),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text("= 0.50"), findsOneWidget);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: "2/",
+        selection: TextSelection.collapsed(offset: 2),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text("= 0.50"), findsNothing);
+    await tester.tap(find.byType(TextField).last);
+    await tester.pumpAndSettle();
+    expect(find.text("Please complete the expression"), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets(
-    "phone physical select-all keeps selection for keypad replacement",
+    "preview remains visible above native keyboard inset after rotation",
     (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      await mount(tester, size: const Size(390, 844));
-      await tester.tap(amount());
+      await mount(tester, size: const Size(390, 844), scale: 2);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.enterText(amount(), "100/3");
       await tester.pumpAndSettle();
-      controller.value = const TextEditingValue(
-        text: "100/3",
-        selection: TextSelection.collapsed(offset: 5),
-      );
-      await tester.pumpAndSettle();
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      expect(tester.getBottomLeft(find.text("= 33.33")).dy, lessThan(544));
+      tester.view.physicalSize = const Size(844, 390);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 180);
       await tester.pumpAndSettle();
       expect(
-        controller.selection,
-        const TextSelection(baseOffset: 0, extentOffset: 5),
+        tester.getBottomLeft(find.text("= 33.33")).dy,
+        lessThanOrEqualTo(210),
       );
-      await tester.tap(key("2"));
-      await tester.pumpAndSettle();
-      expect(controller.text, "2");
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       controller.dispose();
-      debugDefaultTargetPlatformOverride = null;
     },
   );
 }

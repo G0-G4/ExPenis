@@ -2,7 +2,6 @@ import "package:flutter/material.dart";
 
 import "package:expenis_mobile/utils/amount_expression.dart";
 import "package:expenis_mobile/utils/format.dart";
-import "package:expenis_mobile/widgets/amount_calculator_keyboard.dart";
 
 class AmountExpressionField extends FormField<AmountExpressionResult> {
   AmountExpressionField({
@@ -28,7 +27,6 @@ class _AmountExpressionFieldState
     extends FormFieldState<AmountExpressionResult> {
   final _focus = FocusNode();
   final _fieldKey = GlobalKey();
-  AmountInputScopeState? _scope;
   bool _showValidation = false;
 
   @override
@@ -44,7 +42,7 @@ class _AmountExpressionFieldState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _scope = AmountInputScope.maybeOf(context);
+    if (_focus.hasFocus) _revealField();
   }
 
   @override
@@ -60,16 +58,25 @@ class _AmountExpressionFieldState
   void _changed() {
     didChange(evaluateAmountExpression(widget.controller.text));
     if (_showValidation) validate();
-    if (_focus.hasFocus) _scope?.revealField();
+    if (_focus.hasFocus) _revealField();
   }
 
   void _focusChanged() {
     if (_focus.hasFocus) {
-      _scope?.showForField(widget.controller, _focus, _fieldKey);
+      _revealField();
     } else {
       validate();
-      _scope?.deactivateField(_focus);
     }
+  }
+
+  void _revealField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_focus.hasFocus) return;
+      final fieldContext = _fieldKey.currentContext;
+      if (fieldContext != null) {
+        Scrollable.ensureVisible(fieldContext, alignment: 0.5);
+      }
+    });
   }
 
   @override
@@ -82,32 +89,24 @@ class _AmountExpressionFieldState
   void dispose() {
     widget.controller.removeListener(_changed);
     _focus.removeListener(_focusChanged);
-    _scope?.deactivateField(_focus);
     _focus.dispose();
     super.dispose();
   }
 
   Widget _buildField() {
     final result = value ?? evaluateAmountExpression(widget.controller.text);
-    final phone =
-        MediaQuery.sizeOf(context).shortestSide < 600 && _scope != null;
     final immediateError =
         result.status == AmountExpressionStatus.divisionByZero;
     return TextField(
       key: _fieldKey,
       controller: widget.controller,
       focusNode: _focus,
-      keyboardType: phone ? TextInputType.none : TextInputType.text,
+      keyboardType: TextInputType.text,
+      textInputAction: TextInputAction.done,
+      onEditingComplete: () => _focus.unfocus(),
       autocorrect: false,
       enableSuggestions: false,
       selectAllOnFocus: false,
-      onTap: () {
-        if (_focus.hasFocus) {
-          _scope?.showForField(widget.controller, _focus, _fieldKey);
-        }
-      },
-      // Touching the calculator is still interacting with this field. Other
-      // taps (including touch on mobile) finish input and run validation.
       onTapOutside: (_) => _focus.unfocus(),
       decoration: widget.decoration.copyWith(
         helperText: result.isValid ? "= ${formatAmount(result.amount!)}" : null,
