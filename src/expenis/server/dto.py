@@ -179,3 +179,14 @@ class MeResponse(BaseModel):
     id: int
     username: str | None
     telegram_id: int | None
+
+
+class ExportAccountDto(BaseModel):
+    id: int
+    name: str
+    currency_code: str
+    is_deleted: bool
+
+
+class ExportAccountsResponse(BaseModel):
+    accounts: list[ExportAccountDto]

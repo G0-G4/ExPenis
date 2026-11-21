@@ -1,0 +1,13 @@
+{
+  "csv": {
+    "rows": 20000,
+    "seconds": 1.138,
+    "bytes": 2480168
+  },
+  "xlsx": {
+    "rows": 20000,
+    "seconds": 1.93,
+    "bytes": 650285
+  },
+  "peak_rss_mib": 227.0
+}
