@@ -68,6 +68,20 @@ It is normal for the versions to diverge. Example:
 
 The git tag `vX.Y.Z` is **always** taken from `pubspec.yaml` (the build number after `+` is ignored for the tag).
 
+**Coordinate backend and client releases — REQUIRED:**
+
+- Before releasing, check both combinations: new client with the deployed backend,
+  and existing supported clients with the new backend.
+- Keep backend changes backward compatible: preserve existing request/response
+  contracts and behavior; prefer additive changes with compatible defaults.
+  Cover old-client API scenarios with regression tests.
+- If a new client requires an updated backend, deploy its migrations and backend
+  first, then verify readiness and compatibility with old clients. Only after
+  those checks publish the client release and deploy Web. Publishing a GitHub
+  Release makes the APK available to existing clients' auto-update checks.
+- For an unavoidable breaking change, use a staged migration or a versioned API
+  so existing clients keep working throughout the rollout.
+
 Before publishing a release — REQUIRED:
 1. Bump `version:` in `frontend/pubspec.yaml` (major/minor/patch + build number).
 2. (Optional) If the backend changed, bump `version = "..."` in `pyproject.toml`.
